@@ -1,6 +1,9 @@
-# Dune II XMS compatibility patch for NuXT
+# Dune II fixes for NuXT
 
-A small patching tool for a specific pair of DOS Dune II executables. It fixes
+The combined fix for my US 1.07 copy of Dune II. Both fixes are working well
+on the NuXT: it keeps the XMS workaround and skips the manual-word check.
+
+A small patching tool for a specific pair of DOS executables. It fixes
 startup failure with UMB-only memory managers that advertise an XMS interface:
 
 ```text
@@ -14,7 +17,9 @@ modify CONFIG.SYS, add a TSR or consume additional resident memory.
 
 ## Use your own game files
 
-No game executables or data are included. On Linux (Python 3.10+):
+No game executables or data are included. Use your original SETUP.EXE and
+DUNE2.EXE as inputs, even if you already have the older XMS-only patch.
+On Linux (Python 3.10+):
 
 ```sh
 python3 patch.py /path/to/your/DUNE2 --check
@@ -27,20 +32,20 @@ rejected rather than patched by guessing. The originals are never overwritten.
 If disk writing fails partway, remove the incomplete new output directory and
 retry with adequate space.
 
-Copy SETUPNX.EXE and DUNENX.EXE from that new directory to your DOS DUNE2 folder,
+Copy SETUPNX.EXE and DUNE2FX.EXE from that new directory to your DOS DUNE2 folder,
 keeping all your existing game data and original executables. Boot normally:
 
 ```dos
 C:
 CD \DUNE2
 SETUPNX
-DUNENX
+DUNE2FX
 ```
 
 Select AdLib music/effects, no digitized sound, and no extended memory if offered.
 SETUPNX writes the game's normal DUNE.CFG; both original/patched programs share
-that configuration. Use DUNENX to play. To undo the workaround, launch the
-original executables again or delete the two NX executables.
+that configuration. Use DUNE2FX to play. To undo the workaround, launch the
+original executables again or delete SETUPNX.EXE and DUNE2FX.EXE.
 
 ## Supported files and exact change
 
@@ -51,9 +56,14 @@ original executables again or delete the two NX executables.
 
 At SETUP file offset 0x8C33, and DUNE2 offsets 0x25368 and 0x2EB67, replace
 `CD 2F` (INT 2Fh) with `30 C0` (XOR AL,AL). These are AX=4300h XMS installation
-probes followed by a comparison against AL=80h. Six bytes change in total;
-all other bytes and executable sizes remain unchanged. Output hashes are
-verified by the tool. This is not a general patch for every Dune II release.
+probes followed by a comparison against AL=80h.
+
+The game also changes `74 07` to `90 90` at 0x17248 and `75 69` to `EB 69`
+at 0x1724F. That skips the whole manual-check block after missions 1 and 7,
+including its screen setup, through the existing continuation at 0x172BA.
+
+Both XMS fixes in the game remain applied. Seven bytes change in DUNE2.EXE
+and two in SETUP.EXE; executable sizes and all other bytes stay unchanged. Output hashes are verified by the tool. This is not a general patch for every Dune II release.
 
 ## Validation and references
 
@@ -62,6 +72,12 @@ controlled XMS stub advertising a manager but rejecting functions. Patched
 setup reached its menu and patched game reached the main menu under that same
 stub. The owner then confirmed the fix works on a real NuXT with USE!UMBS and
 DOSMAX. This is startup compatibility validation, not a complete playthrough.
+
+The combined build was also checked with the same XMS stub in QEMU. Targeted
+instruction tests verified that the old build entered the manual check after
+missions 1/7 and the new build skipped it, while retaining both XMS fixes. The
+owner confirmed the combined build works on the NuXT. This wasn't a complete
+campaign playthrough.
 
 The included tests use synthetic fixtures, not commercial game bytes:
 
@@ -73,6 +89,11 @@ Relevant interfaces and saved-config layout:
 - [Microsoft XMS specification](https://jnz.dk/swag/FAQ/0053.PAS.html)
 - [USE!UMBS documentation](https://retrocmp.de/hardware/above-plus/use!umbs.txt)
 - [OpenDUNE config layout](https://github.com/OpenDUNE/OpenDUNE/blob/master/src/config.h)
+
+The manual-check gate was identified using
+[Segra's Dune II reverse-engineering post](https://forum.dune2k.com/topic/20156-dune-2-concrete-bug-fix/)
+and matched against this exact US executable. Posted addresses from other
+versions must not be applied blindly. No unrelated gameplay patches are added.
 
 The patcher/tests are MIT licensed. Dune II and its executable code retain
 their respective owners' rights. Do not include generated game copies when

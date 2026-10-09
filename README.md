@@ -24,7 +24,8 @@ publishers in here.
 | [INVADERS](INVADERS/) | 1.0 | `INVADERS.COM` | EGA/VGA arcade game with AdLib effects |
 | [NUXTLINK](NUXTLINK/) | 3.1, current UI fixes | `dos/NUXFER.COM` or `NUXFER31.COM` | Verified serial transfers and Linux GUI |
 | [SUNSET](SUNSET/) | 3.1 | `SUNSET.EXE` | Endless neon road/palm demo and original synthwave score |
-| [DUNE2FIX](DUNE2FIX/) | 1.0 | Generate locally from your own executables | Dune II XMS detection compatibility patch |
+| [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Dune II XMS fix and manual-check removal |
+| [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | CPU, 8087, memory, video, BIOS and drive information |
 
 ORBIT87 and ORBITV20 share one source tree and are both built by its build
 script. No separate V20 project is missing. Each program's README.TXT contains

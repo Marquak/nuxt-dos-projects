@@ -24,6 +24,9 @@ all possible third-party claims.
   OPL2 score and instrument bank. The referenced synthwave recording is an
   inspiration, not a bundled sample, transcription or licensed recording.
   The Furnace audition contains project instrument parameters and test notes.
+- NUXTDASH: original assembly dashboard; BIOS/Trident/VBE documentation,
+  XTIDE structure definitions and the 8088 BIOS POST banner were references.
+  No firmware source or ROM is included.
 - DUNE2FIX: original compatibility patcher; metadata describes exact local game
   versions. No original or patched game executable, PAK, save or soundtrack
   is included. The patcher license grants no rights in Dune II itself.
@@ -47,7 +50,7 @@ See VALIDATION.md for the compiler version used for the snapshot rebuild.
 
 ## Development tools, not vendored dependencies
 
-GNU binutils builds INVADERS without a C runtime. Python and Tkinter run the
+GNU binutils builds INVADERS and NUXTDASH without a C runtime. Python and Tkinter run the
 Linux client and patcher. Pillow is an optional art-generation dependency;
 Unicorn, DOSBox and QEMU are optional test tools. Furnace can import the SBI
 instruments and audition S3M; its executable/source is not bundled. Installing

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create XMS-disabled copies of two exact Dune II executables. Python 3.10+."""
+"""Create NuXT XMS and manual-check fixes for exact US 1.07 Dune II files. Python 3.10+."""
 import argparse
 import hashlib
 import json
@@ -18,9 +18,11 @@ SPECS = {
     'DUNE2.EXE': {
         'size': 367760,
         'sha256': 'e4bc94e900508b156c12be704cc8d12c7b52432b07fe3a3b42f5ceae976ce54d',
-        'output': 'DUNENX.EXE',
+        'output': 'DUNE2FX.EXE',
         'offsets': (0x25368, 0x2EB67),
-        'patched_sha256': 'efc54a5bdcb195c632e8e482f7de8ec8af04be4eb84cb9c0e37101976962a3de',
+        'extra_patches': ((0x17248, b'\x74\x07', b'\x90\x90'),
+                          (0x1724F, b'\x75\x69', b'\xeb\x69')),
+        'patched_sha256': 'a02f63a5161ac171d1ea38be565afb5f98f7dcda2ef8a8050a78407987069085',
     },
 }
 
@@ -38,6 +40,12 @@ def patch_bytes(data, spec):
             raise ValueError('Expected XMS interrupt instruction not found')
         # INT 2Fh -> XOR AL,AL: report XMS absent to the following CMP AL,80h.
         result[offset:offset+2] = b'\x30\xc0'
+    # Skip the entire mission-1/7 manual-check block through its existing exit.
+    # Preserve both XMS changes above; do not import other unofficial fixes.
+    for offset, expected, replacement in spec.get('extra_patches', ()):
+        if len(expected) != len(replacement) or result[offset:offset+len(expected)] != expected:
+            raise ValueError('Expected manual-check branch not found')
+        result[offset:offset+len(expected)] = replacement
     result = bytes(result)
     if digest(result) != spec['patched_sha256']:
         raise ValueError('Patched checksum mismatch')
@@ -79,7 +87,7 @@ def main(argv=None):
                 stream.write(data)
         report = {name: digest(data) for name, data in files.items()}
         (args.output/'SHA256.json').write_text(json.dumps(report, indent=2)+'\n')
-        print(f'Created SETUPNX.EXE and DUNENX.EXE in {args.output}')
+        print(f'Created SETUPNX.EXE and DUNE2FX.EXE in {args.output}')
         print('Copy these two files into your DOS DUNE2 folder. Originals are unchanged.')
         return 0
     except (OSError, ValueError) as exc:

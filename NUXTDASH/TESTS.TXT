@@ -1,0 +1,68 @@
+NUXTDASH 1.3 - VERIFICATION
+==========================
+2026-10-09. DASH.COM: 10428 bytes; program allocation: 21600 bytes.
+SHA-256: 4605d3619252737db8c85fcfad2e4c398048d7b1ea21ade8cd25866e9a27c75c
+
+QEMU + MS-DOS 6.22, no 86Box:
+- System BIOS unknown banner handled correctly on SeaBIOS.
+- VBE-reported 16384 KiB shown with its source.
+- BIOS drive 80h: translated CHS and 34 MiB EDD capacity.
+- Configured 1.44 MB floppy shown; absent second drives labelled.
+- Six-page navigation, F6, wrap, refresh and DOS return.
+- All six pages exported to new numbered reports; old reports preserved.
+
+Assembled-code tests in Unicorn, with synthetic BIOS services/ROM images:
+- Trident 256/512 KiB fallback, VBE 512 KiB/64 MiB/full-range formatting.
+- Unsupported, malformed, zero-memory and legacy-video cases.
+- Old/new system BIOS banners, unknown/malformed/bounded near-ROM-end cases.
+- Actual r638 ROM header/title/revision/config fields at F000h; controller
+  bytes set in synthetic memory to NuXT-style 0170h/0178h/rev2 for this test.
+- EDD capacity, AH=15h fallback, CHS fallback at maximum 1024/256/63 geometry,
+  BIOS errors and phantom-drive responses. Only information calls issued.
+- Regression: UMB totals, holes, bounds and link restoration; x87 present/
+  absent logic; V20 speed arithmetic, non-NEC and stopped-timer cases.
+
+The owner confirmed the final 1.3 build works on the NuXT. No claim of physical
+VRAM testing, ATA identification or disk surface testing. A defective BIOS
+query can hang inside its handler. Actual startup performance on V20 depends
+on BIOS implementation. Historical 1.2 coverage and limitations follow.
+
+NUXTDASH 1.2 - VERIFICATION
+==========================
+2026-10-09; GNU binutils, .code16 / .arch i8086.
+DASH.COM: 7805 bytes; requested memory: 18976 bytes.
+SHA-256: 037b217581d4a8ecf8cdd1609019fff572a32c8e9dc16f926f2df77fb24e98e0
+
+MS-DOS 6.22 + QEMU 486, 8 MiB RAM, VGA; no 86Box tests.
+- Overview: DOS version, x87 response, unsupported-CPU speed shown correctly.
+- EMM386 NOEMS + DOS=HIGH,UMB: total/free/largest matched DOS MEM rounding.
+- DOSKEY loaded high: 135 KiB total, 4 KiB used, 131 KiB free/largest.
+- MEM before/after Dash exit: unchanged memory readings.
+- No UMB driver: None exposed by DOS, without fabricated physical-RAM claim.
+- Export and R refresh worked with and without the UMB driver.
+- Coprocessor probe preserved control/status/tag and all eight stack registers
+  with a non-default control word and live values. The test compares these
+  fields; it does not assert identical instruction/operand pointer fields
+  across its FSAVE/FRSTOR setup in QEMU.
+
+Instruction-level tests execute the assembled routines in Unicorn with
+synthetic DOS services, MCBs, x87 stores and BIOS ticks:
+- Upper free/used blocks, DOS SD block and excluded SC gap; header accounting.
+- Invalid MCB signature, segment wrap and invalid low segment rejected.
+- Original linked/unlinked state restored after successful and invalid scans.
+- Missing x87 response and five control-word values, including sentinel values.
+- CPU conversion for synthetic 4.77/7.16/9.55 MHz timing, non-NEC fallback,
+  and stopped synchronization timer. These verify logic, not physical timing.
+
+Inherited 1.1 coverage: all five pages, numeric/function/arrow navigation,
+numbered reports, status-only updates, monochrome/alternate-page/graphics/
+40-column startup and screen restoration. The 1.2 pass rechecks the changed
+pages and report paths; no new graphics-mode routines were introduced.
+
+LIMITS
+------
+Physical NEC timing calibration, NuXT USE!UMBS/DOSMAX totals and empty-8087
+socket behavior still need bare-metal testing. QEMU is not a V20/8087 timing
+model. No 286/386/8088 physical tests, alternate UMB managers or DOS 2 tests
+were performed. Disk failures and UMB-link restoration failure are handled
+but were not forced in the guest. CPU samples assume normal BIOS timer rate.

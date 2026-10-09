@@ -21,6 +21,30 @@ class PatchTests(unittest.TestCase):
         self.assertEqual(tool.patch_bytes(original, spec), expected)
         self.assertEqual(original[7:9], b'\xcd\x2f')
 
+    def combined_fixture(self):
+        # Synthetic instruction snippets, not an embedded commercial executable.
+        data = b'header' + b'\xcd\x2f' * 2 + b'\x74\x07\x75\x69' + b'end'
+        expected = b'header' + b'\x30\xc0' * 2 + b'\x90\x90\xeb\x69' + b'end'
+        spec = dict(size=len(data), sha256=tool.digest(data), output='DUNE2FX.EXE',
+                    offsets=(6, 8), extra_patches=((10, b'\x74\x07', b'\x90\x90'),
+                    (12, b'\x75\x69', b'\xeb\x69')), patched_sha256=tool.digest(expected))
+        return data, expected, spec
+
+    def test_combined_keeps_both_xms_fixes(self):
+        data, expected, spec = self.combined_fixture()
+        self.assertEqual(tool.patch_bytes(data, spec), expected)
+        self.assertEqual(data[6:10], b'\xcd\x2f' * 2)
+
+    def test_manual_check_opcode_guard(self):
+        data, _, spec = self.combined_fixture()
+        spec['extra_patches'] = ((10, b'\x75\x07', b'\x90\x90'),)
+        with self.assertRaises(ValueError): tool.patch_bytes(data, spec)
+
+    def test_patch_cannot_change_file_size(self):
+        data, _, spec = self.combined_fixture()
+        spec['extra_patches'] = ((10, b'\x74\x07', b'\x90'),)
+        with self.assertRaises(ValueError): tool.patch_bytes(data, spec)
+
     def test_unknown_version_rejected(self):
         data, _, spec = self.fixture()
         for bad in (data+b'!', b'X'+data[1:]):

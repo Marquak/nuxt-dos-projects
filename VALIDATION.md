@@ -4,6 +4,24 @@ This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
 
+## Dash 1.3 and Dune II 1.1 update
+
+The owner confirmed both final builds work well on the NuXT before this upload.
+
+- NUXTDASH rebuilt from the prepared source in an isolated directory using
+  GNU binutils. DASH.COM matched the tested 10,428-byte binary exactly.
+- DUNE2FIX: all 10 synthetic unit tests passed, including both retained XMS
+  edits, manual-check branch guards and refusing file-size changes.
+- The updated public patcher generated SETUPNX.EXE and DUNE2FX.EXE from the
+  owner's original files. Both matched the already-tested local builds exactly.
+  Commercial inputs and outputs stayed outside the repository.
+- The earlier QEMU and targeted instruction tests are recorded in the project
+  documentation. No emulator testing was repeated for this upload, and no
+  86Box tests were run.
+- Snapshot checksums were refreshed for the new project and patcher update.
+
+The checks below describe the earlier collection packaging pass.
+
 ## Rebuilds
 
 Open Watcom C/C++ 2.0 beta, Linux x86-64 tools built Oct 5 2026 06:25:14;
