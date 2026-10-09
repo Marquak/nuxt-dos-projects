@@ -1,0 +1,86 @@
+NuXT Menu 1.2 - validation
+
+Build: Open Watcom, 16-bit real mode, -0 -ms -os -fpc, warnings as errors.
+MENU.EXE has a 2 KiB stack; NUI.EXE has a 4 KiB stack. Link maps were
+checked for the DOS small-model 64 KiB data-segment limit. No FPU required.
+
+DOSBox: 29 configuration/data checks passed. These cover exact packed
+record size, save/load, previous-save backup, CRC failure, truncated files,
+recovery when the primary is missing, corrupt backup handling, invalid
+parents and cycles, unterminated fields, allowed program extensions, and
+DOS path validation. Added CRC check-vector/reference comparisons and
+recovery-save tests proving that a valid backup survives a damaged primary
+and that ordinary backup rotation resumes after repair. TEST.SH reproduces these in an isolated directory.
+
+MS-DOS 6.22 in a private QEMU image:
+- Started MENU from C:\APPS while its two EXEs were in C:\MENU.
+- Browsed from the menu directory through the root to a nested directory.
+- Added an EXE, edited its label and arguments, and launched it.
+- The child logged cwd=C:\APPS\SUB, /A and 123 as separate arguments.
+- The menu returned to the same submenu with the selected entry preserved.
+- Added and launched a BAT; it received hello and world as arguments.
+- Selected 80x43 and 80x50; QEMU VGA supplied 50 rows for both requests.
+  The interface uses the actual BIOS row count. Native 43-row timing has
+  not been verified on real VGA hardware.
+- Changed preset and custom colours; they persisted across child launches.
+- Cancelled an appearance edit and recovered the previous display settings.
+- Created, entered, reordered and removed an empty submenu.
+- Moved a program into a different submenu and found it there.
+- Opened the DOS prompt with F9, then EXIT returned to the menu.
+- F10 returned to DOS and restored the original C:\APPS working directory.
+- /SAFE restored Classic blue and 80x25 without deleting saved entries.
+- Cancelling an edited browser filter retained the previous filter.
+- An unavailable drive and a missing target produced readable errors.
+- Correcting the missing target with F4 allowed it to launch again.
+
+The final build was rerun through SAFE, filter cancellation, unavailable
+drive, missing/edited target launch, and exit after adding the conservative
+DOS command-line limit and guarding mouse-driver detection.
+
+Memory probe, identical child EXE with heap released:
+  Direct launch: 35,637 free paragraphs
+  From menu:     33,688 free paragraphs
+  Difference:     1,949 paragraphs = 31,184 bytes, about 30.5 KiB
+This includes the supervisor and the extra COMMAND.COM used for batch
+support. The larger UI process has exited before the child runs. Actual
+free memory varies with DOS, drivers, environment size and configuration.
+
+Mouse fixes in 1.1:
+- INT 33h release counters replace polling for button-down edges, retaining
+  quick clicks across redraws; held buttons do not repeat through menus.
+- Single-click opens submenus/browser directories; program double-clicks
+  allow one second. A quick second click after opening a folder is ignored.
+- Reset the mouse driver after video/font changes, then set text bounds.
+- The binary configuration format is unchanged; existing menus still load.
+
+CuteMouse v2.0 alpha 4 in private MS-DOS 6.22/QEMU images, using emulated
+PS/2 and Microsoft serial mice (COM2). Input was injected through QEMU
+mouse events, not keyboard substitutes or simulated INT 33h responses:
+- Single-click Games, Demos and a newly created nested submenu.
+  Serial-mouse clicks used 35 ms button holds; PS/2 used 80 ms.
+- Right-click returns to parent; double-click does not fall through into
+  a child, and holding the button does not traverse nested menus.
+- Click the F2 toolbar; browse root, APPS and SUB directories by mouse.
+- Double-click an EXE in the browser, add it, double-click to launch, then
+  return to the menu with mouse support still working.
+- Click top menu entries and bottom toolbar after every screen-layout
+  selection: actual 25 and 50 rows. See the 43-row BIOS limitation above.
+- F10 restores DOS. Mouse movement/hit positions were verified in text RAM.
+
+COM files use the same COMMAND.COM dispatch path; integration probes used
+EXE and BAT targets. Standard VGA was emulated; Trident/Vidsync interaction
+and real NuXT behaviour remain to be checked by the user.
+
+No 86Box tests, disk-image delivery, AUTOEXEC/CONFIG changes, physical-disk
+writes, or changes to existing games/serial utilities were made.
+Version 1.2 validation:
+- Compiled with warnings as errors; 29 data checks passed in DOSBox.
+- Repeated the COM2/CuteMouse integration test with 35 ms button holds.
+- Loaded a pre-1.2 menu, edited/launched its program, and returned correctly.
+- /SAFE applied initially; an F5 theme change survived the next launch.
+- Browser filter apply/clear, all-files toggle, refresh and parent navigation
+  invalidate the cache correctly. Filter cancellation retains the old view.
+- Rendering/CRC benchmarks use DOSBox at fixed 3000 cycles, with identical
+  compiler flags and fixtures. See REVIEW.TXT for results and limitations.
+
+Private development screenshots and emulator images are not bundled.

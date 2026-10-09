@@ -1,0 +1,18 @@
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.C text eol=lf
+*.H text eol=lf
+*.ASM text eol=lf
+*.S text eol=lf
+*.INC text eol=lf
+*.TXT -text
+*.txt -text
+*.BAT text eol=crlf
+*.EXE binary
+*.COM binary
+*.PNG binary
+*.png binary
+*.SBI binary
+*.S3M binary

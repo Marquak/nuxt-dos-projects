@@ -1,0 +1,11 @@
+8087 detected: 1
+Perspective, integer assembly, FPU rounding/stack errors: 0
+640x480/16: full-frame initial + move/erase/overlap errors 0
+640x480/256: full-frame initial + move/erase/overlap errors 0
+800x600/16: full-frame initial + move/erase/overlap errors 0
+800x600/256: full-frame initial + move/erase/overlap errors 0
+1024x768/16: full-frame initial + move/erase/overlap errors 0
+1024x768/256: full-frame initial + move/erase/overlap errors 0
+320x200/16: full-frame initial + move/erase/overlap errors 0
+320x200/256: full-frame initial + move/erase/overlap errors 0
+TOTAL ERRORS: 0

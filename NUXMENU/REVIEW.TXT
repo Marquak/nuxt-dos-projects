@@ -1,0 +1,80 @@
+NuXT Menu 1.2 - code review and optimization pass
+2026-10-08
+
+FIXES MADE
+1. When NUXMENU.DAT was corrupt and the program recovered NUXMENU.BAK,
+   the next save used to replace the good backup with the corrupt primary.
+   It now keeps the known-good recovery copy while replacing the primary.
+   Regression checks cover recovery, saving the repaired data, losing that
+   new primary, and subsequent normal backup rotation.
+
+2. MENU passed startup overrides (/SAFE, /25, /43, /50) to every new UI
+   process. This could undo appearance changes when a launched game returned.
+   Overrides now apply only on initial startup. Saved F5 choices then win.
+
+OPTIMIZATIONS MADE
+- Screen rectangles use a short 8086-compatible REP STOSW assembly fill.
+  Bounds and colour attributes are calculated once per rectangle, replacing
+  thousands of per-character put() calls. Text writes also use row pointers
+  and clip once. No extra full-screen buffer or resident allocation added.
+- CRC-16 uses a 16-entry / 32-byte nibble table instead of a bit-at-a-time
+  loop. The polynomial, seed, packed file format and checks are unchanged.
+- Saving validates the structure and calculates its CRC once, rather than
+  calculating it and then repeating the calculation during validation.
+  Loading still checks the stored CRC against the complete configuration.
+- Browser filtering reuses its results until the directory contents, filter,
+  or all-files switch changes. Scans/refreshes explicitly invalidate it.
+- The existing small-supervisor design remains: the UI exits before running
+  a child. There is no floating-point work here to benefit from an 8087.
+
+CONTROLLED BENCHMARK
+DOSBox, fixed 3000 cycles, identical Open Watcom -0 -ms -os build flags.
+Same three-entry menu; 40 draws with changing selection; eight CRC passes
+across the configuration payload. Times below are milliseconds from clock().
+
+                                  1.1          1.2       Ratio
+  Draw 80x25, 40 frames           2911          329        8.85x
+  Draw 80x50, 40 frames           5658          495       11.43x
+  CRC, eight payload passes      7854         2032        3.87x
+
+The final frame buffers were compared byte for byte: identical at both
+sizes (4000 and 8000 bytes). Saving's eliminated second CRC pass is an
+additional reduction not counted by the CRC-only benchmark above.
+These are isolated emulator measurements, not bare-metal speed claims or
+whole-program launch timings. Disk access and child-program load time remain.
+
+Binary size: MENU.EXE 15618 -> 15634 bytes; NUI.EXE 32924 -> 33262 bytes.
+No data-format migration. Keep existing NUXMENU.DAT and NUXMENU.BAK.
+
+VALIDATION
+29 configuration/CRC/recovery checks passed in DOSBox. In private QEMU
+MS-DOS 6.22 images, checked old saved menus, editing and child launches,
+initial-only /SAFE, browser cache invalidation, and the existing CuteMouse
+COM2 serial-mouse regression workflow. No 86Box or physical-media changes.
+QEMU's VGA BIOS still supplies 50 rows for the 43-row request; actual BIOS
+geometry is used for drawing and mouse bounds. Native 43-row mode remains
+a hardware check. See TESTING.TXT for the recorded results.
+
+RECOMMENDED NEXT ADDITIONS (NOT IMPLEMENTED IN THIS PASS)
+1. Consistent mouse controls: a visible Back button, scroll arrows, and
+   clickable move/appearance controls. Particularly useful with tall menus.
+2. Search all menus: type a few letters, see matching programs together
+   with their submenu paths, and launch without navigating each category.
+3. Batch-add from a chosen directory with a preview and checkboxes. Avoid
+   blindly importing setup/uninstall tools or duplicate executables.
+4. Duplicate entry / launch profiles: give the same executable separate
+   labels and arguments for different configurations without browsing again.
+5. A per-entry "launch and quit menu" option for memory-hungry software,
+   freeing the supervisor at the cost of not returning automatically.
+
+EXISTING LIMITS TO REVISIT ONLY WHEN NEEDED
+128 menu entries and 384 files per directory. The browser reports when it
+hits that cap. A paged directory list would be preferable to a much larger
+permanent allocation on this machine. No graphics rewrite or FPU/TSR layer
+is warranted for this text launcher.
+
+RELATED PROJECTS CHECKED (design references; no external code copied)
+https://github.com/MobyGamer/total-dos-launcher
+  Searchable/indexed collections are a useful direction if the menu grows.
+https://github.com/zirkoni/zmenu
+  A related lightweight DOS menu and Open Watcom build reference.

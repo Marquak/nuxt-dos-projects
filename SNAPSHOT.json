@@ -1,0 +1,31 @@
+{
+  "snapshot_date": "2026-10-09",
+  "collection": "NuXT DOS projects",
+  "projects": {
+    "NUXMENU": "1.2",
+    "ORBIT87": "2.0, includes ORBITV20",
+    "STARFIELD": "1.0",
+    "MATRIX": "2.0",
+    "INVADERS": "1.0",
+    "NUXTLINK": "3.1 with current Linux UI/sorting changes",
+    "SUNSET": "3.1",
+    "DUNE2FIX": "1.0 patcher only"
+  },
+  "binaries": {
+    "INVADERS/INVADERS.COM": "fb5cfcef2e129c8a12fe49eb21a0df1229eb3f4cc48ae059b97f534912a2eaea",
+    "MATRIX/BENCH.EXE": "91ca8c76fd137ee3b146395c7cace24b1020e6be2e0e27093b577fd947fe6fa6",
+    "MATRIX/CHECK.EXE": "785208019ae71e1c0564fd41ac9658d620fe6149acb4188630d40ec6a4c71f8a",
+    "MATRIX/FPUTEST.EXE": "a3d71fb997ed5209a419c6fc6db719d44dc866f9515d61dacda083715088c7fc",
+    "MATRIX/MATRIX.EXE": "b6148f318829374ec49a80425914505a04c31d5dbd92b800a2fd6e80bf8e7779",
+    "NUXMENU/MENU.EXE": "905187935636403fc10f4210cd8a3f76adc276e20a1b59a4c85bd23d6369dec3",
+    "NUXMENU/NUI.EXE": "96d1165dd102a23a2e99e5e642bf0715d2c37969b166c637242c9048058b7e05",
+    "NUXTLINK/NUXFER31.COM": "b44c648a26349f314c0802658ea2c01943fb965ba7e8bae87ff38790bcc8e586",
+    "NUXTLINK/dos/NUXFER.COM": "b44c648a26349f314c0802658ea2c01943fb965ba7e8bae87ff38790bcc8e586",
+    "ORBIT87/ORBIT87.EXE": "9c2cb45a496d89eab892c30c48aa4f6f65c30c65a1e3f294ac4e14da5500ed47",
+    "ORBIT87/ORBITV20.EXE": "9dc58f71a79ade399e5ee581c68e43e24fc69e5705f0af729b724b3da3ed224c",
+    "STARFIELD/STAR.EXE": "b8fd1fd38ae86d15b31e67b74438aa278e716b5128fd80f8025de843d7c384cb",
+    "SUNSET/SUNSET.EXE": "886a2ccb71962649bac47d5a87f64314dc7eaf34d3580ffa00619bce407318cc"
+  },
+  "game_executables_included": false,
+  "toolchain": "Open Watcom 2.0 beta Oct 5 2026; GNU binutils 2.47"
+}

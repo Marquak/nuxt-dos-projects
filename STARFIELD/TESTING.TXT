@@ -1,0 +1,50 @@
+STARFIELD 1.0 - Validation (2026-10-07)
+
+Open Watcom DOS V20/80186 build, isolated original-8087 assembler module.
+No 86Box tests, user emulator settings changes, or physical NuXT tests.
+
+CHECK.EXE, DOSBox 0.74-3, normal core, S3 VGA, maximum cycles:
+- All four resolutions and both colour depths: PASS.
+- Full-screen readback versus an independent point raster after initial
+  drawing and a move/erase update: PASS. Includes overlaps, adjacent bits,
+  all sixteen shades, opposite screen corners and screen edges.
+- 256-star stress in both 640x480 modes, three large movement steps, with
+  full-screen reference comparison after every step: PASS.
+- Packed video bytes read directly; planar results checked independently
+  through each VGA read-map plane. This catches accidental plane selection,
+  destructive erasures and stray writes outside the dirty region.
+- Every perspective coefficient at every resolution matched between integer
+  and 8087 table generation. A non-default FPU rounding mode was restored,
+  with an empty x87 stack and no invalid-operation/stack fault: PASS.
+- Signed assembly projection checked against a 32-bit C reference across
+  positive/negative coordinates and depths: PASS.
+TOTAL ERRORS: 0. Full log: CHECK.TXT.
+
+Actual STAR.EXE, QEMU 486 CPU, private DOS 6.22 test image:
+- 8087 detection reported in menu.
+- 640x480/16 starts, visible animation changes between screenshots.
+- Space freezes the framebuffer exactly; Space resumes animation.
+- Speed keys work; Esc returns to menu; Q exits to DOS.
+- Menu selection starts 320x200/256 correctly.
+- /NO87 reports integer fallback and starts/runs/exits.
+- /AUTO returns directly to DOS. Speed 63 + clamps to 64;
+  speed 3 - clamps to 2, verified through STAR.LOG.
+QEMU and DOSBox do not establish original-8087 electrical compatibility or
+NuXT FPS. Original-8087 WAIT protocol and instruction subset are inherited
+from the tested Matrix/Orbit/Sunset math modules. /NO87 bypass is tested;
+physical operation without a coprocessor still needs bare-metal validation.
+
+SLOW DOSBOX SPEED CHECK
+Normal core, fixed 3,000 cycles, 60 animation frames, default speed 12:
+  320x200  256 colours  128 stars: 60 ticks (18.2 updates/sec)
+  640x480   16 colours  128 stars: 60 ticks (18.2 updates/sec)
+  640x480   16 colours  256 stars: 85 ticks (12.9 updates/sec)
+  800x600  256 colours  128 stars: 60 ticks (18.2 updates/sec)
+ 1024x768   16 colours  128 stars: 60 ticks (18.2 updates/sec, /NO87)
+Table generation and mode setup are outside the reported animation time.
+BIOS ticks are approximately 18.2065 Hz. This is a short emulated workload,
+not a calibrated 10 MHz V20 measurement. Star positions vary with time seed.
+
+The Trident native fallback was reused from Matrix; this round exercised
+standard VGA/VBE in emulators, not the physical Trident BIOS. 1024x768/256
+was tested on emulated S3 and is NOT supported by a 512 KB NuXT card.

@@ -1,0 +1,40 @@
+NEON COAST 3.1 CHANGES
+
+- New original 104 BPM synthwave soundtrack: Horizon Runner.
+- Three-note pads, moving FM bass tone, lead scoops/vibrato and timed echo.
+- Hardware bass drum with a pitch sweep frees all six melodic channels.
+- Kick-driven chord ducking, snare flams, fills, breakdown and build.
+- 96-bar / 3:42 arrangement, alternate lead answers and endless playback.
+- Bounded table-driven effects, cached OPL2 writes and existing safe delays.
+- Renderer, 8087/V20 projection, artwork, resolutions and controls retained.
+- 100-frame DOSBox comparison: 227 ticks versus 226 before; eight palms.
+- Six editable Furnace/SBI patches and an AdLib patch-audition module.
+- Host music tests, address/undefined-behaviour checks and DOS IRQ tests.
+
+NEON COAST 3.0 CHANGES
+
+- Faster 320x200 renderer for both 256 and 16 colours: cached background,
+  reusable RAM frame, assembly line drawing and changed-span scanning.
+- Old geometry is restored in RAM; only completed regions reach VGA.
+- 8087-generated depth table removes repeated floating-point divisions
+  during animation; V20 fixed-point assembly handles the hot projection.
+- Screen coordinates are reused by all edges sharing each vertex.
+- Sparse renderer retained for higher resolutions and low-memory fallback.
+- /REPORT now identifies the active renderer.
+- Same artwork, Night Circuit soundtrack, controls and endless playback.
+- 100-frame 320x200/256 DOSBox comparison: 414 -> 226 ticks, about 1.8x
+  throughput, with more palm detail retained. Real NuXT testing pending.
+- New whole-frame renderer tests and exhaustive cached-depth checks.
+
+NEON COAST 2.0 CHANGES
+
+- New default: 320x200 / 256 colours, using standard linear VGA mode 13h.
+- Added real 16-colour modes at 320x200, 640x480 and 800x600.
+- Custom 16-colour neon palette with fixed ordered dithering.
+- Menu chooses resolution and colour depth separately; Enter starts.
+- New /320, /16 and /256 command-line options; /640 and /800 still work.
+- New original 128 BPM AdLib soundtrack, Night Circuit.
+- Precomputed palm shapes and distance-based frond detail reduce CPU work.
+- Assembly conversion packs eight pixels into four VGA plane bytes.
+- Existing 8087 perspective, endless loop, no text, pause/mute and safe exit
+  are preserved. Runtime requires only SUNSET.EXE.

@@ -1,0 +1,13 @@
+VERSION 2.0
+- Single-pass VGA glyph writes: eight CPU writes instead of 32.
+- Dirty-cell batching, duplicate suppression and grouping by shade/row.
+- Cached row/bank addresses and 8086 assembly character blitters.
+- Packed-colour expansion lookup and word writes.
+- Correct bank-boundary handling for clearing and packed glyph rows.
+- Stricter VBE compatibility/readability checks and broader planar probe.
+- Automatic 8087/x87 detection and startup FSQRT glow-curve generation.
+- Identical integer fallback, with /NO87 to bypass all coprocessor use.
+- G toggles glow; /NOGLOW starts without it. Space also pauses glow.
+- Same resolution/colour menu and silent operation.
+- About 10.4x/11.2x faster isolated DOSBox drawing benchmarks (16/256).
+  Physical NuXT speed still needs measurement; animation pacing unchanged.

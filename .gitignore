@@ -1,0 +1,32 @@
+# Generated build and Python files
+*.o
+*.obj
+*.MAP
+*.map
+*.err
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+/dist/
+# Local application state and transfers
+.nuxtlink/
+NXLCACHE/
+NUXMENU.DAT
+NUXMENU.BAK
+*.part
+ORBIT.LOG
+SUNSET.LOG
+# Do not add commercial game/OS files or disk images
+DUNE2FIX/*.EXE
+DUNE2FIX/*.exe
+DUNE2FIX/patched/
+*.img
+*.IMG
+*.ima
+*.IMA
+*.vhd
+*.VHD
+.DS_Store

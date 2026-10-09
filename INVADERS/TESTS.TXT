@@ -1,0 +1,64 @@
+XT INVADERS 1.0 - VERIFICATION
+=============================
+
+Executable size: 5171 bytes
+SHA-256: fb5cfcef2e129c8a12fe49eb21a0df1229eb3f4cc48ae059b97f534912a2eaea
+Program allocation, including stack and PSP: 7136 bytes.
+Built with GNU binutils 2.47, .code16 and .arch i8086.
+
+RUNTIME TESTS
+-------------
+FreeDOS 1.3 in QEMU, 4 MiB RAM, standard VGA in EGA mode 0Dh,
+with and without the emulated AdLib/OPL2 device.
+
+- OPL2 timer detection succeeds with emulated AdLib.
+- New game starts with 50 aliens, three lives and zero score.
+- Held movement advances five pixels/tick and stops on release.
+- Pause freezes player and formation.
+- Mute keys off all active voices.
+- Sound can be re-enabled.
+- P resumes the game.
+- A shot striking solid shield pixels is removed and erodes the shield.
+- Alien collision removes one alien and awards 30 points for the top row.
+- Bonus ship awards 100 points and schedules another appearance.
+- Enemy bolt costs one life and starts the death animation.
+- Respawn grants temporary invulnerability.
+- Last alien triggers wave-clear and 100-point wave bonus.
+- Next wave restores shields/aliens and grants a life up to five.
+- Losing the final life reaches game over.
+- Space restarts while preserving session best score.
+- Score saturates safely at 65535 instead of wrapping.
+- An alien formation reaching the player line ends the game.
+- Normal exit restores the original IRQ1 vector, mode 03h and DOS prompt.
+- With no AdLib attached, the title reports silent operation; game starts,
+  fires and exits successfully.
+- Captured OPL2 PCM contains sound output with nonzero samples and no
+  full-scale clipping. Effects triggered in the collision fixtures include
+  alien hits, marching, saucer activity and player explosions.
+- The final /S build plays silently with an emulated AdLib present.
+- Command-line /? returns help to the DOS prompt.
+- Title and gameplay screenshots visually reviewed for layout and sprites.
+- Release ZIP verified against the executable and source files.
+
+METHOD AND LIMITS
+----------------
+Keyboard-driven smoke tests cover normal launch, firing and exit. The
+collision and progression checks use the emulator debugger to arrange
+specific game states, then let the real compiled game execute them. This
+makes rare cases (last alien, last life, score overflow) reproducible.
+No debug/test fixture code is included in the released executable.
+
+The full deterministic suite ran before a small title-message change that
+labels /S as SILENT MODE rather than implying no sound card was found.
+The final binary was rebuilt and smoke-tested after that change.
+
+QEMU is not a cycle-accurate NEC V20, original EGA or Trident TVGA9000i.
+Physical NuXT performance and an original-design AdLib reproduction remain
+untested. EGA compatibility uses documented EGA mode/register operations;
+runtime graphics tests used a VGA adapter in EGA mode, not physical EGA.
+DOS 2.0 is the API target; runtime testing used FreeDOS only.
+The error path for insufficient memory/video support was not exercised.
+Sound capture validates generated PCM; it does not establish analog sound
+quality or precise reproduction-card timing on the user's hardware.
+
+Screenshots show the emulator, not the user's NuXT.
