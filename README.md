@@ -17,17 +17,17 @@ publishers in here.
 
 | Project | Current release | DOS files to copy | Purpose |
 | --- | --- | --- | --- |
-| [NUXMENU](NUXMENU/) | 1.2 | `MENU.EXE` and `NUI.EXE` together | Mouse/keyboard launcher, submenus, file explorer and themes |
-| [ORBIT87](ORBIT87/) | 2.0 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | Five-scene VGA/8087 demo with AdLib techno |
-| [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Endless silent star flight with optional 8087 setup |
-| [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Silent digital rain and optional 8087 palette glow |
-| [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | EGA/VGA, gameport controls, AdLib march and wireframe scenery |
-| [NUXTROIDS](NUXTROIDS/) | 1.2 | `NUXTROID.EXE` | Greyscale asteroid shooter, optional 8087 and AdLib |
-| [NUXTRIS](NUXTRIS/) | 1.1 | `NUXTRIS.EXE` | ИuXTяis, Type A/B, named scores and gameport controls |
-| [NUXTLINK](NUXTLINK/) | 3.2 | `NUXFER32.COM` | 9600 handshake, multi-folder queue and verified serial transfers |
-| [SUNSET](SUNSET/) | 3.1 | `SUNSET.EXE` | Endless neon road/palm demo and original synthwave score |
-| [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Dune II XMS fix and manual-check removal |
-| [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | CPU, 8087, memory, video, BIOS and drive information |
+| [NUXMENU](NUXMENU/) | 1.2 | `MENU.EXE` and `NUI.EXE` together | Organise and launch DOS programs from menus, with a file browser for adding them. |
+| [ORBIT87](ORBIT87/) | 2.0 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | Watch an animated space demo set to an AdLib techno soundtrack. |
+| [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Fly through an endless field of stars in a silent animated demo. |
+| [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Fill the screen with falling green characters inspired by The Matrix. |
+| [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Defend Earth from descending alien waves in a Space Invaders-style game. |
+| [NUXTROIDS](NUXTROIDS/) | 1.2 | `NUXTROID.EXE` | Pilot a spaceship, dodge asteroids and shoot them into smaller pieces. |
+| [NUXTRIS](NUXTRIS/) | 1.1 | `NUXTRIS.EXE` | Fit falling blocks together and clear complete rows in a Tetris-style game. |
+| [NUXTLINK](NUXTLINK/) | 3.2 | `NUXFER32.COM` | Transfer files and folders between Linux and DOS over a serial cable, or back up a DOS drive. |
+| [SUNSET](SUNSET/) | 3.1 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset, past palm trees, with a synthwave soundtrack. |
+| [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Patch your own Dune II files to avoid the XMS startup error and skip manual-word checks. |
+| [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Inspect your DOS computer's processor, memory, video, ports, BIOS and drives. |
 
 ORBIT87 and ORBITV20 share one source tree and are both built by its build
 script. No separate V20 project is missing. Each program's README.TXT contains
