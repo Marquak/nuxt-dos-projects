@@ -197,6 +197,38 @@ class UITests(unittest.TestCase):
         self.assertFalse(a.report_button.instate(['disabled']))
         self.assertTrue(a.start_button.instate(['disabled']))
 
+    def test_new_previews_append_and_navigation_never_retargets_jobs(self):
+        self.connect_fixture();a=self.app
+        one=Plan('upload',str(self.folder),'\\ONE','C:\\',jobs=[
+            Job(str(self.folder/'BIG.BIN'),'\\ONE\\BIG.BIN',meta(1000),'send')])
+        two=Plan('upload',str(self.folder/'SUB'),'\\TWO','C:\\',jobs=[
+            Job(str(self.folder/'SUB/SMALL.BIN'),'\\TWO\\SMALL.BIN',meta(20),'send')])
+        for plan in (one,two):a.events.put(('done',('prepared',plan)));a.poll()
+        a.local_navigate(self.folder/'SUB');a.fill('\\OTHER',self.listing)
+        self.assertEqual(len(a.plan.jobs),2)
+        self.assertEqual(a.queue_tree.set('job:0','path'),'C:\\ONE\\BIG.BIN')
+        self.assertEqual(a.queue_tree.set('job:1','source'),str(self.folder/'SUB/SMALL.BIN'))
+        self.assertEqual(a.queue_tree.set('job:1','path'),'C:\\TWO\\SMALL.BIN')
+
+    def test_mixed_queue_shows_correct_source_and_destination_sides(self):
+        self.connect_fixture();a=self.app;one=self.make_plan()
+        two=Plan('download',str(self.folder/'SUB'),'\\REMOTE','C:\\',jobs=[
+            Job('\\REMOTE\\FILE.BIN',str(self.folder/'SUB/FILE.BIN'),meta(12),'receive')])
+        a.events.put(('done',('prepared',two)));a.poll()
+        self.assertEqual(a.queue_tree.set('job:0','path'),'C:\\BIG.BIN')
+        self.assertEqual(a.queue_tree.set('job:2','source'),'C:\\REMOTE\\FILE.BIN')
+        self.assertEqual(a.queue_tree.set('job:2','path'),str(self.folder/'SUB/FILE.BIN'))
+
+    def test_conflicting_preview_does_not_clear_queue(self):
+        self.connect_fixture();a=self.app;one=self.make_plan()
+        two=Plan('upload',str(self.folder/'SUB'),'\\','C:\\',jobs=[
+            Job(str(self.folder/'SUB/BIG.BIN'),'\\BIG.BIN',meta(1000),'send')])
+        with patch('nuxtlink.messagebox.showerror') as error:
+            a.events.put(('done',('prepared',two)));a.poll()
+            self.assertTrue(error.called)
+        self.assertIs(a.plan,one);self.assertEqual(len(a.plan.jobs),2)
+        self.assertFalse(a.busy)
+
     def test_compact_layout_keeps_controls_and_rows_visible(self):
         self.connect_fixture();a=self.app;self.make_plan()
         self.root.geometry('1024x720');self.root.update()

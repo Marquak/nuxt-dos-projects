@@ -1,15 +1,23 @@
-# XT Invaders 1.0
+# XT Invaders 2.0
 
-A little Space Invaders-style game for an XT. EGA or VGA, optional AdLib
-effects, and a single COM file. All the game code, graphics and sounds were
-made for this project.
+A little Space Invaders-style game for an XT. EGA or VGA, gameport controls,
+AdLib effects and a single COM file. The aliens now march to a four-note
+thump, with a different wireframe backdrop each wave.
 
-- **Run:** copy `INVADERS.COM` to DOS; start with `INVADERS`.
-- **Hardware:** 8088/8086 or later; EGA/VGA. No external game assets or audio driver.
+- **Run:** `INVADERS` for 320x200; `INVADERS /V` for 640x480. Both use 16 colours.
+- **Joystick/gamepad:** add `/J` to calibrate, or press J at the title.
+- **Controls:** arrows and Space, or gameport left/right and button 1. P or
+  button 2 pauses; M toggles sound; Escape quits.
+- **Hardware:** 8088/8086 or later; EGA/VGA; optional AdLib and standard
+  analog-compatible PC gameport. No external assets or audio driver.
 - **Full instructions:** [README.TXT](README.TXT).
-- **Build:** `sh BUILD.SH` (GNU binutils) from this folder.
+- **Build:** `sh BUILD.SH` with GNU binutils.
 
-Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
-and this project's test notes for validation and build dependencies.
+Version 2.0 improves fire-tap handling, doubles the player/laser update rate,
+reduces redraw work and adds six original wireframe backgrounds. VGA uses
+crisp doubled sprites in a centred 640x400 playfield within 640x480.
+
+Tested in QEMU and DOSBox, including an emulated gameport controller. See
+[TESTS.TXT](TESTS.TXT) for coverage and hardware-validation limits.
 Project-authored material is MIT licensed; see [../LICENSE](../LICENSE) and
 [../THIRD_PARTY.md](../THIRD_PARTY.md) for runtime/dependency terms.

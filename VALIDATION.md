@@ -1,8 +1,38 @@
-# Snapshot checks, 2026-10-09
+# Snapshot checks, 2026-10-11
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
+
+## October 11 publication
+
+NuXTroids 1.2 and NuXTris 1.1 were added with source, binaries, build scripts,
+licenses and test notes. The owner called both single-player games complete.
+NuXT Link 3.2 replaces 3.1; Invaders 2.0's prepared update is also included.
+Other published program sources/binaries were compared against current outputs
+and were already current. Repository-specific documentation is retained.
+
+Fresh isolated builds of the four changed/added programs match their released
+binaries. The snapshot verifier checks every published file. Prior development
+validation is recorded in each project; it was not repeated in emulators just
+for uploading. Link's 54 host/Tk tests and compiled DOS QEMU integration passed
+during today's implementation. Its new connection logic still needs physical
+NuXT confirmation. No 86Box testing was used.
+
+NuXTris's upstream MIT notice and compiler runtime licenses are retained.
+Commercial game executables, OS disks, user saves and transfer records are
+excluded. DUNE2FIX remains a patcher requiring the owner's original game.
+
+## Invaders 2.0 local update, 2026-10-11
+
+- Isolated GNU binutils rebuild matches the 10,549-byte COM exactly.
+- 86 QEMU checks passed in each resolution, plus real emulated keyboard
+  short-tap tests, silent mode and operation without AdLib hardware.
+- DOSBox's emulated gameport passed a scripted virtual-controller run through
+  calibration, movement, firing, pause and resume. Physical gameport timing
+  and NuXT performance remain untested for this update.
+- Source, executable, README and test notes are synchronized with outputs.
+  No 86Box tests were run. Full details are in INVADERS/TESTS.TXT.
 
 ## Dash 1.3 and Dune II 1.1 update
 

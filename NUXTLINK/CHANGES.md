@@ -1,4 +1,36 @@
-# NuXT Link 3.1  -  Linux UI refresh, 8 October 2026
+# NuXT Link 3.2 - 11 October 2026
+
+- Start at 9600, find the server, then negotiate the chosen transfer settings.
+  Normal disconnect returns the server to 9600. Manual settings and servers
+  left at other speeds remain discoverable.
+- Recover a lost settings-proposal reply using its confirmation token. Retry
+  confirmation safely, check committed settings and retain timed rollback.
+- Move DOS status printing before the confirmation reply so a three-wire
+  client cannot race console output. Invalidate cached replies when a failed
+  settings transmission abandons its pending state.
+- Append upload/download previews from multiple folders. Paths and policies
+  belong to each batch. Duplicate targets fail without replacing the queue.
+  Resume keeps completed work; backup manifests remain separate.
+- Reapply earlier directory metadata when later batches write into those
+  directories. Check stale source metadata before replacing downloaded files
+  or uploading changed files with old timestamps.
+- Failed serial-port open attempts no longer restore or release another
+  instance's port settings. Validate HELLO drive names before accepting them.
+- Limit routine progress notifications to roughly 12 per second while keeping
+  job transitions and final updates. No checksums or verification were removed.
+
+FileZilla's per-item local/remote paths were a design reference for the queue.
+This implementation is original Python, with no copied FileZilla code or new
+runtime dependency. References: [queue source](https://fossies.org/linux/FileZilla/src/interface/queue.cpp),
+[serial open behaviour](https://pyserial.readthedocs.io/en/latest/pyserial_api.html),
+and the [FreeDOS networking archive](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/net/).
+The client continues to use Python's standard-library termios transport.
+
+Older release notes follow.
+
+---
+
+# NuXT Link 3.1 - Linux UI refresh, 8 October 2026
 
 - Each file pane retains its own sort column and direction across folder changes,
   refreshes and filters. Folders remain first in either direction; numeric sizes
@@ -23,7 +55,7 @@ Replace the entire Linux folder, including the new `interface.py` layout module.
 
 ---
 
-# NuXT Link 3.1  -  original DOS receive-overrun fix
+# NuXT Link 3.1 - original DOS receive-overrun fix
 
 Protocol remains v3; the Linux client is unchanged. The existing file formats,
 CRC checks, verified resume and metadata checks remain unchanged too.

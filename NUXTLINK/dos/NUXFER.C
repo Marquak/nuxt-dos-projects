@@ -23,7 +23,7 @@ typedef unsigned long U32;
 static U8 req[CAP+6], prev[CAP+4], reply[CAP+8], record[96];
 static U8 block[4096];
 static U16 crc_table[256];
-static unsigned base, com=1, speed=5, fifo, saved[5];
+static unsigned base, com=1, speed=3, fifo, saved[5];
 static unsigned divisors[]={96,48,24,12,6,3,2,1};
 static const char *bauds[]={"1200","2400","4800","9600","19200","38400","57600","115200"};
 static unsigned quitting, changing, cached, active, last_tick;
@@ -341,7 +341,7 @@ static void show_settings(void){
 static void settings_poll(void){
     if(pending==1&&(unsigned)(ticks()-switch_tick)>=3){
         speed=new_speed;flow=new_flow;peer=new_peer;chunksize=new_chunk;
-        uart_speed();cached=0;pending=2;switch_tick=ticks();show_settings();rts(1);
+        uart_speed();cached=0;pending=2;switch_tick=ticks();rts(1);
     }else if(pending==2&&(unsigned)(ticks()-switch_tick)>=218){
         speed=old_speed;flow=old_flow;peer=old_peer;chunksize=old_chunk;
         uart_speed();cached=0;pending=0;puts("Unconfirmed settings rolled back.");show_settings();rts(1);
@@ -421,6 +421,9 @@ static void dispatch(void){
         memcpy(reply+6,p,9);pw(reply+4,9);pending=3;break;
     case 0x42:
         if(n!=4||pending!=2||dword(p)!=switch_token){error("No matching settings change");break;}
+        /* Finish console output before ACK: a 3-wire peer may send the next
+         * packet immediately. Never print after saying the server is ready. */
+        show_settings();puts("Connection settings confirmed.");
         info_reply();pending=4;break;
     case 0x50:delete_entry(n);break;
     case 0x51:rename_entry(n);break;
@@ -529,9 +532,9 @@ int main(int argc,char **argv){
     base=*(U16 __far *)MK_FP(0x40,(com-1)*2);if(!base){puts("COM port is not present in the BIOS table.");return 1;}
     old24=_dos_getvect(0x24);_dos_setvect(0x24, (void (__interrupt __far *)(void))MK_FP(code_segment(),(unsigned)critical));
     uart_open();reply[0]='N';reply[1]='X';
-    printf("\nNUXT LINK 3.1 - entire %c:\\ drive\n",drive);
+    printf("\nNUXT LINK 3.2 - entire %c:\\ drive\n",drive);
     show_settings();
-    puts("Files, folders, hidden/system files and DOS metadata.\nEsc exits. Idle keys: B baud, F flow, D peer lines, C COM, S status.\nPartials survive disconnects. Defaults: COM1 38400 /FLOW:NONE.");
+    puts("Files, folders, hidden/system files and DOS metadata.\nEsc exits. Idle keys: B baud, F flow, D peer lines, C COM, S status.\nPartials survive disconnects. Defaults: COM1 9600 /FLOW:NONE.");
     last_tick=ticks();
     while(!quitting){
         rts(0);keys();
@@ -557,13 +560,13 @@ int main(int argc,char **argv){
         }
         if(send()){
             if(pending==3){pending=1;switch_tick=ticks();}
-            else if(pending==4){pending=0;puts("Connection settings confirmed.");}
-        }else if(pending==3)pending=0;else if(pending==4)pending=2;
+            else if(pending==4)pending=0;
+        }else if(pending==3){pending=0;cached=0;}else if(pending==4){pending=2;cached=0;}
         rts(1);
     }
     pause_file();uart_close();_dos_setvect(0x24,old24);puts("\nStopped. UART restored; resumable partials retained.");return 0;
 usage:
     puts("NUXFER [COM1..COM4] [1200..115200] [/FLOW:NONE|RTSCTS]\n"
          "       [/PEER:NONE|DSR|DCD|BOTH] [/BLOCK:128|256|512]\n"
-         "Defaults: COM1 38400 /FLOW:NONE /PEER:NONE /BLOCK:128");return 1;
+         "Defaults: COM1 9600 /FLOW:NONE /PEER:NONE /BLOCK:128");return 1;
 }

@@ -70,7 +70,7 @@ dos_ok:
  shr bx,cl
  mov ah,0x4a
  int 0x21
- # /S skips every AdLib access; /? gives usage.
+ # /S silent, /V VGA 640x480, /E EGA 320x200, /J joystick calibration.
  xor cx,cx
  mov cl,byte ptr [0x80]
  mov si,0x81
@@ -84,8 +84,20 @@ args:
 arg_sound:
  and al,0xdf
  cmp al,'S'
- jne arg_next
+ jne arg_video
  mov byte ptr [skip_sound],1
+arg_video:
+ cmp al,'V'
+ jne arg_ega
+ mov byte ptr [video_mode],0x12
+arg_ega:
+ cmp al,'E'
+ jne arg_joy
+ mov byte ptr [video_mode],0x0d
+arg_joy:
+ cmp al,'J'
+ jne arg_next
+ mov byte ptr [want_joy],1
 arg_next:
  loop args
 check_video:
@@ -93,12 +105,20 @@ check_video:
  xor bx,bx
  int 0x10
  cmp al,0x1a
+ jne check_ega
+ cmp bl,7
  je video_ok
+ cmp bl,8
+ je video_ok
+check_ega:
+ cmp byte ptr [video_mode],0x12
+ je video_error
  mov ah,0x12
  mov bx,0x10
  int 0x10
  cmp bl,3
  jbe video_ok
+ video_error:
  mov dx,OFFSET err_video
  jmp dos_error
 video_ok:
@@ -108,12 +128,13 @@ video_ok:
  mov byte ptr [old_mode],al
  mov byte ptr [old_page],bh
  call sound_detect
- mov ax,0x000d
+ xor ax,ax
+ mov al,byte ptr [video_mode]
  int 0x10
  mov ah,0x0f
  int 0x10
  and al,0x7f
- cmp al,0x0d
+ cmp al,byte ptr [video_mode]
  je mode_ok
  call restore_video
  mov dx,OFFSET err_video
@@ -121,34 +142,69 @@ video_ok:
 mode_ok:
  call graphics_setup
  call install_keyboard
+ call install_timer
  mov ax,0x40
  mov es,ax
  mov ax,word ptr es:[0x6c]
  mov word ptr [rng],ax
  or word ptr [rng],1
- mov word ptr [last_tick],ax
+ mov word ptr [last_tick],0
  mov ax,0xa000
  mov es,ax
  call title_screen
+ cmp byte ptr [want_joy],0
+ je main_loop
+ call joy_calibrate
 main_loop:
- # Use IRQ-driven key states, including releases: smooth simultaneous input.
- cmp byte ptr [keys+1],0
- jne quit
- call ticks
- cmp ax,word ptr [last_tick]
- jne next_tick
+ # Atomic sleep avoids losing a timer interrupt between check and HLT.
+ cli
+ mov ax,word ptr [clock_ticks]
+ sub ax,word ptr [last_tick]
+ jnz next_tick
  sti
  hlt
  jmp main_loop
 next_tick:
+ sti
+ # Keep fractional cadence; bound recovery to four steps after a slow frame.
+ cmp ax,4
+ jbe tick_ready
+ mov ax,word ptr [clock_ticks]
+ sub ax,4
  mov word ptr [last_tick],ax
+tick_ready:
+ inc word ptr [last_tick]
  inc word ptr [frame]
+ call input_snapshot
+ call joy_poll
+ cmp byte ptr [pressed+1],0
+ je check_calibration
+ cmp byte ptr [state],6
+ jne quit
+ mov byte ptr [joy_enabled],0
+ mov byte ptr [state],0
+ call title_screen
+ jmp frame_done
+check_calibration:
+ cmp byte ptr [state],6
+ jne normal_input
+ call joy_calibration_input
+ jmp frame_done
+normal_input:
+ cmp byte ptr [pressed+36],0
+ je check_sound_tick
+ cmp byte ptr [state],0
+ je begin_joy
+ cmp byte ptr [state],3
+ jne check_sound_tick
+begin_joy:
+ call joy_calibrate
+ jmp frame_done
+check_sound_tick:
  call sound_tick
  # Sound toggle (edge).
- cmp byte ptr [keys+50],0
+ cmp byte ptr [pressed+50],0
  je check_pause
- cmp byte ptr [previous+50],0
- jne check_pause
  cmp byte ptr [state],0
  je mute_title
  call hud
@@ -159,10 +215,11 @@ mute_title:
  call toggle_sound
  call title_screen
 check_pause:
- cmp byte ptr [keys+25],0
+ cmp byte ptr [pressed+25],0
+ jne pause_pressed
+ cmp byte ptr [joy_pause_edge],0
  je dispatch
- cmp byte ptr [previous+25],0
- jne dispatch
+pause_pressed:
  cmp byte ptr [state],1
  je pause_game
  cmp byte ptr [state],2
@@ -172,6 +229,7 @@ check_pause:
  jmp dispatch
 pause_game:
  mov byte ptr [state],2
+ mov byte ptr [fire_pending],0
  call sound_silence
  text 118,118,15,msg_pause
 dispatch:
@@ -189,16 +247,12 @@ dispatch:
  call game_tick
  jmp frame_done
 title_input:
- cmp byte ptr [keys+57],0
- jne start_edge
- cmp byte ptr [keys+28],0
+ cmp byte ptr [pressed+57],0
+ jne new_game
+ cmp byte ptr [pressed+28],0
+ jne new_game
+ cmp byte ptr [joy_fire_edge],0
  je frame_done
- cmp byte ptr [previous+28],0
- jne frame_done
- jmp new_game
-start_edge:
- cmp byte ptr [previous+57],0
- jne frame_done
 new_game:
  mov word ptr [score],0
  mov byte ptr [lives],3
@@ -206,6 +260,8 @@ new_game:
  call new_wave
  jmp frame_done
 between_waves:
+ test word ptr [frame],1
+ jnz frame_done
  dec byte ptr [state_timer]
  jnz frame_done
  cmp byte ptr [wave],99
@@ -219,6 +275,8 @@ wave_lives:
  call new_wave
  jmp frame_done
 dying:
+ test word ptr [frame],1
+ jnz frame_done
  dec byte ptr [state_timer]
  jnz frame_done
  cmp byte ptr [lives],0
@@ -239,16 +297,9 @@ dying:
 end_game:
  call game_over
 frame_done:
- push es
- push cs
- pop es
- mov si,OFFSET keys
- mov di,OFFSET previous
- mov cx,128
- rep movsb
- pop es
  jmp main_loop
 quit:
+ call remove_timer
  call remove_keyboard
  call sound_silence
  call restore_video
@@ -277,7 +328,7 @@ dos_message:
  int 0x21
 
 # IRQ1 owns keyboard while playing; XT latch acknowledge + PIC EOI.
-# The PIT/IRQ0 and DOS timekeeping are never reprogrammed.
+# Make edges are latched in the IRQ so quick press/release pairs survive.
 install_keyboard:
  mov ax,0x3509
  int 0x21
@@ -315,6 +366,12 @@ key_make:
  and ax,0xff7f
  xor bx,bx
  mov bl,al
+ test ah,ah
+ jz key_store
+ cmp byte ptr [keys+bx],0
+ jne key_store
+ mov byte ptr [key_edges+bx],1
+key_store:
  mov byte ptr [keys+bx],ah
 key_ack:
  in al,0x61
@@ -329,12 +386,70 @@ key_ack:
  pop bx
  pop ax
  iret
-ticks:
- push es
- mov ax,0x40
+# 36.413 Hz PIT mode 2; forward alternate interrupts to the previous IRQ0.
+# BIOS time therefore retains its usual 18.2065 Hz cadence. No DOS in ISR.
+install_timer:
+ mov ax,0x3508
+ int 0x21
+ mov word ptr [old_timer],bx
+ mov word ptr [old_timer+2],es
+ mov dx,OFFSET timer_irq
+ mov ax,0x2508
+ int 0x21
+ cli
+ mov al,0x34
+ out 0x43,al
+ xor al,al
+ out 0x40,al
+ mov al,0x80
+ out 0x40,al
+ sti
+ mov ax,0xa000
  mov es,ax
- mov ax,word ptr es:[0x6c]
+ ret
+remove_timer:
+ push ds
+ cli
+ mov al,0x36
+ out 0x43,al
+ xor al,al
+ out 0x40,al
+ out 0x40,al
+ lds dx,dword ptr [old_timer]
+ mov ax,0x2508
+ int 0x21
+ pop ds
+ sti
+ ret
+timer_irq:
+ push ax
+ inc word ptr cs:[clock_ticks]
+ xor byte ptr cs:[bios_phase],1
+ jz timer_chain
+ mov al,0x20
+ out 0x20,al
+ pop ax
+ iret
+timer_chain:
+ pop ax
+ ljmp cs:[old_timer]
+input_snapshot:
+ save
+ push es
+ push cs
  pop es
+ mov si,OFFSET key_edges
+ mov di,OFFSET pressed
+ mov cx,64
+ cli
+ rep movsw
+ mov di,OFFSET key_edges
+ mov cx,64
+ xor ax,ax
+ rep stosw
+ sti
+ pop es
+ restore
  ret
 random:
  mov ax,word ptr [rng]
@@ -345,9 +460,237 @@ rng_store:
  mov word ptr [rng],ax
  ret
 
+# Standard analog-compatible PC gameport, joystick 1: X bit 0, buttons 4/5.
+# PIT-based time units do not depend on CPU speed. Only the required axis
+# is read, with a 2 ms time limit AND a hard loop bound for broken timers.
+# Interrupts remain enabled during polling, including keyboard and IRQ0.
+pit_count:
+ pushf
+ cli
+ xor al,al
+ out 0x43,al
+ in al,0x40
+ mov ah,al
+ in al,0x40
+ xchg al,ah
+ popf
+ ret
+joy_read:
+ push bx
+ push cx
+ push dx
+ push si
+ mov dx,0x201
+ call pit_count
+ mov si,ax
+ out dx,al
+ mov cx,2048
+joy_wait:
+ in al,dx
+ test al,1
+ jz joy_read_done
+ # Check elapsed time regularly, without repeatedly delaying the port read.
+ test cl,15
+ jnz joy_continue
+ call pit_count
+ mov bx,si
+ sub bx,ax
+ and bx,0x7fff
+ cmp bx,2386
+ jae joy_timeout
+joy_continue:
+ loop joy_wait
+joy_timeout:
+ mov ax,0xffff
+ jmp joy_read_return
+joy_read_done:
+ call pit_count
+ sub si,ax
+ and si,0x7fff
+ mov ax,si
+ cmp ax,2386
+ jae joy_timeout
+joy_read_return:
+ pop si
+ pop dx
+ pop cx
+ pop bx
+ ret
+joy_poll:
+ save
+ mov byte ptr [joy_left],0
+ mov byte ptr [joy_right],0
+ mov byte ptr [joy_fire],0
+ mov byte ptr [joy_fire_edge],0
+ mov byte ptr [joy_pause_edge],0
+ cmp byte ptr [joy_enabled],0
+ je joy_poll_done
+ call joy_read
+ mov word ptr [joy_raw],ax
+ mov byte ptr [joy_valid],0
+ cmp ax,0xffff
+ jne joy_connected
+ # Don't leave held controls stuck after an unplug. Stop polling altogether
+ # after eight failures; J from title/game-over offers recalibration.
+ mov byte ptr [joy_old_buttons],0
+ inc byte ptr [joy_failures]
+ cmp byte ptr [state],6
+ je joy_poll_done
+ cmp byte ptr [joy_failures],8
+ jb joy_poll_done
+ mov byte ptr [joy_enabled],0
+ jmp joy_poll_done
+joy_connected:
+ mov byte ptr [joy_failures],0
+ mov byte ptr [joy_valid],1
+ cmp byte ptr [state],6
+ je joy_get_buttons
+ cmp ax,word ptr [joy_low]
+ jae joy_test_right
+ mov byte ptr [joy_left],1
+joy_test_right:
+ cmp ax,word ptr [joy_high]
+ jbe joy_get_buttons
+ mov byte ptr [joy_right],1
+joy_get_buttons:
+ mov dx,0x201
+ in al,dx
+ not al
+ and al,0x30
+ mov byte ptr [joy_buttons],al
+ mov ah,byte ptr [joy_old_buttons]
+ not ah
+ and ah,al
+ mov byte ptr [joy_old_buttons],al
+ test al,0x10
+ jz joy_test_edge
+ mov byte ptr [joy_fire],1
+joy_test_edge:
+ test ah,0x10
+ jz joy_test_pause
+ mov byte ptr [joy_fire_edge],1
+joy_test_pause:
+ test ah,0x20
+ jz joy_poll_done
+ mov byte ptr [joy_pause_edge],1
+joy_poll_done:
+ restore
+ ret
+joy_calibrate:
+ call sound_silence
+ mov byte ptr [state],6
+ mov byte ptr [cal_step],0
+ mov byte ptr [joy_enabled],1
+ mov byte ptr [joy_old_buttons],0x30
+ mov byte ptr [joy_failures],0
+joy_cal_screen:
+ call clear_screen
+ text 100,35,11,msg_cal_title
+ mov si,OFFSET msg_cal_center
+ cmp byte ptr [cal_step],0
+ je joy_cal_prompt
+ mov si,OFFSET msg_cal_left
+ cmp byte ptr [cal_step],1
+ je joy_cal_prompt
+ mov si,OFFSET msg_cal_right
+joy_cal_prompt:
+ mov ax,61
+ mov dx,85
+ mov bl,15
+ call draw_text
+ text 82,112,14,msg_cal_accept
+ text 58,145,8,msg_cal_cancel
+ ret
+joy_calibration_input:
+ cmp byte ptr [pressed+28],0
+ jne joy_cal_accept
+ cmp byte ptr [pressed+57],0
+ jne joy_cal_accept
+ cmp byte ptr [joy_fire_edge],0
+ je joy_cal_done
+joy_cal_accept:
+ cmp byte ptr [joy_valid],0
+ je joy_cal_fail
+ # Median of three timer measurements reduces interruption jitter.
+ call joy_read
+ mov bx,ax
+ call joy_read
+ mov cx,ax
+ call joy_read
+ cmp bx,cx
+ jbe cal_sort2
+ xchg bx,cx
+cal_sort2:
+ cmp cx,ax
+ jbe cal_sort3
+ xchg cx,ax
+cal_sort3:
+ cmp bx,cx
+ jbe cal_median
+ xchg bx,cx
+cal_median:
+ mov ax,cx
+ cmp ax,2386
+ jae joy_cal_fail
+ cmp byte ptr [cal_step],0
+ jne joy_cal_left
+ mov word ptr [joy_center],ax
+ jmp joy_cal_next
+joy_cal_left:
+ cmp byte ptr [cal_step],1
+ jne joy_cal_right
+ mov word ptr [joy_min],ax
+ jmp joy_cal_next
+joy_cal_right:
+ mov bx,word ptr [joy_center]
+ sub ax,bx
+ jc joy_cal_fail
+ cmp ax,32
+ jb joy_cal_fail
+ shr ax,1
+ add ax,bx
+ mov word ptr [joy_high],ax
+ sub bx,word ptr [joy_min]
+ jc joy_cal_fail
+ cmp bx,32
+ jb joy_cal_fail
+ shr bx,1
+ mov ax,word ptr [joy_center]
+ sub ax,bx
+ mov word ptr [joy_low],ax
+ mov byte ptr [state],0
+ call title_screen
+ ret
+joy_cal_next:
+ inc byte ptr [cal_step]
+ call joy_cal_screen
+joy_cal_done:
+ ret
+joy_cal_fail:
+ mov byte ptr [joy_enabled],0
+ mov byte ptr [state],0
+ call title_screen
+ # Replace setup hint with an actionable calibration failure.
+ text 64,175,11,msg_joystick
+ text 64,175,12,msg_cal_failed
+ ret
+
 # EGA mode 0Dh: map mask selects color planes; XOR and latches let exactly
 # the same sprite erase itself. Only moving objects touch display memory.
 graphics_setup:
+ xor bx,bx
+ xor ax,ax
+ mov dx,40
+ cmp byte ptr [video_mode],0x12
+ jne make_rows
+ mov ax,3200
+ mov dx,160
+make_rows:
+ mov word ptr [row_offsets+bx],ax
+ add ax,dx
+ add bx,2
+ cmp bx,400
+ jb make_rows
  mov ax,0xa000
  mov es,ax
  mov dx,0x3ce
@@ -369,29 +712,40 @@ clear_screen:
  xor ax,ax
  xor di,di
  mov cx,4000
+ cmp byte ptr [video_mode],0x12
+ jne clear_pixels
+ mov cx,19200
+clear_pixels:
  rep stosw
+ mov byte ptr [plane_cache],15
  mov ax,0x1803
  out dx,ax
  restore
  ret
 # AX=x, DX=y, SI=bitmap, CX=width in bytes, BP=rows, BL=color.
-# All registers preserved. Caller keeps bitmap within the 320x200 screen.
+# All registers preserved. Logical coordinates stay 320x200 in both modes.
+# VGA doubles pixels to 640x400 and centres that playfield in 640x480.
 sprite:
  save
  mov word ptr [draw_x],ax
  mov byte ptr [draw_width],cl
- mov ax,dx
- mov di,40
- mul di
- mov di,ax
- mov ax,word ptr [draw_x]
- mov cl,3
- shr ax,cl
- add di,ax
+ mov di,dx
+ shl di,1
+ mov di,word ptr [row_offsets+di]
+ cmp bl,byte ptr [plane_cache]
+ je sprite_plane_ready
+ mov byte ptr [plane_cache],bl
  mov dx,0x3c4
  mov ah,bl
  mov al,2
  out dx,ax
+sprite_plane_ready:
+ cmp byte ptr [video_mode],0x12
+ je sprite_vga
+ mov ax,word ptr [draw_x]
+ mov cl,3
+ shr ax,cl
+ add di,ax
  mov cx,word ptr [draw_x]
  and cl,7
 sprite_row:
@@ -420,6 +774,66 @@ sprite_next:
  add di,40
  dec bp
  jnz sprite_row
+ restore
+ ret
+# Expand each source byte with a 256-word lookup. Each output byte is
+# XORed into both scanlines. Reading latches before each write is required.
+sprite_vga:
+ mov ax,word ptr [draw_x]
+ shl ax,1
+ mov cx,ax
+ and cl,7
+ mov byte ptr [draw_shift],cl
+ mov cl,3
+ shr ax,cl
+ add di,ax
+vga_row:
+ push di
+ mov cl,byte ptr [draw_shift]
+ mov ch,byte ptr [draw_width]
+ mov byte ptr [draw_carry],0
+vga_byte:
+ lodsb
+ xor ah,ah
+ mov bx,ax
+ shl bx,1
+ mov dx,word ptr [double_bits+bx]
+ # First eight expanded pixels.
+ mov ah,dh
+ xor al,al
+ shr ax,cl
+ or ah,byte ptr [draw_carry]
+ mov byte ptr [draw_carry],al
+ mov al,byte ptr es:[di]
+ mov byte ptr es:[di],ah
+ mov al,byte ptr es:[di+80]
+ mov byte ptr es:[di+80],ah
+ inc di
+ # Last eight expanded pixels.
+ mov ah,dl
+ xor al,al
+ shr ax,cl
+ or ah,byte ptr [draw_carry]
+ mov byte ptr [draw_carry],al
+ mov al,byte ptr es:[di]
+ mov byte ptr es:[di],ah
+ mov al,byte ptr es:[di+80]
+ mov byte ptr es:[di+80],ah
+ inc di
+ dec ch
+ jnz vga_byte
+ test cl,cl
+ jz vga_next
+ mov ah,byte ptr [draw_carry]
+ mov al,byte ptr es:[di]
+ mov byte ptr es:[di],ah
+ mov al,byte ptr es:[di+80]
+ mov byte ptr es:[di+80],ah
+vga_next:
+ pop di
+ add di,160
+ dec bp
+ jnz vga_row
  restore
  ret
 # Font is a compact original 5x7 bitmap table, 6-pixel advance.
@@ -466,7 +880,7 @@ number_loop:
  loop number_loop
  restore
  ret
-hud:
+hud_format:
  save
  mov ax,word ptr [score]
  mov di,OFFSET score_digits
@@ -483,6 +897,20 @@ hud:
  mov al,byte ptr [lives]
  add al,'0'
  mov byte ptr [life_digit],al
+ restore
+ ret
+hud_numbers:
+ save
+ call hud_format
+ text 42,3,15,score_digits
+ text 132,3,11,best_digits
+ text 230,3,14,wave_digits
+ text 302,3,10,life_digit
+ restore
+ ret
+hud:
+ save
+ call hud_format
  text 6,3,15,hud_score
  text 102,3,11,hud_best
  text 200,3,14,hud_wave
@@ -497,6 +925,96 @@ hud_sound:
  mov bl,8
  call draw_text
  restore
+ ret
+
+# Static wave scenery. Integer Bresenham, drawn once, no framebuffer copy.
+# XOR sprites restore these lines when erased, including damaged shields.
+background:
+ save
+ mov dx,0x3ce
+ mov ax,0x1003
+ out dx,ax
+ xor ax,ax
+ mov al,byte ptr [wave]
+ dec ax
+ mov bl,6
+ div bl
+ mov bl,ah
+ xor bh,bh
+ shl bx,1
+ mov si,word ptr [background_table+bx]
+ lodsw
+ mov cx,ax
+background_line:
+ push cx
+ lodsw
+ mov word ptr [line_x],ax
+ lodsw
+ mov word ptr [line_y],ax
+ lodsw
+ mov word ptr [line_x2],ax
+ lodsw
+ mov word ptr [line_y2],ax
+ push si
+ call wire_line
+ pop si
+ pop cx
+ loop background_line
+ mov dx,0x3ce
+ mov ax,0x1803
+ out dx,ax
+ restore
+ ret
+wire_line:
+ mov ax,word ptr [line_x2]
+ sub ax,word ptr [line_x]
+ mov word ptr [line_sx],1
+ jns wire_dx
+ neg ax
+ mov word ptr [line_sx],-1
+wire_dx:
+ mov word ptr [line_dx],ax
+ mov ax,word ptr [line_y2]
+ sub ax,word ptr [line_y]
+ mov word ptr [line_sy],1
+ jns wire_dy
+ neg ax
+ mov word ptr [line_sy],-1
+wire_dy:
+ neg ax
+ mov word ptr [line_dy],ax
+ add ax,word ptr [line_dx]
+ mov word ptr [line_error],ax
+wire_pixel:
+ mov ax,word ptr [line_x]
+ mov dx,word ptr [line_y]
+ mov si,OFFSET wire_dot
+ mov cx,1
+ mov bp,1
+ mov bl,1
+ call sprite
+ cmp ax,word ptr [line_x2]
+ jne wire_step
+ cmp dx,word ptr [line_y2]
+ je wire_done
+wire_step:
+ mov ax,word ptr [line_error]
+ shl ax,1
+ cmp ax,word ptr [line_dy]
+ jl wire_y
+ mov dx,word ptr [line_dy]
+ add word ptr [line_error],dx
+ mov dx,word ptr [line_sx]
+ add word ptr [line_x],dx
+wire_y:
+ cmp ax,word ptr [line_dx]
+ jg wire_pixel
+ mov dx,word ptr [line_dx]
+ add word ptr [line_error],dx
+ mov dx,word ptr [line_sy]
+ add word ptr [line_y],dx
+ jmp wire_pixel
+wire_done:
  ret
 
 # Screens and world initialization.
@@ -528,6 +1046,7 @@ title_screen:
  text 91,135,14,msg_start
  text 58,153,7,msg_controls
  text 64,165,7,msg_controls2
+ text 64,175,11,msg_joystick
  mov si,OFFSET silent_text
  cmp byte ptr [skip_sound],0
  jne title_audio
@@ -547,6 +1066,8 @@ title_audio:
 new_wave:
  call sound_silence
  call clear_screen
+ call background
+ mov byte ptr [shields_crushed],0
  mov byte ptr [state],1
  mov byte ptr [anim],0
  mov word ptr [group_x],40
@@ -561,6 +1082,8 @@ new_wave:
  mov byte ptr [ufo_active],0
  mov word ptr [ufo_timer],150
  mov byte ptr [shot_active],0
+ mov byte ptr [fire_pending],0
+ mov byte ptr [march_note],0
  mov word ptr [enemy_y],0
  mov word ptr [enemy_y+2],0
  mov word ptr [enemy_y+4],0
@@ -594,8 +1117,6 @@ shield_draw_init:
  jb shield_draw_init
  call draw_aliens
  call player_draw
- mov al,2
- call effect
  ret
 game_over:
  mov byte ptr [state],3
@@ -613,10 +1134,16 @@ game_over:
  call hud
  ret
 
-# One simulation step per BIOS tick (~18.2 Hz). Drop excess time when slow.
+# Player and laser at 36.4 Hz. World/aliens retain the original real-time
+# speed. A tap queues briefly, and a freed projectile slot fires this step.
 game_tick:
  call player_update
  call shot_update
+ cmp byte ptr [state],1
+ jne game_tick_done
+ call player_try_fire
+ test word ptr [frame],1
+ jnz game_tick_done
  call enemy_update
  cmp byte ptr [state],1
  jne game_tick_done
@@ -633,33 +1160,90 @@ no_march:
 game_tick_done:
  ret
 player_update:
- cmp byte ptr [player_visible],0
- je player_move
- call player_sprite
- mov byte ptr [player_visible],0
-player_move:
+ mov ax,word ptr [player_x]
+ mov dx,word ptr [frame]
+ and dx,1
+ add dx,2
+ xor bx,bx
  cmp byte ptr [keys+75],0
- je player_right
- sub word ptr [player_x],5
- cmp word ptr [player_x],8
- jge player_right
- mov word ptr [player_x],8
-player_right:
+ jne move_left
+ cmp byte ptr [joy_left],0
+ je test_right
+move_left:
+ dec bx
+test_right:
  cmp byte ptr [keys+77],0
- je player_fire
- add word ptr [player_x],5
- cmp word ptr [player_x],296
- jle player_fire
- mov word ptr [player_x],296
-player_fire:
+ jne move_right
+ cmp byte ptr [joy_right],0
+ je move_ship
+move_right:
+ inc bx
+move_ship:
+ test bx,bx
+ jz player_clamp
+ jg player_to_right
+ sub ax,dx
+ jmp player_clamp
+player_to_right:
+ add ax,dx
+player_clamp:
+ cmp ax,8
+ jge player_upper
+ mov ax,8
+player_upper:
+ cmp ax,296
+ jle player_visibility
+ mov ax,296
+player_visibility:
+ mov dl,1
  cmp byte ptr [invulnerable],0
- je player_try_fire
+ je player_compare
+ test word ptr [frame],1
+ jnz player_blink
  dec byte ptr [invulnerable]
+player_blink:
+ test word ptr [frame],4
+ jz player_compare
+ xor dl,dl
+player_compare:
+ cmp ax,word ptr [player_x]
+ jne player_changed
+ cmp dl,byte ptr [player_visible]
+ je player_update_done
+player_changed:
+ push ax
+ push dx
+ cmp byte ptr [player_visible],0
+ je player_old_erased
+ call player_sprite
+player_old_erased:
+ pop dx
+ pop ax
+ mov word ptr [player_x],ax
+ mov byte ptr [player_visible],dl
+ test dl,dl
+ jz player_update_done
+ call player_sprite
+player_update_done:
+ ret
 player_try_fire:
  cmp byte ptr [keys+57],0
- je player_draw
+ jne request_shot
+ cmp byte ptr [pressed+57],0
+ jne request_shot
+ cmp byte ptr [joy_fire],0
+ jne request_shot
+ cmp byte ptr [joy_fire_edge],0
+ je try_pending
+request_shot:
+ mov byte ptr [fire_pending],6
+try_pending:
+ cmp byte ptr [fire_pending],0
+ je fire_done
+ dec byte ptr [fire_pending]
  cmp byte ptr [shot_active],0
- jne player_draw
+ jne fire_done
+ mov byte ptr [fire_pending],0
  mov ax,word ptr [player_x]
  add ax,7
  mov word ptr [shot_x],ax
@@ -668,10 +1252,12 @@ player_try_fire:
  call shot_sprite
  mov al,0
  call effect
+fire_done:
+ ret
 player_draw:
  cmp byte ptr [invulnerable],0
  je player_show
- test word ptr [frame],2
+ test word ptr [frame],4
  jnz player_draw_done
 player_show:
  call player_sprite
@@ -703,7 +1289,9 @@ shot_update:
  mov ax,word ptr [shot_x]
  mov word ptr [hit_x],ax
  # Test each crossed point against shield pixels; never tunnel through them.
- mov cx,7
+ mov cx,word ptr [frame]
+ and cx,1
+ add cx,3
 shot_travel:
  dec word ptr [shot_y]
  mov ax,word ptr [shot_y]
@@ -745,26 +1333,18 @@ shot_done:
  ret
 
 alien_position:
- # BX=index, returns AX=x and DX=y; preserves BX.
- mov ax,bx
- mov cl,10
- div cl
- push ax
- xor ah,ah
+ # Two byte tables replace repeated DIV/MUL for all 50 alien positions.
+ xor ax,ax
+ mov al,byte ptr [alien_rows+bx]
  mov dx,ax
- mov cl,4
- shl dx,cl
  add dx,word ptr [group_y]
- pop ax
- mov al,ah
- xor ah,ah
- mov cl,24
- mul cl
+ mov al,byte ptr [alien_columns+bx]
  add ax,word ptr [group_x]
  ret
 alien_sprite:
- push bx
  call alien_position
+alien_at:
+ push bx
  mov si,OFFSET alien_low
  mov byte ptr [alien_color],11
  cmp bx,30
@@ -798,22 +1378,39 @@ draw_alien_next:
  jb draw_alien_loop
  ret
 alien_hit:
- xor bx,bx
-alien_hit_loop:
+ # First candidate row intersected by the five-pixel projectile.
+ mov ax,word ptr [shot_y]
+ add ax,4
+ sub ax,word ptr [group_y]
+ js alien_hit_no
+ mov dx,ax
+ mov cl,4
+ shr dx,cl
+ cmp dx,5
+ jae alien_hit_no
+ and ax,15
+ sub ax,4
+ cmp ax,8
+ jge alien_hit_no
+ mov ax,word ptr [shot_x]
+ sub ax,word ptr [group_x]
+ js alien_hit_no
+ mov cl,24
+ div cl
+ cmp al,10
+ jae alien_hit_no
+ cmp ah,16
+ jae alien_hit_no
+ xor ah,ah
+ mov bx,dx
+ shl bx,1
+ shl dx,1
+ shl dx,1
+ shl dx,1
+ add bx,dx
+ add bx,ax
  cmp byte ptr [aliens+bx],0
- je alien_hit_next
- call alien_position
- mov cx,word ptr [shot_x]
- sub cx,ax
- cmp cx,16
- jae alien_hit_next
- mov cx,word ptr [shot_y]
- add cx,4
- cmp cx,dx
- jl alien_hit_next
- add dx,8
- cmp word ptr [shot_y],dx
- jge alien_hit_next
+ je alien_hit_no
  call alien_sprite
  mov byte ptr [aliens+bx],0
  dec byte ptr [alive_count]
@@ -839,14 +1436,14 @@ alien_points:
 alien_hit_yes:
  mov al,1
  ret
-alien_hit_next:
- inc bx
- cmp bx,50
- jb alien_hit_loop
+alien_hit_no:
  xor al,al
  ret
 march:
- call draw_aliens
+ mov ax,word ptr [group_x]
+ mov word ptr [march_dx],ax
+ mov ax,word ptr [group_y]
+ mov word ptr [march_dy],ax
  mov ax,word ptr [direction]
  add word ptr [group_x],ax
  cmp word ptr [group_x],8
@@ -858,28 +1455,51 @@ turn_formation:
  neg word ptr [direction]
  add word ptr [group_y],6
 formation_place:
+ mov ax,word ptr [group_x]
+ sub word ptr [march_dx],ax
+ mov ax,word ptr [group_y]
+ sub word ptr [march_dy],ax
  xor byte ptr [anim],1
- call draw_aliens
+ # Erase and replace one alien at a time, rather than blanking the fleet.
+ xor bx,bx
+march_draw:
+ cmp byte ptr [aliens+bx],0
+ je march_draw_next
+ call alien_position
+ push ax
+ push dx
+ add ax,word ptr [march_dx]
+ add dx,word ptr [march_dy]
+ xor byte ptr [anim],1
+ call alien_at
+ xor byte ptr [anim],1
+ pop dx
+ pop ax
+ call alien_at
+march_draw_next:
+ inc bx
+ cmp bx,50
+ jb march_draw
  mov al,2
  call effect
  # Once the lowest surviving row enters the shield band, remove shields.
- xor bx,bx
- mov word ptr [lowest],0
+ mov bx,49
 find_lowest:
  cmp byte ptr [aliens+bx],0
- je lowest_next
+ jne lowest_found
+ dec bx
+ jns find_lowest
+ ret
+lowest_found:
  call alien_position
  add dx,8
- cmp dx,word ptr [lowest]
- jbe lowest_next
  mov word ptr [lowest],dx
-lowest_next:
- inc bx
- cmp bx,50
- jb find_lowest
  cmp word ptr [lowest],148
  jb march_speed
- # XOR erase shields, zero their collision masks, without erasing aliens.
+ # XOR erase shields only once, without erasing aliens or the backdrop.
+ cmp byte ptr [shields_crushed],0
+ jne check_invasion
+ mov byte ptr [shields_crushed],1
  xor bx,bx
 shield_crush:
  call draw_shield
@@ -894,6 +1514,7 @@ shield_crush:
  mov cx,128
  rep stosw
  pop es
+ check_invasion:
  cmp word ptr [lowest],175
  jb march_speed
  mov byte ptr [lives],0
@@ -1041,9 +1662,9 @@ hit_no_player_shot:
  call player_sprite
  mov byte ptr [player_visible],0
 hit_player_erased:
- call hud
+ call hud_numbers
  dec byte ptr [lives]
- call hud
+ call hud_numbers
  mov ax,word ptr [player_x]
  mov dx,175
  mov si,OFFSET explosion
@@ -1076,14 +1697,14 @@ ufo_update:
  call ufo_sprite
  ret
 ufo_move:
- test word ptr [frame],1
+ test word ptr [frame],2
  jnz ufo_done
  call ufo_sprite
  add word ptr [ufo_x],3
  cmp word ptr [ufo_x],303
  ja ufo_hide
  call ufo_sprite
- test word ptr [frame],7
+ test word ptr [frame],15
  jnz ufo_done
  mov al,4
  call effect
@@ -1095,7 +1716,7 @@ ufo_hide:
  ret
 add_score:
  push ax
- call hud
+ call hud_numbers
  pop ax
  add word ptr [score],ax
  jnc score_no_overflow
@@ -1106,7 +1727,7 @@ score_no_overflow:
  jbe score_hud
  mov word ptr [best],ax
 score_hud:
- call hud
+ call hud_numbers
  ret
 
 # Destructible 32x16 shields; 5x5 craters and per-pixel collision.
@@ -1324,6 +1945,25 @@ patch_loop:
  inc bx
  cmp bx,5
  jb patch_loop
+ # March channel: low, softly modulated thud with a fast decay.
+ mov ax,0x0122
+ call opl_write
+ mov ax,0x0125
+ call opl_write
+ mov ax,0x2842
+ call opl_write
+ mov ax,0x0245
+ call opl_write
+ mov ax,0xf862
+ call opl_write
+ mov ax,0xf865
+ call opl_write
+ mov ax,0x0a82
+ call opl_write
+ mov ax,0x0a85
+ call opl_write
+ mov ax,0x00c2
+ call opl_write
 sound_detection_done:
  ret
 toggle_sound:
@@ -1364,6 +2004,17 @@ effect:
  mov al,byte ptr [effect_lengths+bx]
  mov byte ptr [sfx_time+bx],al
  mov al,byte ptr [effect_low+bx]
+ cmp bx,2
+ jne effect_pitch
+ push bx
+ xor bx,bx
+ mov bl,byte ptr [march_note]
+ mov al,byte ptr [march_pitches+bx]
+ inc bl
+ and bl,3
+ mov byte ptr [march_note],bl
+ pop bx
+effect_pitch:
  mov byte ptr [sfx_low+bx],al
  mov al,bl
  add al,0xa0
@@ -1387,7 +2038,11 @@ sound_channel:
  je sound_next
  dec byte ptr [sfx_time+bx]
  jz sound_keyoff
+ test word ptr [frame],1
+ jnz sound_next
  mov al,byte ptr [effect_slide+bx]
+ test al,al
+ jz sound_next
  sub byte ptr [sfx_low+bx],al
  mov al,bl
  add al,0xa0
@@ -1411,13 +2066,16 @@ sound_tick_done:
 old_mode: .byte 3
 old_page: .byte 0
 skip_sound: .byte 0
-usage: .ascii "XT INVADERS 1.0 - EGA/VGA + AdLib arcade game\r\n"
- .ascii "INVADERS [/S]    /S skips AdLib probing and runs silently.\r\n"
+video_mode: .byte 0x0d
+want_joy: .byte 0
+usage: .ascii "XT INVADERS 2.0 - EGA/VGA + AdLib arcade game\r\n"
+ .ascii "INVADERS [/E | /V] [/J] [/S]\r\n"
+ .ascii "/E 320x200  /V 640x480 16 colors  /J calibrate gameport  /S silent\r\n"
  .ascii "Arrows: move  Space: fire/start  P: pause  M: mute  Esc: quit\r\n"
  .ascii "DOS 2+, 8088/V20+, EGA or VGA. AdLib at 388h is optional.\r\n$"
 err_memory: .ascii "Not enough DOS memory for XT INVADERS.\r\n$"
 err_dos: .ascii "XT INVADERS requires DOS 2.0 or later.\r\n$"
-err_video: .ascii "XT INVADERS requires EGA or VGA mode 0Dh.\r\n$"
+err_video: .ascii "Video mode unavailable. /E requires EGA; /V requires VGA.\r\n$"
 farewell: .ascii "Thanks for playing XT INVADERS!\r\n$"
 msg_xt: .asciz "8088 / V20"
 msg_title: .asciz "X T   I N V A D E R S"
@@ -1425,16 +2083,24 @@ msg_subtitle: .asciz "DEFEND THE LAST OUTPOST"
 msg_30: .asciz "SCOUT       30 POINTS"
 msg_20: .asciz "RAIDER      20 POINTS"
 msg_10: .asciz "DRONE       10 POINTS"
-msg_start: .asciz "PRESS SPACE TO START"
+msg_start: .asciz "SPACE OR FIRE TO START"
 msg_controls: .asciz "ARROWS MOVE    HOLD SPACE TO FIRE"
 msg_controls2: .asciz "P PAUSE    M SOUND    ESC QUIT"
+msg_joystick: .asciz "J SET UP JOYSTICK OR GAMEPAD"
+msg_cal_title: .asciz "GAMEPORT CALIBRATION"
+msg_cal_center: .asciz "RELEASE STICK OR PAD TO CENTRE"
+msg_cal_left: .asciz "HOLD STICK OR PAD FULL LEFT"
+msg_cal_right: .asciz "HOLD STICK OR PAD FULL RIGHT"
+msg_cal_accept: .asciz "PRESS ENTER OR BUTTON ONE"
+msg_cal_cancel: .asciz "ESC CANCELS - KEYBOARD STILL WORKS"
+msg_cal_failed: .asciz "NO VALID X AXIS - PRESS J TO RETRY"
 msg_top_controls: .asciz "ARROWS MOVE   SPACE FIRE"
 msg_bottom_controls: .asciz "P PAUSE    M SOUND    ESC QUIT"
 msg_pause: .asciz "-- PAUSED --"
 msg_end: .asciz "OUTPOST LOST"
 msg_gameover: .asciz "G A M E  O V E R"
 msg_final: .asciz "YOUR FINAL SCORE"
-msg_restart: .asciz "PRESS SPACE TO TRY AGAIN"
+msg_restart: .asciz "SPACE OR FIRE TO TRY AGAIN"
 msg_quit: .asciz "ESC RETURNS TO DOS"
 msg_waveclear: .asciz "WAVE CLEAR"
 adlib_text: .asciz "ADLIB ON"
@@ -1455,17 +2121,77 @@ op_offsets: .byte 0,1,2,8,9
 mod_levels: .byte 0x18,0x08,0x25,0x00,0x12
 waveforms: .byte 0,1,0,1,2
 feedbacks: .byte 0x06,0x0e,0x04,0x0e,0x08
-effect_lengths: .byte 3,4,1,9,2
+effect_lengths: .byte 6,8,2,18,4
 effect_low: .byte 240,220,120,190,170
-effect_high: .byte 0x15,0x0d,0x08,0x09,0x12
+effect_high: .byte 0x15,0x0d,0x09,0x09,0x12
+march_pitches: .byte 238,205,175,148
 effect_slide: .byte 55,42,0,17,55
+# Duplicated bits, MSB-first; generated by the assembler.
+double_bits:
+.set d,0
+.rept 256
+ .word ((d & 128)*384) | ((d & 64)*192) | ((d & 32)*96) | ((d & 16)*48) | ((d & 8)*24) | ((d & 4)*12) | ((d & 2)*6) | ((d & 1)*3)
+ .set d,d+1
+.endr
+alien_rows:
+.set a,0
+.rept 50
+ .byte (a/10)*16
+ .set a,a+1
+.endr
+alien_columns:
+.set a,0
+.rept 50
+ .byte (a%10)*24
+ .set a,a+1
+.endr
+wire_dot: .byte 128
+.include "WIRE.INC"
 .include "ART.INC"
 
 .section .bss
 bss_start:
 old_irq: .skip 4
 keys: .skip 128
-previous: .skip 128
+key_edges: .skip 128
+pressed: .skip 128
+old_timer: .skip 4
+clock_ticks: .skip 2
+bios_phase: .skip 1
+row_offsets: .skip 400
+plane_cache: .skip 1
+draw_shift: .skip 1
+draw_carry: .skip 1
+fire_pending: .skip 1
+march_note: .skip 1
+march_dx: .skip 2
+march_dy: .skip 2
+joy_enabled: .skip 1
+joy_left: .skip 1
+joy_right: .skip 1
+joy_fire: .skip 1
+joy_fire_edge: .skip 1
+joy_pause_edge: .skip 1
+joy_buttons: .skip 1
+joy_old_buttons: .skip 1
+joy_raw: .skip 2
+joy_valid: .skip 1
+joy_failures: .skip 1
+joy_center: .skip 2
+joy_min: .skip 2
+joy_low: .skip 2
+joy_high: .skip 2
+cal_step: .skip 1
+shields_crushed: .skip 1
+line_x: .skip 2
+line_y: .skip 2
+line_x2: .skip 2
+line_y2: .skip 2
+line_dx: .skip 2
+line_dy: .skip 2
+line_sx: .skip 2
+line_sy: .skip 2
+line_error: .skip 2
 state: .skip 1
 state_timer: .skip 1
 score: .skip 2

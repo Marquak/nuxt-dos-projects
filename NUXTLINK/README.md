@@ -1,92 +1,65 @@
-# NuXT Link 3.1
+# NuXT Link 3.2
 
 A way to get files to and from the NuXT without swapping cards or floppies.
-It has a Linux file-manager GUI, folder transfers and file-level drive backups,
-with CRC verification, DOS timestamps and attributes preserved.
+Queue files from different folders, back up a drive, and keep the DOS dates
+and attributes intact. CRC verification stays on.
 
-The DOS server targets 8088/8086 and NEC V20. The Linux client needs Python
+The DOS server targets 8088/8086 and NEC V20. The Linux GUI needs Python
 3.10+ and Tkinter. No pip packages are required.
 
 ## Upgrade and start
 
-**Linux UI refresh, 8 October 2026:** replace the complete `linux/` folder and
-relaunch `sh linux/launch.sh`. Keep `interface.py` alongside `nuxtlink.py`.
-Your existing DOS 3.1 server and saved connection profiles remain compatible;
-there is no DOS update for this UI refresh.
-
-Each file pane remembers its own sort column and direction when navigating,
-refreshing or filtering, with folders first and an arrow on the active heading.
-Click **Filter** to search names in the current folder; **Hide** clears the
-filter. Enter a path and press Enter to navigate. In a file list, **F5** refreshes,
-**Alt+Up** opens the parent, **Ctrl+L** focuses its path and **Ctrl+A** selects
-visible entries. Hidden/system files remain included.
-
-**Connection options** reveals peer checks, packet size, FTDI latency and the
-DOS-port reminder. Edited link settings are marked pending until **Apply
-changes** succeeds. **Diagnostics** still shows the individual error counters,
-FIFO and handshake lines. Hover over options for explanations.
-
-The queue shows source, destination and bytes. Local paths in its table are
-relative to the preview's local root; double-click a job for complete paths,
-metadata and any error/skip reason. Separate file and queue progress bars show
-byte progress; completion/verification is indicated by job status. Folder-only
-and deletion queues use completed job counts for overall progress. Cancel,
-clear and resume retain their existing behaviour.
-
-For the original **DOS 3.0 to 3.1** upgrade, replace the DOS program; Linux
-protocol-v3 clients are compatible. The DOS patch addresses receive overruns during uploads by using a
-short 8086 assembly receive loop and holding RTS low during CRC checks and
-console output. The owner confirmed successful 115200 uploads on the NuXT after this fix;
-other machines and cables still need their own checks.
-
-Use 57600 for copying `NUXFER31.COM` to the NuXT alongside your existing server.
-Disconnect the Linux client, exit the old server with Esc, then start:
+Replace the complete Linux folder, including the new `transfer_queue.py`, and
+restart the client. Saved profiles still work. Copy `NUXFER32.COM` to DOS using
+your current server, disconnect, then press Esc on DOS before starting the new
+server. The versioned filename lets you keep the old program as a fallback.
 
 ```dos
-NUXFER31 COM1 115200 /FLOW:RTSCTS /PEER:BOTH /BLOCK:512
+C:\NET\NUXFER32 COM1
 ```
 
-Select those same settings in Linux and reconnect. Counters start at zero;
-compare **UART overruns** before and after an upload. Lower to 57600 if the
-counter increases. Old totals do not clear when baud or block size changes.
-`dos/NUXFER.COM` and `NUXFER31.COM` in this package are identical; the alternate name
-lets you stage this update without overwriting a running program.
-
-When updating from v1/v2, update **both** DOS and Linux to protocol v3.
-Exit the old server before replacing its executable.
-This source package does not include a floppy image. Copy the server using
-your existing transfer method or a DOS data floppy.
-
-On DOS:
-
-```dos
-COPY A:\NUXFER31.COM C:\NUXFER31.COM
-C:\NUXFER31 COM1 38400
-```
-
-Use the actual directory where you keep the server. It always shares the **whole
-drive containing NUXFER.COM**. For example, launching `C:\TOOLS\NUXFER` while the
-prompt is `A:\` shares `C:\`. Launching the copy on the floppy shares `A:\`.
-The Linux browser starts at that drive's root; there is no other-drive selector.
-
-On Linux, from the extracted package:
+Use the actual directory where you copied it. The default is now **9600 baud**
+for the initial handshake. In Linux, keep your preferred transfer settings,
+for example **115200, rtscts, peer both, block 512** with your full-handshake
+cable. Connect negotiates those settings after finding the server.
 
 ```sh
 sh linux/launch.sh
 ```
 
-Choose the serial device and matching speed, then **Connect**. A USB-to-RS-232
-adapter and null-modem cable are required for the real machine. For 86Box, enter
-the PTY displayed by its COM1 virtual console (for example `/dev/pts/3`). Your
-86Box settings are independent of this package.
+`NUXFER.COM`, `NUXFER32.COM` and `dos/NUXFER.COM` are identical. Update both sides
+for all 3.2 fixes; the wire protocol remains v3. Versions 1 and 2 need both sides
+upgraded. No floppy image is included in this release.
+
+The server shares the **whole drive containing its executable**. Launching
+`C:\NET\NUXFER32` from an `A:\` prompt shares `C:\`. Launching the floppy copy
+shares `A:\`. The Linux browser starts at that drive's root.
+
+Choose the serial device before Connect. A USB-to-RS-232 adapter and null-modem
+cable are required for the real machine. An emulator's serial PTY can also be
+entered as the device. This package does not change emulator settings.
+
+Each file pane remembers its sort column and direction across folders, refreshes
+and filters. Folders stay first. Filter searches the current folder; Hide clears
+it. F5 refreshes, Alt+Up opens the parent, Ctrl+L focuses the path, and Ctrl+A
+selects visible entries. Hidden/system files remain included.
+
+Connection options reveals peer checks, packet size, FTDI latency and the DOS
+port reminder. Changes stay marked pending until Apply changes succeeds.
+Diagnostics shows individual UART/error counters and handshake lines.
 
 ## Connection settings and full-handshake cables
 
-The ordinary DOS bootstrap remains `NUXFER COM1 38400`. Choose the desired baud,
-flow and optional peer checks in the GUI, then Connect. The client first tries
-the selected baud, then 38400 if different, and negotiates the selected settings
-on both ends. It does not scan every speed. The DOS port must already be the one
-physically connected to the cable.
+Start DOS with `NUXFER32 COM1` for a 9600-baud handshake. The client tries
+9600 first, then the selected speed and other supported speeds if needed. This
+also finds an older server, a manually selected baud, or a server left at its
+transfer speed after a crash. Discovery can take longer in those cases.
+The DOS COM port must already be the one physically connected to the cable.
+
+Normal Disconnect returns the DOS server to 9600, no flow/peer requirements,
+and 128-byte blocks before closing. Your selected transfer settings remain in
+the GUI. If reset cannot be confirmed, the client reports it; subsequent
+connection discovery can find the retained speed.
 
 For the full-handshake cable, use **flow rtscts**, initially **peer none**. The
 optional peer choices `dsr`, `dcd`, `both` require those readiness inputs before
@@ -116,7 +89,7 @@ NUXFER COM1 38400 /FLOW:NONE /PEER:NONE
 ```
 
 `/PEER:` accepts `NONE`, `DSR`, `DCD`, `BOTH`. `/BLOCK:` accepts `128`, `256`,
-`512`. Defaults are COM1, 38400, no flow control, no required peer lines, 128.
+`512`. Defaults are COM1, 9600, no flow control, no required peer lines, 128.
 The 128-byte default is suitable for the original three-wire setup; larger
 blocks are optional. Packet CRC and whole-file verification always apply.
 
@@ -156,6 +129,24 @@ Double-click folders to navigate; double-click files to prepare a transfer.
 Transfers first appear in the queue for review. Download selection uses the
 current local folder. Upload selection accepts files and folders from the local
 pane. Columns can be sorted; right-click offers the relevant actions.
+
+Prepare an upload or download, browse to another pair of folders, and prepare
+another. New previews **append** to the queue. Each batch keeps its source,
+destination and existing-file policy; browsing later never retargets queued
+items. Uploads and downloads can share a queue. The table shows full paths;
+double-click a row for details if a long path is clipped.
+
+Conflicting destination files are rejected without changing the existing queue.
+Choose another destination or clear the queue before queuing the same target
+again. Deletions have their own preview and require clearing the transfer queue.
+Separate file and queue progress bars show byte progress; job status records
+verification and completion. Directory-only operations use job counts.
+
+Cancel retains unfinished work. Resume skips completed batches. The first
+batch's local `.nuxtlink/last-queue.json` and `last-report.txt` record the whole
+queue; individual backups retain their own manifests. Queue reports are not
+automatically reloaded after restarting the app. Repeat the selection to resume
+verified partials after an app restart.
 
 On DOS: **New folder** creates an 8.3 directory; **Rename / move** accepts an
 8.3 name or a root-relative destination path and never overwrites an existing
@@ -292,9 +283,9 @@ RTS/CTS, toggle required DSR+DCD, cycle present COM ports, or print status.
 
 Supported speeds: **1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200**.
 All use **8N1**. Flow control is selectable: **none** for a three-wire cable,
-or **rtscts** for crossed RTS/CTS. Software XON/XOFF is not used. Start at 38400
-with the NuXT's FIFO UART, or 9600 with an older UART, and lower the speed if
-retries or UART errors increase.
+or **rtscts** for crossed RTS/CTS. Software XON/XOFF is not used. The 9600 handshake is separate from your
+selected transfer speed. Lower the transfer speed if retries or UART errors
+increase.
 Maximum speeds depend on the adapter, cable and CPU. No graphics hardware or
 sound card is needed.
 
@@ -307,7 +298,7 @@ The disk and DOS environment must remain available during transfers.
 
 ## Build and test
 
-`dos/NUXFER.COM` and `NUXFER31.COM` are the same compiled server.
+`dos/NUXFER.COM`, the package-root copy, and `NUXFER32.COM` are the same compiled server.
 Build from source with Open Watcom:
 
 ```sh
@@ -329,9 +320,3 @@ python3 -m unittest discover -s tests -v
 same folder on the shared drive) and overwrites its test files. See `TESTING.md`
 for the validation performed on this release, additional v3 integration tests,
 and `PROTOCOL.md` for the wire format.
-
-## License
-
-Project-authored source is MIT licensed; see [../LICENSE](../LICENSE).
-Open Watcom runtime terms are retained in [OWLIC.TXT](OWLIC.TXT).
-See [../THIRD_PARTY.md](../THIRD_PARTY.md) for provenance and source links.

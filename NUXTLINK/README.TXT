@@ -1,41 +1,37 @@
-NUXT LINK 3.1 - DOS RECEIVE-OVERRUN PATCH
-========================================
-This is a DATA floppy, not a boot disk.
-dos/NUXFER.COM and NUXFER31.COM are identical. Use the alternate name to keep
-an old server available while copying the new one.
+NUXT LINK 3.2
+=============
+Copy NUXFER32.COM beside your existing server. Disconnect Linux, exit the
+old DOS server with Esc, then start from its folder:
 
-Existing NuXT Link 3 Linux clients work with this patch unchanged.
-When upgrading from version 1/2, update both DOS and Linux.
+  NUXFER32 COM1
 
-Upload NUXFER31.COM using 57600, then disconnect Linux and exit the old
-DOS server with Esc. On DOS, from the folder containing the update:
+Default startup is 9600 baud, no flow/peer requirements, 128-byte blocks.
+In Linux keep your desired transfer baud and click Connect. The client
+finds the server and switches both ends to your chosen settings.
+Normal Disconnect returns the server to 9600 for the next connection.
+Manual baud and flow options still work; the client searches other rates
+if the server is already running with different settings.
 
-  NUXFER31 COM1 115200 /FLOW:RTSCTS /PEER:BOTH /BLOCK:512
+Replace the complete Linux folder, including transfer_queue.py, then run:
+  sh linux/launch.sh
+Saved profiles remain compatible. For all fixes, update both sides.
+NUXFER.COM and NUXFER32.COM are identical; wire protocol remains v3.
 
-Select 115200, rtscts, peer both, block 512 in Linux and reconnect.
-For a 3-wire cable use /FLOW:NONE /PEER:NONE and a suitable lower baud.
-
-The patch uses a short 8086 receive loop and holds RTS low during CRC
-checking, disk work and console output. File CRC, resume validation and
-DOS timestamps/attributes remain unchanged. It is compatible with V20.
-
-The four UART counts mean overrun / parity / framing / break.
-They are cumulative until you exit/restart, even when settings change.
-Press S while idle after an upload and check whether overruns increased.
-Use 57600 if errors continue. Emulator tests cannot prove real NuXT timing.
-
-Start at 57600 instead by replacing 115200 in the command above and in
-Linux. Supported baud rates: 1200 2400 4800 9600 19200 38400 57600 115200.
+FULL HANDSHAKE: select rtscts; peer both needs DSR and DCD wired.
+THREE WIRES: select flow none and peer none.
+Supported baud: 1200 2400 4800 9600 19200 38400 57600 115200.
 /FLOW:NONE or RTSCTS. /PEER:NONE, DSR, DCD, BOTH. /BLOCK:128, 256, 512.
+Example manual startup:
+  NUXFER32 COM1 115200 /FLOW:RTSCTS /PEER:BOTH /BLOCK:512
 Idle keys: B baud, F flow, D peer, C COM, S status. Esc exits.
-At very low baud, Esc can wait for the current packet to finish.
-The program shares the ENTIRE drive containing the running executable.
+The ENTIRE drive containing the running executable is shared.
 
-See README.md, CHANGES.md and TESTING.md in this folder for details.
+QUEUE: prepare files, browse elsewhere and add more. Each addition keeps
+its source and destination. Uploads and downloads can share the queue.
+Duplicate target conflicts leave the old queue intact. Clear the queue
+before preparing deletions. Cancel retains pending work and partials.
 
-LINUX UI REFRESH - 8 OCTOBER 2026
-The ZIP now includes a revised Linux interface. Replace the full linux/
-folder (including interface.py), then run sh linux/launch.sh as before.
-It remembers each file pane's sorting across folders, offers name filters,
-and shows source/destination plus separate file and queue progress.
-This UI update does not require replacing the DOS executable again.
+CRC/file verification, resumable transfers and DOS timestamps/attributes
+remain enabled. UART counts are cumulative until server restart.
+See README.md, CHANGES.md and TESTING.md for details and test limits.
+This release does not include a floppy image.

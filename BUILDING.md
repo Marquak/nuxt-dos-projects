@@ -18,7 +18,7 @@ export WATCOM=/path/to/watcom
 sh BUILD_ALL.SH
 ```
 
-This rebuilds all eight DOS projects, including both ORBIT executables,
+This rebuilds all ten DOS projects, including both ORBIT executables,
 and refreshes NuXTLink's alternate-name binary. DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
@@ -32,7 +32,7 @@ For a single project:
 ```
 
 After a NuXTLink-only build, `dos/NUXFER.COM` is authoritative; copy it to
-`NUXTLINK/NUXFER31.COM` if you also use the alternate-name distribution file.
+`NUXTLINK/NUXFER32.COM` and `NUXTLINK/NUXFER.COM` to refresh both distribution copies.
 Build scripts select the required CPU target; do not replace them with generic
 compiler defaults. V20 does not support arbitrary 286/386 instructions, and
 8087 assembly must remain compatible with the original coprocessor.
@@ -66,3 +66,7 @@ need no Python imaging library. `python3 SUNSET/tools/make_art.py` regenerates
 the art and previews; `python3 SUNSET/tools/export_opl_bank.py` regenerates the
 Furnace instrument bank. MATRIX and ORBIT fonts and INVADERS sprite bytes are
 included as source. See THIRD_PARTY.md for tool/runtime license information.
+
+NuXTroids and NuXTris support `sh BUILD.SH --test` with WATCOM set. Their
+CHECK.EXE programs and test files are for a disposable DOS test directory.
+See their TESTS.TXT files for the recorded validation.

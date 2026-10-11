@@ -1,0 +1,37 @@
+NUXTRIS 1.1 - source and reference credits
+
+Game rules adapted from olzhasar/sdl-tetris (MIT):
+  https://github.com/olzhasar/sdl-tetris
+  Commit: 428d99d52a1de2448c7442d2655fae56aa6e9e96
+  Source: src/game.c and src/game.h
+  Licence: UPSTREAM.TXT, preserved verbatim, including the upstream
+  copyright placeholders as published. Attribution: olzhasar and the
+  sdl-tetris contributors.
+
+The adaptation uses the upstream coordinate-pair tetromino representation,
+Fisher-Yates bag, collision/movement/rotation routines and row-shifting
+approach. It adds a preview, byte-sized board, 32-bit score and line mask,
+separate lock/clear/spawn phases, fixed tick timing, Type B and save files.
+Spawn orientations, scoring and input behaviour differ from upstream.
+SDL code and assets are not included. The DOS version has no SDL dependency.
+
+Historical reference:
+  https://tetris.wiki/Tetris_(Electronika_60)
+  Used to check the original well size, simple presentation and next-piece
+  preview. No page text or art is included in the game.
+
+Local reusable code:
+  NuXTroids/Invaders planar VGA renderer, font, XT keyboard/timer handling,
+  and bounded PIT-timed PC gameport calibration, adapted for this game.
+  These are earlier MIT-licensed NuXT DOS project components.
+  Version 1.1 also reuses NuXTroids 1.1's original glyph-delta HUD blitter.
+  New graphics, title glyphs and four-line-clear fanfare are original.
+
+Additional DOS source reference:
+  https://www.freedos.org/about/devel/
+  FreeDOS's archived INFOPlus gameport routine was reviewed for context.
+  No INFOPlus source was incorporated. Archive inclusion does not imply a
+  common licence.
+
+Built with Open Watcom 2. See OWLIC.TXT for runtime terms.
+Developed with Codex, with design direction and hardware testing by Marquak.

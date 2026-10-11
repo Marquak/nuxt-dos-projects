@@ -1,4 +1,42 @@
-# Linux UI refresh validation  -  8 October 2026
+# NuXT Link 3.2 validation - 11 October 2026
+
+All **54 host tests passed**, including 10 Tk GUI tests on private Xvfb.
+Connection tests model mismatched baud rates, lost initial replies, lost
+proposal/confirmation replies, rollback, cancellation, explicit rejection,
+legacy/manual rates and failed serial ownership. Queue tests cover multiple
+roots, mixed directions, repeated filenames, atomic conflict rejection,
+cancel/resume, stale metadata and separate backup manifests.
+The GUI was inspected at 1180x820 and 1024x720 with connection options both
+collapsed and expanded. The test display does not require Xvfb for normal use.
+
+The **24,966-byte DOS COM** was compiled with Open Watcom, 8086 tiny model,
+warnings as errors. A clean rebuild produced identical bytes.
+
+The compiled server passed the existing integration suites on a disposable
+MS-DOS 6.22/FAT16 QEMU disk, plus new connection and multiple-folder checks:
+
+- Startup at 9600, negotiation, lost proposal ACK recovery, disconnect reset
+  and reconnect to the requested speed.
+- Binary boundary sizes, sequence wrap, corrupt/dropped requests and replies,
+  verified resume and preservation of existing destination files.
+- Exact file/directory DOS dates and attributes, backup/restore/incremental
+  verification, empty directories and declared 40 MiB partial-transfer sizes.
+- Settings at 9600/38400/57600/115200, all block sizes, none/RTSCTS, lost final
+  ACK recovery, unconfirmed rollback, protected rename/delete and malformed
+  requests.
+- Multiple upload and download roots, identical filenames in different
+  folders, and exact metadata after executing the combined queues.
+
+Limits: QEMU's PTY does not simulate FTDI timing or physical baud mismatch;
+baud-aware host tests cover the latter logically. QEMU ran a 486 CPU, not a
+cycle-accurate NuXT. First-connect reliability and throughput still need a
+real NuXT check. No physical serial adapter, FTDI setting, user DOS drive or
+86Box configuration was accessed. No claim of a measured hardware speed gain.
+The older tests below are historical, not additional current test counts.
+
+---
+
+# Linux UI refresh validation - 8 October 2026
 
 All **31 host tests passed**: the existing 24 protocol/metadata/profile tests
 and 7 new Tk GUI tests, run on a private Xvfb display with simulated DOS listings
@@ -23,7 +61,7 @@ DOS/emulator validation below was not repeated for this UI-only update.
 
 ---
 
-# Original NuXT Link 3.1 validation  -  6 October 2026
+# Original NuXT Link 3.1 validation - 6 October 2026
 
 The 24,968-byte DOS COM builds with Open Watcom `-0 -mt -l=com`, warnings as
 errors. It contains only 8086-targeted C/runtime code and `.8086` assembly.
@@ -67,7 +105,7 @@ its FreeDOS and GUI runs were not repeated for 3.1.
 
 ---
 
-# NuXT Link 3.0 validation  -  6 October 2026
+# NuXT Link 3.0 validation - 6 October 2026
 
 ## Compiled DOS server
 

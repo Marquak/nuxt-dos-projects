@@ -311,12 +311,14 @@ class SerialPort:
             raise ValueError('Unsupported baud rate')
         self.fd = os.open(path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         self.old = None
+        self.exclusive = False
         self.path, self.baud, self.flow, self.peer = path, baud, flow, peer
         try:
-            self.old = termios.tcgetattr(self.fd)
             fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             if hasattr(termios, 'TIOCEXCL'):
                 fcntl.ioctl(self.fd, termios.TIOCEXCL)
+                self.exclusive = True
+            self.old = termios.tcgetattr(self.fd)
             attrs = termios.tcgetattr(self.fd)
             attrs[0] = 0
             attrs[1] = 0
@@ -382,6 +384,10 @@ class SerialPort:
         termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
         self.baud, self.flow, self.peer = baud, flow, peer
 
+    def discard(self):
+        """Only during idle discovery/speed changes, never during a transfer."""
+        termios.tcflush(self.fd, termios.TCIOFLUSH)
+
     def modem_status(self):
         try:
             return struct.unpack('I', fcntl.ioctl(self.fd, termios.TIOCMGET, struct.pack('I', 0)))[0]
@@ -396,7 +402,7 @@ class SerialPort:
             except OSError:
                 pass
             try:
-                if hasattr(termios, 'TIOCNXCL'):
+                if self.exclusive and hasattr(termios, 'TIOCNXCL'):
                     fcntl.ioctl(self.fd, termios.TIOCNXCL)
             except OSError:
                 pass
@@ -450,8 +456,54 @@ class Client:
         hello = self.request(HELLO).decode('ascii', errors='replace')
         if not hello.startswith('NUXTLINK/3 '):
             raise VersionError('Install the matching NuXT Link 3 DOS server and Linux client.')
-        self.drive = hello.split()[1]
+        match = re.fullmatch(r'NUXTLINK/3 ([A-Z]:\\) .+', hello)
+        if not match:
+            raise LinkError('Invalid server greeting or drive')
+        self.drive = match.group(1)
         return hello
+
+    def establish(self, baud, flow='none', peer='none', block_size=128,
+                  notify=lambda text: None):
+        """Discover an idle server, then confirm the requested settings.
+
+        New servers start at 9600. A still-running/older server may be at its
+        previous speed. Never send break or reset modem lines to force it.
+        """
+        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in (128,256,512):
+            raise ValueError('Unsupported connection settings')
+        attempts, timeout = self.attempts, self.timeout
+        rates = list(dict.fromkeys((9600, baud, 38400, 115200, 57600, 19200, 4800, 2400, 1200)))
+        try:
+            self.attempts = 2
+            for index, rate in enumerate(rates):
+                if self.cancelled.is_set():
+                    raise Cancelled('Connection cancelled')
+                # Previous wrong-speed probes can leave a partial DOS frame.
+                # Its bounded receive timeout must expire before another rate.
+                if index and self.cancelled.wait(1.1):
+                    raise Cancelled('Connection cancelled')
+                self.transport.configure(rate, 'none', 'none')
+                if hasattr(self.transport, 'discard'): self.transport.discard()
+                self.parser.buffer.clear()
+                self.baud, self.flow, self.peer = rate, 'none', 'none'
+                self.timeout = max(1.5, 400.0/rate + .8)
+                notify(f'Checking DOS server at {rate} baud...')
+                # Let USB control transfers and the DOS startup banner settle.
+                if self.cancelled.wait(.2): raise Cancelled('Connection cancelled')
+                try:
+                    hello = self.connect()
+                    break
+                except (VersionError, Cancelled):
+                    raise
+                except (LinkError, TimeoutError):
+                    continue
+            else:
+                raise LinkError('No DOS server replied at any supported speed. Check its COM port and cable settings.')
+        finally:
+            self.attempts, self.timeout = attempts, timeout
+        notify(f'Server found at {rate}; confirming {baud} baud...')
+        info = self.apply_settings(baud, flow, peer, block_size)
+        return hello, info
 
     def diagnostics(self, *, cancellable=True):
         return self._diagnostics(self.request(INFO, cancellable=cancellable))
@@ -483,6 +535,7 @@ class Client:
         desired = (baud, flow, peer, block_size)
         if desired == (old['baud'], old['flow'], old['peer'], old['block_size']):
             self.transport.configure(baud, flow, peer)
+            self.timeout = max(3.0, (MAX_PAYLOAD+16)*10/baud + 1.0)
             return old
         token = secrets.randbits(32)
         packet = struct.pack('<BBBHI', BAUDS.index(baud), FLOWS.index(flow), PEERS[peer], block_size, token)
@@ -492,14 +545,21 @@ class Client:
         prepared = False
         try:
             # A RemoteError rejects the proposal without changing either side.
-            answer = self.request(SETTINGS, packet, cancellable=False)
-            if answer != packet:
+            try:
+                answer = self.request(SETTINGS, packet, cancellable=False)
+            except RemoteError:
+                raise
+            except (LinkError, TimeoutError):
+                answer = None  # Server may already have switched after a lost ACK.
+            if answer is not None and answer != packet:
                 raise LinkError('Connection-settings acknowledgement mismatch')
             prepared = True
             time.sleep(.28)
             self.transport.configure(baud, flow, peer)
+            if hasattr(self.transport, 'discard'): self.transport.discard()
             self.parser.buffer.clear()
             self.timeout = max(3.0, (MAX_PAYLOAD+16)*10/baud + 1.0)
+            self.attempts = 2
             answer = self.request(CONFIRM, struct.pack('<I',token), cancellable=False)
             info = self._diagnostics(answer)
             if desired != (info['baud'], info['flow'], info['peer'], info['block_size']):
@@ -657,7 +717,7 @@ class Client:
             self.abort()
             raise
 
-    def download(self, path, destination, progress=lambda done,total: None, *, overwrite=False):
+    def download(self, path, destination, progress=lambda done,total: None, *, overwrite=False, expected_meta=None):
         path, destination = dos_path(path), Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         folder = metadata_dir(destination.parent) / 'partials'
@@ -667,6 +727,8 @@ class Client:
         temp, state = folder / (token+'.part'), folder / (token+'.json')
         try:
             meta = self.stat(path)
+            if expected_meta is not None and meta != expected_meta:
+                raise LinkError('Source metadata changed since preview; refresh the plan')
             if meta.is_dir:
                 raise ValueError('Select a folder transfer for directories.')
             wanted = {'source': identity, 'metadata': asdict(meta)}

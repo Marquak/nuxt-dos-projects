@@ -40,7 +40,7 @@ class Tip:
 
 def build_interface(app, settings):
     a, root = app, app.root
-    root.title('NuXT Link 3.1 — serial file manager')
+    root.title('NuXT Link 3.2 - serial file manager')
     root.geometry(f'{min(1180, root.winfo_screenwidth()-40)}x{min(820, root.winfo_screenheight()-80)}')
     root.minsize(960, 700)
     root.protocol('WM_DELETE_WINDOW', a.close_window)
@@ -65,7 +65,7 @@ def build_interface(app, settings):
     header = ttk.Frame(outer)
     header.pack(fill='x', pady=(0, 4))
     ttk.Label(header, text='NuXT Link', style='Title.TLabel').pack(side='left')
-    ttk.Label(header, text='3.1  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
+    ttk.Label(header, text='3.2  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
     profiles = ttk.Frame(header)
     profiles.pack(side='right')
     ttk.Label(profiles, text='Profile').pack(side='left', padx=5)
@@ -261,7 +261,7 @@ def build_interface(app, settings):
     a.local_menu.add_command(label='Refresh', command=a.local_navigate)
     a.local_tree.bind('<Button-3>', a.local_context)
 
-    queued = ttk.LabelFrame(a.panes, text='Transfer queue — preview before starting', padding=6)
+    queued = ttk.LabelFrame(a.panes, text='Transfer queue - add from any folder', padding=6)
     a.panes.add(queued, weight=2)
     actions = ttk.Frame(queued)
     actions.pack(fill='x', pady=(0,5))
@@ -270,14 +270,14 @@ def build_interface(app, settings):
         button = ttk.Button(actions, text=label, command=command, style='Accent.TButton' if attr=='start_button' else 'TButton')
         button.pack(side='left', padx=(0,5))
         setattr(a, attr, button)
-    Tip(a.clear_button, 'Remove the queue preview. Completed files and resumable partial files are kept.')
+    Tip(a.clear_button, 'Clear all queued batches. Completed files and resumable partial files are kept.')
     Tip(a.cancel_button, 'Stop after the current verified operation. Keep completed work and partial files for resume.')
     a.queue_filter = tk.StringVar(value='All')
     filters = ttk.Combobox(actions, textvariable=a.queue_filter, values=('All','Pending','Failed','Completed'), state='readonly', width=10)
     filters.pack(side='right')
     filters.bind('<<ComboboxSelected>>', lambda e: a.fill_plan())
     ttk.Label(actions, text='Show', style='Hint.TLabel').pack(side='right', padx=5)
-    a.summary = tk.StringVar(value='Queue — select files, then Upload or Download to preview')
+    a.summary = tk.StringVar(value='Queue - add files from any folder before starting')
     queue_title = ttk.Label(queued, textvariable=a.summary)
     queued.configure(labelwidget=queue_title)
     Tip(queue_title, 'Preview the queue before Start / resume. Double-click a job to see full paths, DOS metadata and any error or skip reason.')

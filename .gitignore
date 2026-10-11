@@ -30,3 +30,9 @@ DUNE2FIX/patched/
 *.vhd
 *.VHD
 .DS_Store
+
+# NuXTris player state
+NUXTRIS.DAT
+NUXTRIS.BAK
+NUXTRIS.NEW
+TSTSAVE.*

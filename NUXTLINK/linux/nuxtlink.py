@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NuXT Link 3: full-drive browser and reviewable serial transfer queues."""
+"""NuXT Link 3.2: full-drive browser and reviewable serial transfer queues."""
 import os
 import stat
 import argparse
@@ -12,6 +12,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 from link import BAUDS, PEERS, SerialPort, Client, Cancelled, LinkError, VersionError, ports, dos_path, join_path
 from transfers import plan_download, plan_upload, execute, verify_backup
+from transfer_queue import TransferQueue, append_plan, execute_queue
 from operations import plan_delete, execute_delete
 from profiles import Profiles, DEFAULTS, validate
 from ftdi import LatencySession, read_latency
@@ -196,20 +197,9 @@ class App:
         if not v['device']:messagebox.showinfo('Serial device','Choose a serial device.');return
         remote=self.remote
         def action():
-            # Connect at the selected speed first, then the DOS bootstrap default.
-            # Begin without local gating so we can negotiate RTS/CTS on both ends.
-            port=SerialPort(v['device'],v['baud']);client=Client(port,v['baud']);client.cancelled=self.cancel_event
+            port=SerialPort(v['device'],9600);client=Client(port,9600);client.cancelled=self.cancel_event
             try:
-                client.attempts=1
-                try:hello=client.connect()
-                except VersionError:
-                    raise
-                except LinkError:
-                    if self.cancel_event.is_set():raise Cancelled('Connection cancelled')
-                    if v['baud']==38400:raise
-                    port.configure(38400);client.baud=38400;client.parser.buffer.clear();hello=client.connect()
-                client.attempts=5
-                info=client.apply_settings(v['baud'],v['flow'],v['peer'],v['block'])
+                hello,info=client.establish(v['baud'],v['flow'],v['peer'],v['block'],self.notify)
                 latency=self.latency_session
                 if latency and latency.device!=v['device']:latency.restore(authorize=True);latency=None
                 if latency is None:latency=LatencySession(v['device'])
@@ -294,10 +284,13 @@ class App:
             text+='Review the queue first. Completed deletions cannot be undone.'
             if not messagebox.askyesno('Confirm DOS deletion',text):return
             self.work('Running deletion queue…',lambda:('executed',execute_delete(self.client,plan,self.progress_event,protected=True)))
-        else:self.work('Running transfer queue…',lambda:('executed',execute(self.client,plan,self.progress_event)))
+        else:self.work('Running transfer queue…',lambda:('executed',execute_queue(self.client,plan,self.progress_event)))
     def progress_event(self,index,job,done,total):
-        if done==total or self.events.qsize()<20:
-            self.events.put(('progress',(index,job.status,done,total)))
+        now=time.monotonic(); key=(index,job.status)
+        if done==total or key!=getattr(self,'progress_key',None) or now-getattr(self,'progress_time',0)>=.08:
+            if done==total or self.events.qsize()<20:
+                self.events.put(('progress',(index,job.status,done,total)))
+                self.progress_key,self.progress_time=key,now
     def cancel(self):
         self.cancel_event.set()
         if self.client:self.client.cancelled.set()
@@ -343,17 +336,12 @@ class App:
         actions={'send':'Upload →','receive':'← Download','directory':'Folder','verified':'Verify',
                  'skip':'Skip','delete':'Delete','rmdir':'Delete folder'}
         source,target=str(job.source),str(job.target)
-        drive=self.plan.drive[:2]
-        if self.plan.direction in ('download','delete'):source=drive+source
-        if self.plan.direction=='upload':target=drive+target
-        if self.plan.direction=='delete':target='—'
-        if compact:
-            local=source if self.plan.direction=='upload' else target
-            if self.plan.direction!='delete':
-                try:local='Local: '+str(Path(local).relative_to(self.plan.local_root))
-                except ValueError:pass
-                if self.plan.direction=='upload':source=local
-                else:target=local
+        owner=self.plan.owner(job) if isinstance(self.plan,TransferQueue) else self.plan
+        drive=owner.drive[:2]
+        if owner.direction in ('download','delete'):source=drive+source
+        if owner.direction=='upload':target=drive+target
+        if owner.direction=='delete':target='-'
+        # Keep absolute paths visible: browsing elsewhere never retargets a job.
         return (status or job.status,actions.get(job.action,job.action),source,target,
                 '<DIR>' if job.meta.is_dir else f'{job.meta.size:,}')
 
@@ -445,8 +433,11 @@ class App:
                         if value[0]=='queue_listing':
                             self.status.set(value[4]);self.detail.set(value[5]);self.progress['value']=value[6];self.file_percent.set(value[7])
                     elif value[0]=='prepared':
-                        self.plan=value[1];self.active_progress=None;self.queue_filter.set('All');self.fill_plan()
-                        self.status.set('Preview ready. Review source and destination, then Start / resume.')
+                        try:self.plan=append_plan(self.plan,value[1])
+                        except ValueError as exc:
+                            messagebox.showerror('Queue unchanged',str(exc));self.status.set(str(exc));self.update_controls();continue
+                        self.active_progress=None;self.queue_filter.set('All');self.fill_plan()
+                        self.status.set('Added to queue. Choose more folders or use Start / resume.')
                     elif value[0]=='executed':
                         self.report=value[1];self.fill_plan();self.status.set(self.plan.status+' · Use Open report for full details.')
                         self.detail.set('Double-click a queue entry for full paths, DOS metadata and any issue details.')
@@ -670,10 +661,14 @@ class App:
     def disconnect(self):
         client=self.client;latency=self.latency_session
         def action():
-            if client:
-                try:client.abort()
-                finally:client.transport.close()
             warning=''
+            if client:
+                try:
+                    client.abort()
+                    client.apply_settings(9600,'none','none',128)
+                except (OSError,LinkError) as exc:
+                    warning=' DOS speed reset could not be confirmed: '+str(exc)
+                finally:client.transport.close()
             if latency:
                 try:latency.restore(authorize=True)
                 except (OSError,ValueError) as exc:warning=' Latency restoration: '+str(exc)

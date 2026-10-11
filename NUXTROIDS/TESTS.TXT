@@ -1,0 +1,173 @@
+NUXTROIDS 1.2 - TEST NOTES (2026-10-11)
+====================================
+Executable: 27,042 bytes
+SHA-256: ff5abfa2bb7dd3ff66b1cfd3cdb4e75a2e653ca67d96ca5a712dd3011b7a1a25
+
+CURRENT VALIDATION
+------------------
+Open Watcom 2.0 small model, V20-compatible 80186 code, original 8087 module.
+An independent clean release rebuild is byte-identical. No 86Box testing.
+
+All 66 checks passed at EACH of 320x200, 640x480 and 800x600 in DOSBox 0.74-3.
+Added coverage includes:
+- 1,440 lines per mode against an independent per-pixel wrapping reference,
+  covering all edges, corners, octants, degenerate and fully off-edge lines.
+  Full-screen comparison covers every video plane, including the HUD area.
+- All nine asteroid templates, 32 rotations and eight pixel alignments:
+  cached masks match the assembly polygon renderer exactly.
+- Positions at the cache/line-path boundaries and screen seams match an
+  independent reference. Missing per-shape caches use the same tested line
+  fallback. Actual DOS allocation failure was not injected.
+- Rotation work is spread evenly across four ticks, with unchanged angular
+  speed. Existing collision, firing, background-restoration, HUD, joystick
+  timeout and interrupt-restoration tests still pass.
+
+CONTROLLED PERFORMANCE COMPARISON
+--------------------------------
+DOSBox normal core, fixed 1500 cycles, same work and settings for 1.1/1.2.
+Each case runs 160 simulation+render iterations with 16 moving asteroids,
+continuous fire, thrust, turning and initially 16 particles. Asteroids have
+collision grace for this workload so its object count remains controlled.
+Times below are BIOS ticks, lower is better. These tests do not measure
+frame-rate pacing, physical V20 cycles, or Trident ISA bus wait states.
+
+  Mode: silent 1.1 -> 1.2; AdLib 1.1 -> 1.2
+  320: silent 99 -> 70; AdLib 100 -> 71
+  640: silent 126 -> 91; AdLib 127 -> 93
+  800: silent 123 -> 89; AdLib 124 -> 90
+
+At 640x480, 400 draw/erase pairs of a rotating small asteroid took:
+  Interior: 11 -> 5 BIOS ticks
+  Screen corner: 25 -> 11 BIOS ticks
+These are renderer microbenchmarks, not whole-game FPS improvements.
+Rotation staggering also removes the synchronized fourth-tick rotation burst.
+Simulation rate remains 36.4 Hz with the existing bounded catch-up policy.
+No pixels, particles, sounds or asteroid slots were removed for speed.
+
+Cache payload is 35,720 bytes at 320x200 and 74,536 at the larger modes with
+integer geometry. Tables and allocator overhead are additional; 8087 rounding
+may change a few masks. Startup builds the cache, not the gameplay loop.
+
+CHECK 0/1/2 runs regression checks and writes CHECKS.TXT.
+CHECK 0/1/2 PLAY runs the fixed workload and writes PERFRUN.TXT.
+CHECK 1 BENCH retains the older HUD-only comparison.
+
+Current evidence: work/nuxtroids-perf/build/MODE*.TXT and PERF*.TXT,
+baseline/PERF*.TXT, interactive-final/ and rebuild/.
+The final 640x480 joystick run exercised calibration, firing, thrust,
+steering, pause/resume and clean DOS return; screenshots were reviewed.
+Real NuXT smoothness remains for the user's physical hardware test.
+
+SOURCE REVIEW
+-------------
+Revisited id Software's Wolf3D ID_VH.C cached drawing/update approach and
+https://github.com/lclarkmichalek/asteroids. Existing FreeDOS INFOPlus and
+RBIL references remain documented in README.TXT. No external source was
+copied; the cache and seam renderer are original project code.
+https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_VH.C
+
+HISTORICAL 1.1 / 1.0 NOTES BELOW
+-------------------------------
+NUXTROIDS 1.1 - TEST NOTES (2026-10-11)
+====================================
+Executable: 25,120 bytes
+SHA-256: e05ae230d5a8e9c354b5de0e0cf94465ef3b83ae51499cd051a6304aa40119b7
+
+BUILD AND TARGET
+----------------
+Open Watcom 2.0, DOS small model, V20-compatible 80186 code generation.
+Original 8087 assembly in FPU.ASM; integer gameplay and assembly VGA lines.
+A separate release rebuild produces a byte-identical executable.
+
+SCORE UPDATE FIX (1.1)
+----------------------
+The previous hit path erased and redrew the entire score/best/wave line
+with individual pixel calls. It now compares glyphs and XORs only changed
+font bits using a seven-row assembly routine. Each row touches at most two
+VGA bytes, repeated vertically at the larger modes. Zero masks do not read
+or write video memory. Reads load all VGA latches before XOR writes.
+
+Seven added checks cover decimal carries and score limits; byte-exact
+comparison of all four HUD planes with the old independent pixel renderer;
+unchanged values; shorter messages; every glyph/alignment; clearing to an
+empty string; and no playfield corruption. All seven passed in each mode.
+
+Controlled DOSBox normal-core/fixed-1500-cycle benchmark at 640x480:
+300 successive score AND best-score increments of 20 points:
+  Old whole-line drawing/formatting: 437 BIOS ticks
+  New glyph-delta drawing/formatting: 11 BIOS ticks
+Approximately 40 times less emulated time for this HUD workload alone.
+This is NOT a whole-game FPS speedup or a measured NuXT timing result.
+Reproduce using CHECK 1 BENCH. The default CHECK suite does not benchmark.
+Game physics, scoring, sound effects and asteroid behaviour are unchanged.
+
+DOS CHECKS
+----------
+The source includes an optional CHECK.EXE build. Version 1.1 passed 36
+checks at EACH of 320x200, 640x480 and 800x600 under DOSBox 0.74-3.
+The prior 1.0 build also passed QEMU/FreeDOS checks at 640x480. Those older
+QEMU runs and the interactive checks below are historical unless noted.
+
+Coverage:
+- Fixed-point coordinate limits and screen-edge collision wrapping.
+- Cached integer/8087 geometry agreement within one native pixel.
+- 100 assembly line comparisons against a separate pixel implementation,
+  across different slopes and octants, plus degenerate and wrapped lines.
+- Exact restoration of all four VGA background planes after moving objects.
+- Asteroid splitting, scores, all-small-rock expansion, lives and respawning.
+- Shot collision, cooldown, buffering a short tap until cooldown expires.
+- Wave progression, extra lives, score saturation and stopping with brakes.
+- Bounded gameport reads and keyboard fallback when no controller responds.
+- Restoring the original timer and keyboard interrupt vectors.
+
+INTERACTIVE EMULATOR RUNS
+-------------------------
+DOSBox used its actual emulated gameport, fed by a scripted SDL virtual
+analog controller. Three-stage centre/up-left/down-right calibration,
+button-1 start/fire, left/right steering, button-2 thrust, up-axis thrust,
+pause/resume and Escape were exercised. Screenshots were reviewed at all
+three resolutions. The 800x600 run also used /N to force integer geometry.
+The 320x200 run used /S, and the larger modes used emulated AdLib hardware.
+
+Runs used normal CPU core with fixed 1000 cycles for 320x200 and 1500 for
+the larger modes. These settings are workload tests, not V20 clock-speed
+measurements. A final 640x480 controller run checked the keyboard-latch
+acknowledgement ordering used by the release build.
+
+QEMU runs additionally exercised missing-controller startup, keyboard
+movement/fire, repeated pause/resume, mute/unmute, and normal DOS return.
+Very short, tightly scheduled HMP key sequences were not reliable in the
+automation; controller and complete gameplay input checks used DOSBox.
+The AdLib PCM capture was nonzero, with a peak of 10,611 out of 32,767 and
+no full-scale clipping. This establishes audio output, not subjective sound
+quality on a physical AdLib.
+
+VIDEO AND FPU LIMITS
+-------------------
+800x600 passed using DOSBox's S3 VBE mode. QEMU's selected VGA BIOS did not
+provide a mode accepted by this planar backend and was correctly rejected.
+The native Trident 5Bh path is carried over from our working NuXT demos,
+but this game still needs bare-metal validation of that path.
+
+/N was tested. The automatic absent-8087 path uses the existing project
+probe but was not verified with an absent physical 8087. DOSBox 0.74-3 has
+no FPU-disable configuration option, and hiding QEMU's FPU feature flag did
+not prevent its emulated x87 instructions from executing. Those attempts
+were not valid absent-8087 tests.
+
+No 86Box tests were run. Real NuXT frame rate, ISA VGA memory timing,
+physical gameport calibration/noise and original-8087 timing still need
+hardware playtesting. Standard BIOS PIT timing is expected on entry;
+custom pre-existing timer divisors are not preserved.
+
+1.1 VALIDATION FILES
+--------------------
+work/nuxtroids-hud/build/MODE320.TXT, MODE640.TXT, MODE800.TXT and
+BENCH640.TXT record the regression and HUD timing results. Reference code
+research revisited id Software ID_VH.C text/update routines; no external
+code was copied. The new glyph-delta routine is original project code.
+
+A fresh 640x480 fixed-1500-cycle DOSBox run exercised virtual joystick
+calibration, steering/thrust/fire, score changes, pause/resume and DOS exit.
+Captured screenshots are under work/nuxtroids-hud/interactive.
+No 86Box testing. Physical NuXT score-update timing awaits user testing.

@@ -17,6 +17,21 @@ The server uses a one-second inter-byte receive timeout and closes active file
 handles after about 30 seconds idle. Staging survives timeout, Escape, HELLO and
 CANCEL; uncommitted destinations are not exposed under the final filename.
 
+## Version 3.2 connection discovery
+
+Wire protocol remains v3. The server now defaults to 9600/none/none/128.
+The Linux client probes 9600, the chosen baud, then remaining supported rates
+with bounded HELLO retries and quiet gaps for stale partial frames to expire.
+It opens without flow/peer gating, then negotiates requested settings.
+Normal disconnect negotiates the bootstrap settings before closing.
+
+A lost SETTINGS reply does not prove rejection: the client attempts CONFIRM
+with its known token at the proposed baud, then checks/recovers as necessary.
+Explicit ERROR replies do not trigger this switch. DOS prints confirmation
+status before its ACK, with RTS low, and performs no console output after it.
+A failed settings ACK invalidates the cached response when its pending state
+is abandoned. Transfer framing, CRCs and commit verification are unchanged.
+
 ## Types
 
 * `path`: NUL-terminated CP437 root-relative path, beginning with backslash.

@@ -1,64 +1,72 @@
-XT INVADERS 1.0 - VERIFICATION
-=============================
+XT INVADERS 2.0 - VERIFICATION (2026-10-11)
+=========================================
+Executable: 10,549 bytes
+SHA-256: cffd87bc977102ac229bf4f8b144e4b24ee9696f10b173bd46d7fc1d2701de13
+DOS program allocation, including PSP and stack: 13,104 bytes.
+Built with GNU binutils, .code16 and .arch i8086. No C runtime or FPU needed.
 
-Executable size: 5171 bytes
-SHA-256: fb5cfcef2e129c8a12fe49eb21a0df1229eb3f4cc48ae059b97f534912a2eaea
-Program allocation, including stack and PSP: 7136 bytes.
-Built with GNU binutils 2.47, .code16 and .arch i8086.
+QEMU / FREEDOS 1.3
+-----------------
+The final binary passed the same 86 checks in each of:
+- EGA-compatible 320x200 / 16-colour mode 0Dh on QEMU VGA.
+- VGA 640x480 / 16-colour mode 12h.
 
-RUNTIME TESTS
+Coverage includes:
+- AdLib detection; the requested video mode.
+- BIOS time advancing at half the new simulation tick rate.
+- Player speed, release, opposite-direction cancellation and pause/resume.
+- Short latched fire taps and the new projectile-slot reuse timing.
+- Seven pixels of laser travel across two updates; short queued fire taps.
+- Destructible shields and every one of the 50 alien collision positions.
+- Formation gaps, saucer hits, player death, protection and wave progression.
+- Loading all six backdrops, game over, saturation at 65535 and invasion.
+- Missing-controller calibration failure, cancellation and unplug fallback.
+- Four distinct marching pitches in a repeating sequence.
+- Restoring the original IRQ0/IRQ1 vectors and text video on normal exit.
+
+Additional QEMU runs covered no AdLib hardware and /S with an AdLib present.
+These used actual emulated keyboard events, including 1 ms start, fire and
+Escape taps, movement and key release. All passed. The gameplay fixtures
+above also inject state through QEMU's debugger to reach rare cases quickly;
+no test hooks or test-only code are included in INVADERS.COM.
+
+OPL2 captures contained nonzero audio and no full-scale clipping. Final
+peaks were 13,565 (EGA) and 13,493 (VGA), out of 32,767. Silent mode produced
+no PCM samples. The captures' zero WAV chunk lengths were normalized in the
+test copies before opening them as WAV files. These checks establish output,
+not how convincing the FM march sounds on an actual AdLib and speakers.
+
+DOSBOX 0.74-3
 -------------
-FreeDOS 1.3 in QEMU, 4 MiB RAM, standard VGA in EGA mode 0Dh,
-with and without the emulated AdLib/OPL2 device.
+The final VGA binary also ran with a scripted SDL virtual controller feeding
+DOSBox's real emulated gameport (2axis, timed=true), normal CPU core and a
+fixed 2500-cycle setting. This exercised the compiled port-201h polling:
+- Centre, full-left and full-right calibration accepted via button 1.
+- Button 1 starts a game and fires.
+- Full-left/full-right input moves the ship and centre stops it.
+- Button 2 pauses and resumes the game.
+- Escape exits cleanly; /S runs without audio.
+Screenshots of the calibration stages, gameplay, movement and paused state
+were reviewed. This tests a virtual analog-compatible gamepad, not a real
+joystick card or a proprietary digital gamepad protocol.
 
-- OPL2 timer detection succeeds with emulated AdLib.
-- New game starts with 50 aliens, three lives and zero score.
-- Held movement advances five pixels/tick and stops on release.
-- Pause freezes player and formation.
-- Mute keys off all active voices.
-- Sound can be re-enabled.
-- P resumes the game.
-- A shot striking solid shield pixels is removed and erodes the shield.
-- Alien collision removes one alien and awards 30 points for the top row.
-- Bonus ship awards 100 points and schedules another appearance.
-- Enemy bolt costs one life and starts the death animation.
-- Respawn grants temporary invulnerability.
-- Last alien triggers wave-clear and 100-point wave bonus.
-- Next wave restores shields/aliens and grants a life up to five.
-- Losing the final life reaches game over.
-- Space restarts while preserving session best score.
-- Score saturates safely at 65535 instead of wrapping.
-- An alien formation reaching the player line ends the game.
-- Normal exit restores the original IRQ1 vector, mode 03h and DOS prompt.
-- With no AdLib attached, the title reports silent operation; game starts,
-  fires and exits successfully.
-- Captured OPL2 PCM contains sound output with nonzero samples and no
-  full-scale clipping. Effects triggered in the collision fixtures include
-  alien hits, marching, saucer activity and player explosions.
-- The final /S build plays silently with an emulated AdLib present.
-- Command-line /? returns help to the DOS prompt.
-- Title and gameplay screenshots visually reviewed for layout and sprites.
-- Release ZIP verified against the executable and source files.
+VISUAL / BUILD CHECKS
+--------------------
+Both resolutions and all six backdrops were visually reviewed. VGA uses a
+centred 640x400 image in mode 12h; the extra 80 scanlines remain black.
+The final title, game-over and DOS-return displays were checked. Incremental
+alien redraws and stationary-player redraw suppression are in the build.
 
-METHOD AND LIMITS
-----------------
-Keyboard-driven smoke tests cover normal launch, firing and exit. The
-collision and progression checks use the emulator debugger to arrange
-specific game states, then let the real compiled game execute them. This
-makes rare cases (last alien, last life, score overflow) reproducible.
-No debug/test fixture code is included in the released executable.
+The release source is rebuilt separately and compared with INVADERS.COM.
+The ZIP and refreshed data floppy are checked against the release files.
 
-The full deterministic suite ran before a small title-message change that
-labels /S as SILENT MODE rather than implying no sound card was found.
-The final binary was rebuilt and smoke-tested after that change.
-
-QEMU is not a cycle-accurate NEC V20, original EGA or Trident TVGA9000i.
-Physical NuXT performance and an original-design AdLib reproduction remain
-untested. EGA compatibility uses documented EGA mode/register operations;
-runtime graphics tests used a VGA adapter in EGA mode, not physical EGA.
-DOS 2.0 is the API target; runtime testing used FreeDOS only.
-The error path for insufficient memory/video support was not exercised.
-Sound capture validates generated PCM; it does not establish analog sound
-quality or precise reproduction-card timing on the user's hardware.
-
-Screenshots show the emulator, not the user's NuXT.
+LIMITS
+------
+No 86Box tests were run. QEMU and DOSBox are not cycle-accurate substitutes
+for the NuXT's V20, ISA VGA bus or gameport. Real performance, joystick
+calibration/noise, monitor behaviour and AdLib sound still need hardware
+validation. The DOSBox cycle setting is not a measured V20 frame-rate result.
+Physical EGA and DOS 2.0 compatibility are not runtime-tested; emulator DOS
+runs used FreeDOS 1.3 and DOSBox. The insufficient-memory error path was not
+exercised. Custom pre-existing PIT rates are not supported: the game expects
+standard BIOS timing on entry and restores that timing on exit.

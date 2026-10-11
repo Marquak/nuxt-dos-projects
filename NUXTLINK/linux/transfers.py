@@ -199,6 +199,8 @@ def plan_upload(client, sources, root, *, policy='skip', incremental=True, conte
                 restore=False, notify=lambda message: None):
     """Map every name and detect collisions before any remote mutation."""
     sources = [Path(p).absolute() for p in sources]
+    if not sources:
+        raise ValueError('Select files or folders to upload.')
     local_root = sources[0] if contents else sources[0].parent
     plan = Plan('upload', str(local_root), dos_path(root), client.drive)
     manifest = read_manifest(local_root) if restore else None
@@ -356,6 +358,8 @@ def execute(client, plan, progress=lambda index,job,done,total: None):
             job.status = 'Running'
             progress(index, job, 0, job.meta.size)
             try:
+                if plan.direction == 'upload' and job.action in ('send', 'verified') and local_metadata(job.source) != job.meta:
+                    raise LinkError('Local metadata changed since preview; refresh the plan')
                 if plan.direction == 'download':
                     safe_local(plan.local_root, str(Path(job.target).relative_to(plan.local_root)))
                 if job.action == 'directory':
@@ -383,7 +387,7 @@ def execute(client, plan, progress=lambda index,job,done,total: None):
                     job.status = 'Verified'
                 elif plan.direction == 'download':
                     job.result = client.download(job.source, job.target,
-                        lambda d,t: progress(index, job, d, t), overwrite=job.overwrite)
+                        lambda d,t: progress(index, job, d, t), overwrite=job.overwrite, expected_meta=job.meta)
                     if Metadata(**job.result['metadata']) != job.meta:
                         raise LinkError('Source metadata changed since preview; refresh the plan')
                     job.status = 'Complete'
@@ -410,6 +414,7 @@ def execute(client, plan, progress=lambda index,job,done,total: None):
                 raise Cancelled("Queue cancelled; resumable files retained.")
             try:
                 if plan.direction == 'download':
+                    safe_local(plan.local_root, str(Path(job.target).relative_to(plan.local_root)))
                     preserve_metadata(job.target, job.meta)
                 else:
                     client.set_metadata(job.target, job.meta)

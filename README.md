@@ -10,7 +10,7 @@ The code was written with Codex. This collection grew out of trying things
 on the real machine and fixing what didn't work. The test notes say what was
 checked for each version.
 
-These are the **current versions as of 2026-10-09**. Source, ready-to-run DOS
+These are the **current versions as of 2026-10-11**. Source, ready-to-run DOS
 programs, build scripts and instructions are included. Bring your own DOS.
 There are no commercial OS files, BIOS ROMs or complete games from other
 publishers in here.
@@ -21,8 +21,10 @@ publishers in here.
 | [ORBIT87](ORBIT87/) | 2.0 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | Five-scene VGA/8087 demo with AdLib techno |
 | [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Endless silent star flight with optional 8087 setup |
 | [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Silent digital rain and optional 8087 palette glow |
-| [INVADERS](INVADERS/) | 1.0 | `INVADERS.COM` | EGA/VGA arcade game with AdLib effects |
-| [NUXTLINK](NUXTLINK/) | 3.1, current UI fixes | `dos/NUXFER.COM` or `NUXFER31.COM` | Verified serial transfers and Linux GUI |
+| [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | EGA/VGA, gameport controls, AdLib march and wireframe scenery |
+| [NUXTROIDS](NUXTROIDS/) | 1.2 | `NUXTROID.EXE` | Greyscale asteroid shooter, optional 8087 and AdLib |
+| [NUXTRIS](NUXTRIS/) | 1.1 | `NUXTRIS.EXE` | ИuXTяis, Type A/B, named scores and gameport controls |
+| [NUXTLINK](NUXTLINK/) | 3.2 | `NUXFER32.COM` | 9600 handshake, multi-folder queue and verified serial transfers |
 | [SUNSET](SUNSET/) | 3.1 | `SUNSET.EXE` | Endless neon road/palm demo and original synthwave score |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Dune II XMS fix and manual-check removal |
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | CPU, 8087, memory, video, BIOS and drive information |
@@ -35,7 +37,8 @@ its controls, switches, supported video modes and hardware caveats.
 
 Copy the listed files to a writable DOS folder and launch the program there.
 For NuXTLink, also run `sh NUXTLINK/linux/launch.sh` on Linux; it needs Python 3
-and Tkinter. Keep your existing NUXMENU.DAT when updating the menu.
+and Tkinter. Keep your existing NUXMENU.DAT when updating the menu, and NUXTRIS.DAT/BAK
+when updating NuXTris. Replace the complete NuXTLink Linux folder when upgrading.
 
 The higher resolutions are partly for fun and testing. Don't expect a V20 to
 fly at 1024x768, even with an 8087. Modes above standard VGA depend on the
@@ -52,7 +55,7 @@ historical emulator tests and owner-reported hardware results.
 ## License and provenance
 
 Project-authored code, documentation, procedural art, fonts and composed FM
-music are offered under the [MIT license](LICENSE). Third-party runtime code
+music are offered under the [MIT license](LICENSE). Third-party code, including the adapted NuXTris rules and compiler runtimes,
 retains its own license: see [THIRD_PARTY.md](THIRD_PARTY.md) and each OWLIC.TXT.
 Research references are retained in the project documentation. External music
 and pictures used as inspiration are not bundled.
