@@ -26,6 +26,8 @@ all possible third-party claims.
 - NUXTROIDS: original game, geometry, scenery and sound, reusing earlier NuXT
   project code. Asteroids projects, RBIL, FreeDOS INFOPlus and id Software
   drawing code were references; no Atari assets or external game code copied.
+  Version 1.3 also consulted Little Game Engine and Abrash sprite/dirty-region
+  discussions. The aligned-mask and difference routines are original code.
 - NUXTRIS: rules adapted from MIT-licensed olzhasar/sdl-tetris at commit
   428d99d52a1de2448c7442d2655fae56aa6e9e96. The upstream MIT notice is preserved
   verbatim in NUXTRIS/UPSTREAM.TXT, with adaptation details in CREDITS.TXT.

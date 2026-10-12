@@ -78,19 +78,8 @@ ol_loop:
  mov di,ax
  add di,bp
  lodsw
- shr ax,cl
- mov dx,ax
- or ah,ah
- jz ol_right
  mov al,es:[di]
  mov es:[di],ah
-ol_right:
- mov ax,dx
- or al,al
- jz ol_next
- mov ah,es:[di+1]
- mov es:[di+1],al
-ol_next:
  dec bx
  jnz ol_loop
 ol_done:
@@ -99,6 +88,135 @@ ol_done:
  pop bp
  ret
 outline_ endp
+public outline_wrapped_
+ow_stride dw 0
+ow_top dw 0
+ow_end dw 0
+ow_size dw 0
+; Same sparse masks, with source column stored in the unused low mask byte.
+; CL=signed left column, CH=stride. Wrap byte addresses without line drawing.
+outline_wrapped_ proc near
+ push bp
+ push ds
+ push es
+ mov bp,ax
+ mov ax,0a000h
+ mov es,ax
+ mov ds,dx
+ cld
+ or bx,bx
+ jz ow_done
+ ow_loop:
+ lodsw
+ mov di,ax
+ add di,bp
+ lodsw
+ add al,cl
+ js ow_left
+ cmp al,ch
+ jb ow_vertical
+ sub di,cs:ow_stride
+ jmp short ow_vertical
+ ow_left:
+ add di,cs:ow_stride
+ ow_vertical:
+ cmp di,cs:ow_top
+ jb ow_above
+ cmp di,cs:ow_end
+ jb ow_write
+ sub di,cs:ow_size
+ jmp short ow_write
+ ow_above:
+ add di,cs:ow_size
+ ow_write:
+ mov al,es:[di]
+ mov es:[di],ah
+ dec bx
+ jnz ow_loop
+ ow_done:
+ pop es
+ pop ds
+ pop bp
+ ret
+outline_wrapped_ endp
+public difference_
+; SI -> cache segment, old pointer/count/base, new pointer/count/base.
+; Merge sorted old/new byte masks in RAM. Equal bits cancel before VGA access.
+; SS locals remain accessible after changing DS to the far cache segment.
+difference_ proc near
+ push bp
+ mov bp,sp
+ sub sp,10
+ push ds
+ push es
+ mov ax,[si+4]
+ mov [bp-2],ax
+ mov ax,[si+6]
+ mov [bp-4],ax
+ mov ax,[si+10]
+ mov [bp-6],ax
+ mov ax,[si+12]
+ mov [bp-8],ax
+ mov bx,[si+8]
+ mov dx,[si]
+ mov si,[si+2]
+ mov ax,0a000h
+ mov es,ax
+ mov ds,dx
+ dif_loop:
+ cmp word ptr [bp-2],0
+ je dif_new_tail
+ cmp word ptr [bp-6],0
+ je dif_old_tail
+ mov ax,[si]
+ add ax,[bp-4]
+ mov dx,[bx]
+ add dx,[bp-8]
+ cmp ax,dx
+ jb dif_old
+ ja dif_new
+ mov di,ax
+ mov ax,[si+2]
+ xor ax,[bx+2]
+ add si,4
+ add bx,4
+ dec word ptr [bp-2]
+ dec word ptr [bp-6]
+ or ah,ah
+ jz dif_loop
+ jmp short dif_write
+ dif_old_tail:
+ cmp word ptr [bp-2],0
+ je dif_done
+ mov ax,[si]
+ add ax,[bp-4]
+ dif_old:
+ mov di,ax
+ mov ax,[si+2]
+ add si,4
+ dec word ptr [bp-2]
+ jmp short dif_write
+ dif_new_tail:
+ cmp word ptr [bp-6],0
+ je dif_done
+ mov dx,[bx]
+ add dx,[bp-8]
+ dif_new:
+ mov di,dx
+ mov ax,[bx+2]
+ add bx,4
+ dec word ptr [bp-6]
+ dif_write:
+ mov al,es:[di]
+ mov es:[di],ah
+ jmp dif_loop
+ dif_done:
+ pop es
+ pop ds
+ mov sp,bp
+ pop bp
+ ret
+difference_ endp
 video_init_ proc near ; AX=bytes per row, BX=height
  mov vheight,bx
  mov stride,ax
@@ -325,10 +443,14 @@ wrap_init_ proc near ; AX=first playfield scanline
  mov bx,ax
  mov ax,rows[bx]
  mov wrapoffset,ax
+ mov cs:ow_top,ax
  mov bx,vbytes
+ mov cs:ow_end,bx
  sub bx,ax
  mov wrapbytes,bx
+ mov cs:ow_size,bx
  mov ax,stride
+ mov cs:ow_stride,ax
  shl ax,3
  mov wrapwidth,ax
  ret

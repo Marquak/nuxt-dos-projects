@@ -1,4 +1,4 @@
-/* NuXTroids 1.2. Original V20 DOS game. No game assets from Atari. */
+/* NuXTroids 1.3. Original V20 DOS game. No game assets from Atari. */
 #include "TABLES.H"
 #include <conio.h>
 #include <dos.h>
@@ -269,7 +269,14 @@ static Point rotated(int x, int y, int a) {
    shape separately so no far pointer crosses a 64K segment. Failure simply
    retains the assembly line path. No allocations occur during play. */
 static unsigned __far *outline_cache[9];
-static unsigned outline_start[9][32], outline_count[9][32];
+static unsigned outline_start[9][32][8], outline_count[9][32][8];
+static int outline_bounds[9][32][4];
+static unsigned char shifted_bits[576];
+extern void outline_wrapped(unsigned,const unsigned __far *,unsigned,unsigned);
+#pragma aux outline_wrapped parm[ax][dx si][cx][bx] modify[ax bx cx dx si di]
+extern void difference(const unsigned *);
+#pragma aux difference parm[si] modify[ax bx cx dx si di]
+
 static unsigned char outline_bits[512];
 static void outline_raster(int shape, int angle) {
     int j, k, x, y, xx, yy, dx, dy, sx, sy, major, error, i;
@@ -288,34 +295,69 @@ static void outline_raster(int shape, int angle) {
         }
     }
 }
+/* Build byte-aligned masks once. Adjacent source fragments are combined here,
+   so each destination byte occurs only once, in ascending address order. */
+static void shifted_outline(int shift) {
+    int i,y,x;
+    memset(shifted_bits,0,sizeof(shifted_bits));
+    for(i=0;i<512;i++) if(outline_bits[i]) {
+        y=i>>3; x=i&7;
+        shifted_bits[y*9+x] ^= outline_bits[i] >> shift;
+        if(shift) shifted_bits[y*9+x+1] ^= outline_bits[i] << (8-shift);
+    }
+}
 static void cache_outlines(void) {
-    int shape, angle, i;
+    int shape,angle,i,shift,pass,j;
     unsigned words;
     unsigned __far *v;
     for(shape=0;shape<9;shape++) {
         if(outline_cache[shape]) _ffree(outline_cache[shape]);
-        outline_cache[shape]=0; words=0;
-        for(angle=0;angle<32;angle++) {
-            outline_raster(shape,angle);
-            outline_start[shape][angle]=words;
-            outline_count[shape][angle]=0;
-            for(i=0;i<512;i++) if(outline_bits[i]) {
-                words+=2; ++outline_count[shape][angle];
+        outline_cache[shape]=0;
+        for(pass=0;pass<2;pass++) {
+            words=0; v=outline_cache[shape];
+            for(angle=0;angle<32;angle++) {
+                Point *vertices=shapes[shape][angle];
+                int *bounds=outline_bounds[shape][angle];
+                bounds[0]=bounds[2]=vertices[0].x;
+                bounds[1]=bounds[3]=vertices[0].y;
+                for(j=1;j<8;j++) {
+                    if(vertices[j].x<bounds[0]) bounds[0]=vertices[j].x;
+                    if(vertices[j].y<bounds[1]) bounds[1]=vertices[j].y;
+                    if(vertices[j].x>bounds[2]) bounds[2]=vertices[j].x;
+                    if(vertices[j].y>bounds[3]) bounds[3]=vertices[j].y;
+                }
+                outline_raster(shape,angle);
+                for(shift=0;shift<8;shift+=scale) {
+                    shifted_outline(shift);
+                    outline_start[shape][angle][shift]=words;
+                    outline_count[shape][angle][shift]=0;
+                    for(i=0;i<576;i++) if(shifted_bits[i]) {
+                        if(pass) {
+                            *v++=(i/9)*(width>>3)+(i%9);
+                            *v++=((unsigned)shifted_bits[i]<<8)|(i%9);
+                        }
+                        words+=2; ++outline_count[shape][angle][shift];
+                    }
+                }
             }
-        }
-        /* At most 512 byte cells per angle; actual outlines are much smaller. */
-        if(words>32760) continue;
-        v=_fmalloc(words*sizeof(unsigned));
-        if(!v) continue;
-        outline_cache[shape]=v;
-        for(angle=0;angle<32;angle++) {
-            outline_raster(shape,angle);
-            for(i=0;i<512;i++) if(outline_bits[i]) {
-                *v++=(i>>3)*(width>>3)+(i&7);
-                *v++=(unsigned)outline_bits[i]<<8;
+            if(!pass) {
+                if(words>32760) break;
+                outline_cache[shape]=_fmalloc(words*sizeof(unsigned));
+                if(!outline_cache[shape]) break;
             }
         }
     }
+}
+static int cached_picture(const Picture *p) {
+    int *b;
+    if(!p->on || p->shape<0 || p->shape>=9 || !outline_cache[p->shape] ||
+       (scale==2 && (p->x&1))) return 0;
+    b=outline_bounds[p->shape][p->angle];
+    return p->x+b[0]>=0 && p->x+b[2]<width &&
+           p->y+b[1]>=0 && p->y+b[3]<height-hud;
+}
+static unsigned picture_base(const Picture *p) {
+    return (p->y-32+hud)*(width>>3)+((p->x-32)>>3);
 }
 
 static void geometry(void) {
@@ -366,11 +408,14 @@ static void picture(const Picture *p) {
             dot(wrap(p->x + 1, width), p->y + hud);
         return;
     }
-    if (p->shape >= 0 && p->shape < 9 && outline_cache[p->shape] &&
-        p->x >= 32 && p->x < width-32 && p->y >= 32 && p->y < height-hud-32) {
-        outline((p->y-32+hud)*(width>>3)+((p->x-32)>>3),
-                outline_cache[p->shape]+outline_start[p->shape][p->angle],
-                (p->x-32)&7, outline_count[p->shape][p->angle]);
+    if (p->shape>=0 && p->shape<9 && outline_cache[p->shape] &&
+        !(scale==2 && (p->x&1))) {
+        unsigned shift=(p->x-32)&7;
+        unsigned __far *v=outline_cache[p->shape]+outline_start[p->shape][p->angle][shift];
+        unsigned count=outline_count[p->shape][p->angle][shift];
+        if(cached_picture(p)) outline(picture_base(p),v,0,count);
+        else outline_wrapped(picture_base(p),v,
+            ((unsigned)(width>>3)<<8)|(((p->x-32)>>3)&255),count);
         return;
     }
     if (p->shape == 9) {
@@ -393,8 +438,23 @@ static void picture(const Picture *p) {
 static void replace(Picture *old, const Picture *now) {
     if (!memcmp(old, now, sizeof(*old)))
         return;
-    picture(old);
-    picture(now);
+    if(old->shape==now->shape && old->color==now->color &&
+       cached_picture(old) && cached_picture(now)) {
+        unsigned args[7], a=(old->x-32)&7, b=(now->x-32)&7;
+        unsigned __far *cache=outline_cache[now->shape];
+        args[0]=FP_SEG(cache);
+        args[1]=FP_OFF(cache)+outline_start[old->shape][old->angle][a]*2;
+        args[2]=outline_count[old->shape][old->angle][a];
+        args[3]=picture_base(old);
+        args[4]=FP_OFF(cache)+outline_start[now->shape][now->angle][b]*2;
+        args[5]=outline_count[now->shape][now->angle][b];
+        args[6]=picture_base(now);
+        ink(now->color);
+        difference(args);
+    } else {
+        picture(old);
+        picture(now);
+    }
     *old = *now;
 }
 static void textxy(int x, int y, const char *s, int color) {
@@ -879,7 +939,7 @@ static void controls(void) {
     }
 }
 static void usage(void) {
-    puts("NuXTroids 1.2\nNUXTROID [/L | /V | /8] [/S] [/N] [/M] "
+    puts("NuXTroids 1.3\nNUXTROID [/L | /V | /8] [/S] [/N] [/M] "
          "[/J]\n/L 320x200  /V 640x480 (default)  /8 800x600\n16 greyscale shades in every mode. "
          "/M bright monochrome objects.\n/J calibrate gameport joystick. J recalibrates, K "
          "disables it.\n/S silent (no AdLib probe)  /N integer geometry (no 8087 probe)\nArrow "

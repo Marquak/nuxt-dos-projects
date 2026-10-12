@@ -22,7 +22,7 @@ publishers in here.
 | [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Fly through an endless field of stars in a silent animated demo. |
 | [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Fill the screen with falling green characters inspired by The Matrix. |
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Defend Earth from descending alien waves in a Space Invaders-style game. |
-| [NUXTROIDS](NUXTROIDS/) | 1.2 | `NUXTROID.EXE` | Pilot a spaceship, dodge asteroids and shoot them into smaller pieces. |
+| [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Pilot a spaceship, dodge asteroids and shoot them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | 1.1 | `NUXTRIS.EXE` | Fit falling blocks together and clear complete rows in a Tetris-style game. |
 | [NUXTLINK](NUXTLINK/) | 3.2 | `NUXFER32.COM` | Transfer files and folders between Linux and DOS over a serial cable, or back up a DOS drive. |
 | [SUNSET](SUNSET/) | 3.1 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset, past palm trees, with a synthwave soundtrack. |

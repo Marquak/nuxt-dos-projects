@@ -1,4 +1,4 @@
-NuXTroids 1.2
+NuXTroids 1.3
 =============
 A little wireframe asteroid shooter for the NuXT. Turn, thrust, coast, and
 try not to fly straight into the rock you just split in half.
@@ -81,14 +81,19 @@ Without it, integer calculations build equivalent tables. Gameplay then uses
 cached vertices and fixed-point motion; putting floating-point calculations
 in the pixel loop would cost more than it saves here.
 
-Version 1.2 caches asteroid outlines as sparse XOR byte masks at startup,
-then moves them with an assembly blitter. The cache adds about 35 KiB at
-320x200 or 73 KiB at the larger modes, plus small tables/allocator overhead.
-If an allocation fails, that shape uses the assembly line renderer instead.
-Screen-edge wrapping now stays in assembly too, avoiding per-pixel C calls.
-Rotation updates are spread across four ticks while keeping the same angular
-speed. Empty object slots are skipped before preparing their drawing data.
-Ship controls, motion, collision rules, firing and AdLib timing are unchanged.
+Version 1.3 prepares horizontally aligned asteroid masks at startup. It
+combines overlapping source fragments and, for interior movement, merges
+the old and new outlines in RAM before writing only their pixel difference.
+Unchanged bits cancel without accessing VGA. Screen-edge asteroids now use
+a wrapped cache blitter instead of redrawing all their individual lines.
+Ship controls, collisions, firing, rotation and sound timing are unchanged.
+
+The cache now uses about 291 KiB at 640x480/800x600, plus tables and heap
+bookkeeping. Startup takes longer. If a shape cannot be allocated it uses
+the existing line renderer, so low free conventional RAM can reduce speed.
+The 320x200 mode prepares eight alignments; larger modes need only four.
+There is still no full-screen copy. The sparse RAM merge still reads VGA
+latches for each changed byte, but avoids redundant erase/draw accesses.
 
 The line renderer and gameport reader are assembly. Moving outlines are
 updated individually with XOR drawing, preserving the static background.
@@ -106,8 +111,8 @@ These are diagnostics, not a measured average frame rate.
 
 DOSBox tests looked playable at 640x480 and 800x600, but the NuXT's ISA VGA
 bus is the real test. The Trident path reuses the mode setup from our other
-NuXT demos. The user has confirmed the game runs on the NuXT. The user also confirmed the 1.1 score-update hitch is fixed. Version 1.2's
-general animation improvements still need a physical NuXT playtest.
+NuXT demos. The user has confirmed the game runs on the NuXT. The user also confirmed the 1.1 score-update hitch is fixed. The owner reported lag in later waves in 1.2; version 1.3 needs a new
+physical NuXT playtest.
 No 86Box testing was used.
 
 The program expects normal BIOS timer timing on entry and restores that
@@ -155,6 +160,10 @@ Upstream runtime source: https://github.com/open-watcom/open-watcom-v2
 AI-written, with emulator checks;
 actual NuXT playtesting is still the useful final step.
 
-OWNER UPDATE, 11 OCTOBER 2026
-The owner is happy with this release on the NuXT and considers the
-single-player game complete. Historical test limits above are retained.
+ADDITIONAL RENDERING REFERENCES (1.3)
+-----------------------------------
+Michael Abrash, Graphics Programming Black Book, chapters 26 and 45/46:
+https://www.phatcode.net/res/224/files/html/ch45/45-03.html
+Little Game Engine sprite code:
+https://github.com/mills32/Little-Game-Engine-for-VGA-EGA/blob/master/lt_spr.c
+These informed the review. No external source was copied into this update.

@@ -1,4 +1,4 @@
-# NuXTroids 1.2
+# NuXTroids 1.3
 
 A little asteroid shooter for the NuXT. Turn, thrust, coast, and try not to
 fly straight into the rock you just split in half. Faded planets and stars
@@ -17,8 +17,11 @@ Built for V20/80186-compatible instructions, VGA and an optional original 8087.
 The 8087 prepares rotated outlines at startup; integer tables handle gameplay.
 Without it, the game builds the tables with integer math. AdLib is optional.
 
-The latest version caches asteroid outlines and updates only moving objects
-and changed score pixels. The owner is happy with this version on the NuXT.
+Version 1.3 prepares aligned asteroid masks at startup and combines the old
+and new outlines before drawing. Unchanged pixels cancel out, reducing VGA
+writes as rocks move, rotate and cross screen edges. Rules and sound are unchanged.
+The larger cache uses more RAM; the line renderer remains a fallback if allocation
+fails. Later-wave performance still needs checking on the NuXT.
 Emulator timings are documented separately and aren't physical V20 benchmarks.
 
 [README.TXT](README.TXT) has all controls, video limits and build instructions.

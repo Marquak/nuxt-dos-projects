@@ -195,7 +195,7 @@ static void hud_benchmark(void) {
 static void play_benchmark(void) {
     volatile unsigned long __far *clock = MK_FP(0x40, 0x6c);
     unsigned long begin, elapsed;
-    unsigned i, pass, j;
+    unsigned i, pass, j, k;
     Picture p;
     nofpu=1; geometry(); audiofound=0;
     memset(&p,0,sizeof(p)); p.on=1; p.color=12; p.shape=6;
@@ -226,7 +226,7 @@ static void play_benchmark(void) {
         silence(); keys[57]=keys[72]=keys[77]=0;
     }
     begin=0;
-    for(i=0;i<9;i++) for(j=0;j<32;j++) if(outline_cache[i]) begin+=outline_count[i][j]*4UL;
+    for(i=0;i<9;i++) for(j=0;j<32;j++) if(outline_cache[i]) for(k=0;k<8;k+=scale) begin+=outline_count[i][j][k]*4UL;
     fprintf(report,"Outline cache payload: %lu bytes\n",begin);
     audiofound=0;
 }
@@ -275,6 +275,20 @@ static void renderer_checks(void) {
         sprintf(label,"Cached shape %d: every rotation/alignment matches assembly outlines",shape);
         check(screen_empty(),label); wipe();
     }
+    /* Compare the RAM mask merge against independently drawing final state.
+       Includes same position, rotation changes, sizes, alignments and edges. */
+    for(shape=0;shape<9;shape++) for(a=0;a<64;a++) {
+        Picture old, now;
+        memset(&old,0,sizeof(old)); old.on=1; old.shape=shape; old.color=12;
+        old.angle=a&31;
+        old.x=(a<32?width/2:32)+(a&3)*scale;
+        old.y=(a<32?(height-hud)/2:32);
+        now=old; now.x+=(a%5-2)*scale; now.y+=(a%3-1)*scale;
+        now.angle=(a+1)&31;
+        picture(&old); replace(&old,&now); picture(&now);
+    }
+    check(screen_empty(),"RAM mask differences equal erase/draw across shapes, motion and rotation");
+    wipe();
     /* Exercise the exact fast-path boundaries and nearby wrapping objects. */
     p.color=15;
     for(i=0;i<8;i++) for(j=0;j<8;j++) {
@@ -310,6 +324,11 @@ int main(int argc, char **argv) {
         fclose(report);
         biosmode(3);
         return 2;
+    }
+    if (argc > 2 && !strcmp(argv[2], "render")) {
+        nofpu=1; geometry(); renderer_checks();
+        fprintf(report,"RESULT %d passed, %d failed\n",passed,failed);
+        biosmode(3); fclose(report); return failed!=0;
     }
     if (argc > 2) {
         if (!strcmp(argv[2], "play")) play_benchmark();

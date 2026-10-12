@@ -4,6 +4,20 @@ This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
 
+## NuXTroids 1.3 update
+
+Updated the executable, renderer, source and test notes from the current local
+release. All other published app sources and binaries were already current.
+Multiplayer NuXTris is excluded from this update.
+
+The release records 67 checks at 640x480 and 29 renderer checks each at 320x200
+and 800x600. A controlled 16-rock workload improved from 93 to 84 BIOS ticks
+with AdLib in the same emulator configuration. These are not physical NuXT
+frame rates. The larger mask cache trades RAM for fewer VGA writes.
+
+For publication, a fresh isolated build matched the release executable and
+all repository checksums were verified. No extra emulator tests were run.
+
 ## October 11 publication
 
 NuXTroids 1.2 and NuXTris 1.1 were added with source, binaries, build scripts,
