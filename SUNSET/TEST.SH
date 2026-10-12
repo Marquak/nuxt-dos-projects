@@ -1,5 +1,5 @@
 #!/bin/sh
-# Host music checks plus isolated V20/8087 DOS test builds and DOSBox runs.
+# Host music checks plus isolated V20/8087 DOS test builds and DOSBox-X runs.
 # Usage: WATCOM=/path/to/watcom ./TEST.SH [--build-only] [work-directory]
 # Every generated file stays in a fresh run directory below work-directory
 # (default: ${TMPDIR:-/tmp}/sunset-tests). No QEMU or 86Box is required.
@@ -14,7 +14,7 @@ for arg in "$@"; do
         --build-only) build_only=1 ;;
         --help|-h)
             printf '%s\n' 'Usage: WATCOM=/path/to/watcom ./TEST.SH [--build-only] [work-directory]'
-            printf '%s\n' 'CC and DOSBOX may select the host compiler and DOSBox executable.'
+            printf '%s\n' 'CC and DOSBOX may select the host compiler and DOSBox-X executable.'
             printf '%s\n' 'SUNSET_TEST_TIMEOUT sets the per-case timeout in seconds (default 180).'
             exit 0 ;;
         --*) printf 'Unknown option: %s\n' "$arg" >&2; exit 2 ;;
@@ -33,7 +33,7 @@ export WATCOM
 export PATH="$WATCOM/binl64:$WATCOM/binl:$PATH"
 export INCLUDE="$WATCOM/h"
 host_cc=${CC:-cc}
-dosbox=${DOSBOX:-dosbox}
+dosbox=${DOSBOX:-dosbox-x}
 test_timeout=${SUNSET_TEST_TIMEOUT:-180}
 case "$test_timeout" in
     ''|*[!0-9]*|0) printf '%s\n' 'SUNSET_TEST_TIMEOUT must be a positive integer.' >&2; exit 2 ;;

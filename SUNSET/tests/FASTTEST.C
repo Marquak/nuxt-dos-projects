@@ -48,7 +48,7 @@ int main(void){
   decode_calls=0;if(!tiles_cache_background(decode)){failures++;break;}
   for(i=0;i<200;i++){unsigned x;for(x=0;x<320;x++)row[x]=bg(x,i);video_write_span(0,i,row,320);}
   reset_ref();tiles_begin();check(colors,0);
-  for(f=1;f<=10;f++){
+  for(f=1;f<=15;f++){
    reset_ref();tiles_begin();
    if(f<9){
     draw(0,0,319,199,177);draw(319,0,0,199,179);
@@ -60,8 +60,15 @@ int main(void){
      draw(a,b,c,d,160+i%32);
     }
    }
+   if(f==11){
+    /* Alternating cells force the maximum twenty disjoint runs per row. */
+    for(i=0;i<40;i+=2)draw(i*8,0,i*8,0,177);
+    for(i=1;i<40;i+=2)draw(i*8,199,i*8,199,179);
+   }
+   if(f==12){draw(0,0,319,0,180);draw(0,199,319,199,181);}
+   if(f==13)draw(319,199,319,199,183);
    check(colors,f);
-   if(f==10&&tiles_bytes()!=0){fprintf(logfile,"FAIL clean frame uploaded\n");failures++;}
+   if((f==10||f==15)&&tiles_bytes()!=0){fprintf(logfile,"FAIL clean frame uploaded\n");failures++;}
   }
   if(_fheapchk()!=_HEAPOK||_nheapchk()!=_HEAPOK){failures++;fprintf(logfile,"FAIL heap guard\n");}
   tiles_close();video_close();if(colors==16)break;

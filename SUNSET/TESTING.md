@@ -1,3 +1,70 @@
+# Neon Coast 3.2 validation
+
+A small 320x200 optimization, preserving the picture and Horizon Runner music.
+`SUNSET.EXE`: 126382 bytes; SHA-256 `1891a5b5c5191ba144d63998ef73698e9a2b40b3701b07cd892a38ed712e372f`.
+DGROUP remains 63,184 bytes including the 8,192-byte stack. Far framebuffer
+allocations are unchanged. The new routines keep interrupts enabled.
+
+## Changes and focused checks
+
+The old/new tile-row masks are read with segments loaded once per batch.
+Neighbouring dirty cells are coalesced and copied inside a single assembly
+call per scanline. Restoration benefits both 320 colour depths; direct VGA
+copying benefits 256 colours. The 16-colour conversion remains unchanged.
+
+All 32 full-frame checks passed in DOSBox-X against the independent pixel
+reference, including all octants, intersections, protected car pixels,
+restoration, empty frames, alternating dirty cells (20 separate runs), full
+first/last scanlines and the bottom-right pixel. Both heaps remained intact.
+The unchanged music passed its 164 host checks. A release EXE run with AdLib
+completed 120 frames and returned to DOS, with no tile overflow and full detail.
+No 86Box, physical serial or physical-disk tests were used.
+
+## Comparison
+
+DOSBox-X 2026.10.01, normal core, experimental 80186 CPU model, fixed 3000
+cycles, S3 VGA, emulated AdLib. Both builds render the same 120 scene timestamps
+(`200 + frame * 3`), with eight palms and automatic detail reduction disabled.
+Timing includes restoration, geometry, clipping, drawing, glow and presentation,
+with music interrupts running. Test screenshot readbacks are outside that timing.
+These settings do not model NuXT ISA waits or establish physical V20 speed.
+
+|Mode|3.1 rendering ticks|3.2 rendering ticks|Time reduction|
+|---|---:|---:|---:|
+|320x200 / 256|277|264|4.7%|
+|320x200 / 16|478|466|2.5%|
+
+Both versions uploaded exactly 1,673,856 bytes in 256 colours and 836,928 in
+16 colours. Full framebuffer samples at frames 40 and 120 were byte-identical
+in each depth. This is a reduction in CPU overhead, not fewer visible pixels
+or a cheaper scene. BIOS-tick granularity means the percentages are approximate.
+The first copy-only experiment saved about 1%; batching the mask reads supplied
+most of the remaining gain. Higher-resolution and low-memory sparse drawing
+were not modified or re-benchmarked.
+
+## References and choices
+
+Reviewed our Matrix dirty-cell batches, Starfield video access, ORBIT87 span
+routines and NuXTroids' old/new mask merge. Sunset already composes complete
+regions in RAM, so it keeps that approach. Extra previous-frame buffers and
+per-pixel VGA reads were not added for a speculative saving. Its existing 8087
+setup tables already remove projection division from the normal frame loop.
+
+External design references, with no copied code in this update:
+
+- [Little Game Engine](https://github.com/mills32/Little-Game-Engine-for-VGA-EGA):
+  selective updates and hardware-assisted transfers. Its scrolling/tile model
+  is not a direct replacement for Sunset's changing perspective geometry.
+- [Abrash, masked images and dirty rectangles](https://www.phatcode.net/res/224/files/html/ch46/46-03.html):
+  coalescing update regions and weighing bookkeeping against drawing savings.
+- [FreeDOS C graphics material](https://www.freedos.org/books/cprogramming/bonus/):
+  checked as part of the reference pass; no suitable faster compositor found.
+
+Development evidence is under work/sunset-v32. The tests below describe the
+prior 3.1 release and were not all repeated for this small renderer change.
+
+---
+
 # Neon Coast 3.1 validation
 
 This release replaces the soundtrack with **Horizon Runner**. The renderer,
@@ -108,7 +175,7 @@ Primary technical references consulted:
 - [Furnace instrument importer](https://github.com/tildearrow/furnace/blob/master/src/engine/fileOpsIns.cpp):
   SBI container layout for the exported patches.
 
-Private development captures and emulator images are not bundled. No 86Box
-test was run and no physical disk or user emulator setup was changed during
-that validation pass. The owner later reported liking the soundtrack on the
-real NuXT. See the repository VALIDATION.md for the packaging checks.
+Development evidence is in work/sunset-v31/: baseline/, tests/run.HJxM4z/,
+score-sanitized.csv, bench/, music/, and furnace-audition*. No 86Box test was
+run, and no physical disk, serial configuration or user emulator setup was
+changed. The new soundtrack remains to be judged on the real NuXT/AdLib.

@@ -21,6 +21,12 @@ extern void fast320_line_asm(const Line *p);
 #pragma aux fast320_line_asm parm [si] modify exact [ax bx cx dx si di];
 extern unsigned fast320_runs(const unsigned char *,unsigned,unsigned *);
 #pragma aux fast320_runs parm [si] [ax] [di] value [ax] modify exact [ax bx cx dx si di];
+/* Scan/coalesce one dirty row and copy it in one assembly call. The source
+ * and destination share offsets; masks stay in near memory. */
+extern unsigned fast320_blitrow(const unsigned char *,unsigned,unsigned,unsigned,unsigned);
+#pragma aux fast320_blitrow parm [si] [bx] [di] [ax] [dx] value [ax] modify exact [ax bx cx dx si di];
+extern unsigned fast320_masks(unsigned,unsigned,unsigned,unsigned char *);
+#pragma aux fast320_masks parm [ax] [dx] [si] [di] value [ax] modify exact [ax bx cx dx si di];
 static void copy_run(unsigned srcseg,unsigned dstseg,unsigned off,unsigned n);
 #pragma aux copy_run = \
  "push ds" "push es" "mov ds,ax" "mov es,dx" "mov di,si" \
@@ -58,15 +64,13 @@ int fast320_cache(void (*decode)(unsigned,unsigned char *)){
  copy_run(bgseg,frameseg,0,64000U);ready=1;return 1;
 }
 static void restore_old(void){
- unsigned tr,c,r,bit,off,n,k;unsigned char any;
+ unsigned tr,r,bit,off;unsigned char any;
  for(tr=0;tr<25;tr++){
-  any=0;
-  for(c=0;c<40;c++){changed[c]=bg[64000U+tr*40+c];any|=changed[c];}
+  any=(unsigned char)fast320_masks(bgseg,0,64000U+tr*40,changed);
   if(!any)continue;
   for(r=0;r<8;r++){
    bit=bits[r];if(!(any&bit))continue;off=(tr*8+r)*320U;
-   n=fast320_runs(changed,bit,runs);
-   for(k=0;k<n;k++)copy_run(bgseg,frameseg,off+runs[k*2],runs[k*2+1]);
+   fast320_blitrow(changed,bit,off,bgseg,frameseg);
   }
  }
 }
@@ -91,23 +95,22 @@ void fast320_line(int x0,int y0,int x1,int y1,unsigned char color){
  line.frame=frameseg;line.bg=bgseg;fast320_line_asm(&line);
 }
 int fast320_present(void){
- unsigned tr,c,r,bit,start,off,y,n,count,k;unsigned char any,old,now;
+ unsigned tr,r,bit,start,off,y,n,count,k,masks;unsigned char any;
  uploaded=0;used=0;if(!ready)return 0;
  for(tr=0;tr<25;tr++){
-  any=0;
-  for(c=0;c<40;c++){
-   off=64000U+tr*40+c;old=bg[off];now=frame[off];
-   changed[c]=old|now;any|=changed[c];if(now)used++;
-  }
+  masks=fast320_masks(bgseg,frameseg,64000U+tr*40,changed);
+  any=(unsigned char)masks;used+=masks>>8;
   if(!any)continue;
   for(r=0;r<8;r++){
    bit=bits[r];if(!(any&bit))continue;y=tr*8+r;off=y*320U;
+   if(video_colors()==256){
+    uploaded+=fast320_blitrow(changed,bit,off,frameseg,0xa000);
+    continue;
+   }
    count=fast320_runs(changed,bit,runs);
    for(k=0;k<count;k++){
     start=runs[k*2];n=runs[k*2+1];
-    if(video_colors()==256){
-     copy_run(frameseg,0xa000,off+start,n);uploaded+=n;
-    }else{
+    {
      _fmemcpy(scan,frame+off+start,n);
      if(!video_write_span(start,y,scan,n)){
       /* Preserve old/new union if the caller retries or starts another frame. */

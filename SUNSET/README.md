@@ -1,4 +1,4 @@
-# Sunset 3.1  -  Neon Coast
+# Sunset 3.2  -  Neon Coast
 
 A car heading towards the sunset, wireframe palms going by and an AdLib
 synthwave tune. No text during the demo and no ending. Just let it play.

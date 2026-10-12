@@ -1,4 +1,4 @@
-NEON COAST 3.1
+NEON COAST 3.2
 Endless sunset drive for the NuXT / V20 / 8087 / AdLib
 
 RUN
@@ -112,6 +112,11 @@ PERFORMANCE / DETAIL
   costs about 127 KiB, avoiding repeated background decompression and
   per-pixel tile lookups. V20 assembly draws the lines and finds changed
   spans. Only completed spans are copied to VGA, preserving car occlusion.
+  Version 3.2 batches dirty-mask reads and row copies in assembly, avoiding
+  repeated far-pointer setup and short C-to-assembly calls. No extra RAM
+  buffer, skipped scanlines or reduced detail. At fixed full detail in a
+  DOSBox-X comparison, 120 frames took 264 rendering ticks versus 277 before
+  in 256 colours, and 466 versus 478 in 16 colours. Actual NuXT gains may differ.
   Higher resolutions, or insufficient RAM for the cache, use sparse tiles.
 
   The 8087 prepares scale/depth coefficients once; each frame uses fast

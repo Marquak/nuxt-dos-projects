@@ -1,8 +1,23 @@
-# Snapshot checks, 2026-10-11
+# Snapshot checks, 2026-10-12
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
+
+## Sunset 3.2 update
+
+Updated the executable, source, renderer tests and documentation. The 320x200
+renderer batches dirty-mask reads and row copies in assembly, with no extra
+framebuffer memory or changes to the artwork and soundtrack.
+
+Development checks passed: 32 renderer cases, 164 music checks and a 120-frame
+release run with AdLib. Fixed-scene DOSBox-X rendering time fell from 277 to
+264 ticks in 256 colours and 478 to 466 in 16 colours. Sampled frames matched
+3.1 byte for byte. These are emulator measurements, not physical NuXT results.
+See SUNSET/TESTING.md for the setup and limitations.
+
+For publication, an isolated rebuild matched the release executable and all
+snapshot checksums were verified. No additional emulator runs were needed.
 
 ## NuXTroids 1.3 update
 

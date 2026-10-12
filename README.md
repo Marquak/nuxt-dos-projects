@@ -25,7 +25,7 @@ publishers in here.
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Pilot a spaceship, dodge asteroids and shoot them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | 1.1 | `NUXTRIS.EXE` | Fit falling blocks together and clear complete rows in a Tetris-style game. |
 | [NUXTLINK](NUXTLINK/) | 3.2 | `NUXFER32.COM` | Transfer files and folders between Linux and DOS over a serial cable, or back up a DOS drive. |
-| [SUNSET](SUNSET/) | 3.1 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset, past palm trees, with a synthwave soundtrack. |
+| [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset, past palm trees, with a synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Patch your own Dune II files to avoid the XMS startup error and skip manual-word checks. |
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Inspect your DOS computer's processor, memory, video, ports, BIOS and drives. |
 

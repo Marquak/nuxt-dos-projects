@@ -141,7 +141,7 @@ static void arguments(int argc,char **argv){
   else if(!strnicmp(a,"frames:",7)){frame_limit=strtoul(a+7,0,10);if(!frame_limit||frame_limit>65000UL){puts("Frames must be 1..65000.");exit(1);}}
   else if(!strnicmp(a,"detail:",7)){int n=atoi(a+7);if(n<1||n>3){puts("Detail must be 1..3.");exit(1);}detail=n-1;}
   else {
-   puts("NEON COAST 3.1 - endless V20 / 8087 / AdLib sunset drive\n");
+   puts("NEON COAST 3.2 - endless V20 / 8087 / AdLib sunset drive\n");
    puts("SUNSET [/320|/640|/800] [/16|/256] [/AUTO] [/SILENT] [/NO87] [/DETAIL:1..3]");
    puts("       [/REPORT] [/TICKS:1..65000] [/FRAMES:1..65000]");
    puts("V20/V30 or 80186+ CPU required. Default: 320x200, 256 colours.");
@@ -205,7 +205,7 @@ int main(int argc,char **argv){
  }
  notes=music_notes();elapsed=music_ticks();music_stop();_dos_setvect(0x23,old_break);
  tiles_close();video_close();math_end();
- if(report){FILE *f=fopen("SUNSET.LOG","w");if(f){fprintf(f,"NEON COAST 3.1\nvideo=%s\nrenderer=%s\nresolution=%ux%u\ncolours=%u\n8087=%d\nticks=%lu\nframes=%lu\nrender_ticks=%lu\nbytes_uploaded=%lu\nmax_tiles=%u\noverflow_frames=%lu\nfinal_detail=%u\nnotes=%u\n",driver,renderer,w,h,colors,have87,elapsed,frames,render_ticks,bytes_total,max_tiles,overflow_frames,detail+1,notes);fclose(f);}else{puts("Could not write SUNSET.LOG.");ok=0;}}
+ if(report){FILE *f=fopen("SUNSET.LOG","w");if(f){fprintf(f,"NEON COAST 3.2\nvideo=%s\nrenderer=%s\nresolution=%ux%u\ncolours=%u\n8087=%d\nticks=%lu\nframes=%lu\nrender_ticks=%lu\nbytes_uploaded=%lu\nmax_tiles=%u\noverflow_frames=%lu\nfinal_detail=%u\nnotes=%u\n",driver,renderer,w,h,colors,have87,elapsed,frames,render_ticks,bytes_total,max_tiles,overflow_frames,detail+1,notes);fclose(f);}else{puts("Could not write SUNSET.LOG.");ok=0;}}
  if(!ok)puts("A video transfer failed; returned safely to DOS.");
  else printf("\nNeon Coast stopped. %lu frames. Video and timer restored.\n",frames);
  return ok?0:1;

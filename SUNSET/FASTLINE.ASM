@@ -182,4 +182,100 @@ runs_done:
     mov ax,dx
     ret
 fast320_runs_ endp
+
+; SI near masks[40], BL row bit, DI row offset, AX source seg, DX dest seg.
+; Coalesce neighbouring dirty cells and copy aligned words. No VGA reads,
+; no CLI, no extra framebuffer. AX returns the exact copied byte count.
+public fast320_blitrow_
+fast320_blitrow_ proc near
+    push bp
+    push ds
+    push es
+    push ax                ; source segment
+    push si                ; mask start
+    push bx                ; row bit
+    mov bp,sp
+    mov es,dx
+    xor dx,dx              ; total words copied
+    mov bx,si
+    add bx,40              ; mask end, exclusive
+    cld
+blit_seek:
+    cmp si,bx
+    jae blit_done
+    mov al,[bp]
+    test [si],al
+    jnz blit_start
+    inc si
+    add di,8
+    jmp short blit_seek
+blit_start:
+    xor cx,cx
+blit_more:
+    inc si
+    add cx,4               ; four words per dirty 8-pixel cell
+    cmp si,bx
+    jae blit_copy
+    test [si],al
+    jnz blit_more
+blit_copy:
+    add dx,cx
+    push si
+    push ds
+    mov ds,[bp+4]
+    mov si,di
+    rep movsw
+    pop ds
+    pop si
+    jmp short blit_seek
+blit_done:
+    mov ax,dx
+    shl ax,1
+    add sp,6
+    pop es
+    pop ds
+    pop bp
+    ret
+fast320_blitrow_ endp
+
+; Gather one tile row with segments loaded once, not per C far access.
+; AX old segment, DX new segment (0 => old only), SI offset, DI masks[40].
+; Return AL union of row bits and AH number of nonempty new tiles (0..40).
+public fast320_masks_
+fast320_masks_ proc near
+    push es
+    mov es,ax
+    mov bx,40
+    xor cx,cx
+mask_old:
+    mov al,es:[si]
+    mov [di],al
+    or cl,al
+    inc si
+    inc di
+    dec bx
+    jnz mask_old
+    or dx,dx
+    jz masks_done
+    mov es,dx
+    sub si,40
+    sub di,40
+    mov bx,40
+mask_new:
+    mov al,es:[si]
+    or [di],al
+    or cl,al
+    or al,al
+    jz mask_empty
+    inc ch
+mask_empty:
+    inc si
+    inc di
+    dec bx
+    jnz mask_new
+masks_done:
+    mov ax,cx
+    pop es
+    ret
+fast320_masks_ endp
 end

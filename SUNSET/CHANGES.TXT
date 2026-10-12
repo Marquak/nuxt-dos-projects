@@ -1,3 +1,13 @@
+NEON COAST 3.2 CHANGES
+
+- Batch dirty-row copies and dirty-mask reads in V20 assembly at 320x200.
+- Same RAM footprint, artwork, palm detail, projection and soundtrack.
+- Fixed 120-frame DOSBox-X comparison: 277 -> 264 rendering ticks in 256
+  colours; 478 -> 466 in 16 colours. These are not real V20 measurements.
+- Full-frame regression checks cover both depths, edge runs and erasure.
+- Higher-resolution drawing and low-memory fallback are unchanged.
+- TEST.SH now defaults to DOSBox-X.
+
 NEON COAST 3.1 CHANGES
 
 - New original 104 BPM synthwave soundtrack: Horizon Runner.
