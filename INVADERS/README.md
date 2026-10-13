@@ -1,8 +1,8 @@
 # XT Invaders 2.0
 
-A little Space Invaders-style game for an XT. EGA or VGA, gameport controls,
-AdLib effects and a single COM file. The aliens now march to a four-note
-thump, with a different wireframe backdrop each wave.
+Shoot the aliens before they reach the bottom of the screen. An XT take on
+Space Invaders, with the familiar marching thump, AdLib effects and a different
+background each wave. Play with the keyboard or a gameport joystick/gamepad.
 
 - **Run:** `INVADERS` for 320x200; `INVADERS /V` for 640x480. Both use 16 colours.
 - **Joystick/gamepad:** add `/J` to calibrate, or press J at the title.

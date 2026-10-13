@@ -1,9 +1,9 @@
-NUXT LINK 3.2
-=============
-Copy NUXFER32.COM beside your existing server. Disconnect Linux, exit the
+NUXT LINK 3.2.1
+===============
+Copy NUX321.COM beside your existing server. Disconnect Linux, exit the
 old DOS server with Esc, then start from its folder:
 
-  NUXFER32 COM1
+  NUX321 COM1
 
 Default startup is 9600 baud, no flow/peer requirements, 128-byte blocks.
 In Linux keep your desired transfer baud and click Connect. The client
@@ -15,14 +15,19 @@ if the server is already running with different settings.
 Replace the complete Linux folder, including transfer_queue.py, then run:
   sh linux/launch.sh
 Saved profiles remain compatible. For all fixes, update both sides.
-NUXFER.COM and NUXFER32.COM are identical; wire protocol remains v3.
+NUXFER.COM, NUXFER32.COM and NUX321.COM are identical; protocol remains v3.
+
+SYNC DOS DATE/TIME: click the button beside Diagnostics while connected
+and idle. Sends Linux local time and date, then checks the DOS clock.
+Update both DOS and Linux sides. Existing file timestamps are unchanged.
+Manual sync only; normal DOS clock resolution and serial delay apply.
 
 FULL HANDSHAKE: select rtscts; peer both needs DSR and DCD wired.
 THREE WIRES: select flow none and peer none.
 Supported baud: 1200 2400 4800 9600 19200 38400 57600 115200.
 /FLOW:NONE or RTSCTS. /PEER:NONE, DSR, DCD, BOTH. /BLOCK:128, 256, 512.
 Example manual startup:
-  NUXFER32 COM1 115200 /FLOW:RTSCTS /PEER:BOTH /BLOCK:512
+  NUX321 COM1 115200 /FLOW:RTSCTS /PEER:BOTH /BLOCK:512
 Idle keys: B baud, F flow, D peer, C COM, S status. Esc exits.
 The ENTIRE drive containing the running executable is shared.
 

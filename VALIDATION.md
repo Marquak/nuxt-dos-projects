@@ -4,6 +4,22 @@ This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
 
+## NuXTLink 3.2.1 update and description cleanup
+
+3.2.1 is now the current NuXTLink release. The DOS server, Linux client and
+source include Sync DOS Date/Time, with NUX321.COM as the recommended DOS name.
+NUXFER.COM and NUXFER32.COM remain identical aliases for existing launchers.
+
+Development checks passed 61 host/Tk tests and focused MS-DOS 6.22/QEMU clock
+checks, including invalid dates, leap-day rollover, lost replies and transfers
+with preserved metadata after syncing. Physical NuXT clock sync and RTC
+persistence have not yet been confirmed. See NUXTLINK/TESTING.md for details.
+
+For publication, source and binaries were compared with the tested local
+release, and checksums were refreshed. No emulator reruns were needed.
+The collection table and all eleven project introductions were edited for
+clarity. These documentation edits do not change the other programs.
+
 ## NuXT Menu 1.4 update
 
 Updated the menu source, executables, preview and documentation. This includes

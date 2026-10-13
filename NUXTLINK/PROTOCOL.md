@@ -64,6 +64,7 @@ is abandoned. Transfer framing, CRCs and commit verification are unchanged.
 | 24 | GET_STATUS | empty | scan; ready=1 enables GET_DATA |
 | 21 | GET_DATA | empty | up to the selected block size (128/256/512 bytes) |
 | 22 | GET_END | empty | whole-file CRC after source metadata recheck |
+| 43 | CLOCK (3.2.1+) | empty to read; 8-byte clock to set | 8-byte DOS clock readback |
 | 30 | PAUSE/CANCEL | empty | empty; closes file handles, retains staging |
 | 32 | INSPECT_PARTIALS | empty | discardable count u16 + protected count u16 |
 | 31 | DISCARD_PARTIALS | empty | discarded count u16 + protected count u16 |
@@ -154,3 +155,21 @@ Downloads use 4 KiB DOS read-ahead. The rolling file CRC is advanced only for th
 bytes in a new response; duplicate requests replay the cached response and do
 not advance the file or CRC. Uploads retain the original staging/commit path.
 The version 2 on-disk cache signatures and backup manifest formats are unchanged.
+
+## Clock extension (3.2.1)
+
+CLOCK (43h) uses `year u16 LE, month, day, hour, minute, second, hundredth`
+(eight bytes total). This is local wall time, not UTC or a packed FAT timestamp.
+The year must be 1980-2099; all calendar and time fields are validated before
+any mutation. Empty requests read the clock; lengths other than zero/eight fail.
+Requests are rejected during an active file operation or pending settings change.
+
+Setting calls DOS INT 21h time/date services, time first to avoid an old clock
+near midnight advancing the requested date between calls. Errors identify a
+possible partial update. Readback checks date/time/date to avoid mixing dates
+across midnight. BIOS-tick-based idle state is refreshed after changing the clock.
+Duplicate requests replay their cached response without setting the clock again.
+The client uses a fresh read after the set ACK, allowing elapsed retry time and
+up to two seconds of clock/serial tolerance when checking the result. A lost or
+invalid reply is not reported as success. An older server's Unknown command
+response becomes an explicit upgrade message; other v3 commands are unchanged.

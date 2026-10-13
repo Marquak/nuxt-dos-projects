@@ -19,7 +19,7 @@ sh BUILD_ALL.SH
 ```
 
 This rebuilds all ten DOS projects, including both ORBIT executables,
-and refreshes NuXTLink's alternate-name binary. DUNE2FIX is a Python script;
+and refreshes NuXTLink's alternate-name binaries. DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
 
@@ -32,7 +32,8 @@ For a single project:
 ```
 
 After a NuXTLink-only build, `dos/NUXFER.COM` is authoritative; copy it to
-`NUXTLINK/NUXFER32.COM` and `NUXTLINK/NUXFER.COM` to refresh both distribution copies.
+`NUXTLINK/NUX321.COM`, `NUXTLINK/NUXFER32.COM` and `NUXTLINK/NUXFER.COM`
+to refresh all distribution copies. `NUX321.COM` is the recommended name for 3.2.1.
 Build scripts select the required CPU target; do not replace them with generic
 compiler defaults. V20 does not support arbitrary 286/386 instructions, and
 8087 assembly must remain compatible with the original coprocessor.

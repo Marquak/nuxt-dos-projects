@@ -1,3 +1,30 @@
+# Date/time sync update, 2026-10-13
+
+NuXT Link 3.2.1 built with the existing Open Watcom 8086/tiny-model build,
+warnings as errors. NUXFER.COM is 25,698 bytes, 732 bytes larger than 3.2.
+
+61 host/Tk tests passed, including seven new clock/UI checks: local wall time,
+invalid date/range/readback, old-server errors, elapsed retry time, fresh clock
+verification, idle-only button state and status reporting. Layout was inspected
+at 1024x720 on a private Xvfb display.
+
+The compiled server passed focused checks on a disposable MS-DOS 6.22/QEMU disk:
+1980/2099 date limits, leap years, invalid lengths/fields without clock mutation,
+midnight leap-day rollover, a dropped clock ACK with cached retry (no repeated
+clock reset), active-operation rejection and a binary upload/download with CRC
+verification and unchanged DOS timestamps/attributes after sync. A fresh 9600
+connection negotiated 115200 before the clock checks. DOS tick rounding can put
+readback slightly before the requested fractional second; checks allow for it.
+
+`tests/test_clock.py` and the added Tk test run in the ordinary host suite.
+`tests/integration_clock.py` exposes run(client) for an already connected
+compiled server on a disposable DOS disk. It changes the guest date/time and
+creates CLOCKCHK.BIN; do not point it at a real working drive.
+
+No real UART, Linux system clock, user CF card or 86Box configuration was changed.
+Hardware RTC persistence and physical NuXT sync remain for the owner to check.
+Earlier test reports below describe their respective releases.
+
 # NuXT Link 3.2 validation - 11 October 2026
 
 All **54 host tests passed**, including 10 Tk GUI tests on private Xvfb.
@@ -36,7 +63,7 @@ The older tests below are historical, not additional current test counts.
 
 ---
 
-# Linux UI refresh validation - 8 October 2026
+# Linux UI refresh validation — 8 October 2026
 
 All **31 host tests passed**: the existing 24 protocol/metadata/profile tests
 and 7 new Tk GUI tests, run on a private Xvfb display with simulated DOS listings
@@ -61,7 +88,7 @@ DOS/emulator validation below was not repeated for this UI-only update.
 
 ---
 
-# Original NuXT Link 3.1 validation - 6 October 2026
+# Original NuXT Link 3.1 validation — 6 October 2026
 
 The 24,968-byte DOS COM builds with Open Watcom `-0 -mt -l=com`, warnings as
 errors. It contains only 8086-targeted C/runtime code and `.8086` assembly.
@@ -105,7 +132,7 @@ its FreeDOS and GUI runs were not repeated for 3.1.
 
 ---
 
-# NuXT Link 3.0 validation - 6 October 2026
+# NuXT Link 3.0 validation — 6 October 2026
 
 ## Compiled DOS server
 
@@ -175,7 +202,7 @@ kernel settings were covered separately by PTY host tests.
 
 ## Limits and real adapter change
 
-The attached FTDI adapter was set to a runtime latency of **2 ms**, with
+The attached FTDI adapter FTE201LV was set to a runtime latency of **2 ms**, with
 successful readback, after the owner confirmed the backup had finished.
 No EEPROM or persistent system rule was changed.
 

@@ -1,8 +1,8 @@
 # NuXT Dash 1.3
 
-A little hardware dashboard for my NuXT. Handy for checking the current CPU
-speed after changing turbo, how much upper memory is free, and what the BIOS
-reports about the video card and drives.
+Check what's in your NuXT and what DOS can see. Dash shows CPU speed, memory,
+video, ports, BIOS information and drives. It's handy for checking the turbo
+speed or seeing how much upper memory is free.
 
 Copy **DASH.COM** to your DOS machine and run `DASH`. No installation or
 configuration file needed. This version is working well on my NuXT.

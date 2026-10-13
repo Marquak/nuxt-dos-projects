@@ -1,4 +1,4 @@
-/* NuXT Link 3.1. Open Watcom, 8086 tiny model, DOS 3.31+.
+/* NuXT Link 3.2.1. Open Watcom, 8086 tiny model, DOS 3.31+.
  * The DOS side owns paths and validates every request; the Linux side owns
  * recursion, queues and manifests. No directory tree is held in DOS memory.
  */
@@ -405,11 +405,45 @@ static void rename_entry(unsigned n){
     if(!expected(&d,p)){error("Rename completed but metadata verification failed");return;}
     list_active=0;
 }
+static void clock_reply(void){
+    struct dosdate_t d,after;struct dostime_t t;unsigned tries;
+    /* Do not combine yesterday's date with a time read after midnight. */
+    for(tries=0;tries<3;tries++){
+        _dos_getdate(&d);_dos_gettime(&t);_dos_getdate(&after);
+        if(d.year==after.year&&d.month==after.month&&d.day==after.day){
+            pw(reply+6,d.year);reply[8]=d.month;reply[9]=d.day;
+            reply[10]=t.hour;reply[11]=t.minute;reply[12]=t.second;reply[13]=t.hsecond;
+            pw(reply+4,8);return;
+        }
+    }
+    error("DOS clock changed during read; try again");
+}
+static void clock_command(unsigned n){
+    struct dosdate_t d;struct dostime_t t;unsigned days;U8 *p=req+4;
+    static const U8 month_days[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    if(active||pending){error("Finish or cancel the active operation first");return;}
+    if(!n){clock_reply();return;}
+    if(n!=8){error("Invalid clock request");return;}
+    d.year=word(p);d.month=p[2];d.day=p[3];d.dayofweek=0;
+    t.hour=p[4];t.minute=p[5];t.second=p[6];t.hsecond=p[7];
+    if(d.year<1980||d.year>2099||d.month<1||d.month>12)goto invalid;
+    days=month_days[d.month-1];if(d.month==2&&!(d.year%4))days++;
+    if(!d.day||d.day>days||t.hour>23||t.minute>59||t.second>59||t.hsecond>99)goto invalid;
+    /* Validate everything first. Set time before date so an old clock near
+     * midnight cannot roll the new date forward between the two calls. */
+    if(_dos_settime(&t)){error("DOS refused the time update");return;}
+    last_tick=ticks();
+    if(_dos_setdate(&d)){error("Time updated but DOS refused the date; check DOS clock");return;}
+    clock_reply();return;
+invalid:
+    error("Invalid date/time; use 1980-2099 and a valid calendar date");
+}
 static void dispatch(void){
     unsigned n=word(req+2),e,got;U8 *p=req+4;struct find_t f;char pattern[72];
     if(pending&&req[0]!=0x40&&req[0]!=0x42){error("Connection settings await confirmation");return;}
     switch(req[0]){
     case 0x40:if(n){error("Invalid diagnostics request");break;}info_reply();break;
+    case 0x43:clock_command(n);break;
     case 0x41:
         if(n!=9||p[0]>7||p[1]>1||(p[2]&~0xa0)||(word(p+3)!=128&&word(p+3)!=256&&word(p+3)!=512)){
             error("Invalid connection settings");break;
@@ -532,7 +566,7 @@ int main(int argc,char **argv){
     base=*(U16 __far *)MK_FP(0x40,(com-1)*2);if(!base){puts("COM port is not present in the BIOS table.");return 1;}
     old24=_dos_getvect(0x24);_dos_setvect(0x24, (void (__interrupt __far *)(void))MK_FP(code_segment(),(unsigned)critical));
     uart_open();reply[0]='N';reply[1]='X';
-    printf("\nNUXT LINK 3.2 - entire %c:\\ drive\n",drive);
+    printf("\nNUXT LINK 3.2.1 - entire %c:\\ drive\n",drive);
     show_settings();
     puts("Files, folders, hidden/system files and DOS metadata.\nEsc exits. Idle keys: B baud, F flow, D peer lines, C COM, S status.\nPartials survive disconnects. Defaults: COM1 9600 /FLOW:NONE.");
     last_tick=ticks();

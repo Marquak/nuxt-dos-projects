@@ -28,6 +28,7 @@ CANCEL, ACK, ERROR = 0x30, 0x80, 0xFF
 STAT, MKDIR, META, HASH, HASH_STEP = 4, 5, 6, 7, 8
 PUT_STATUS, GET_STATUS = 0x13, 0x24
 INFO, SETTINGS, CONFIRM, DELETE, RENAME = 0x40, 0x41, 0x42, 0x50, 0x51
+CLOCK = 0x43
 FLOWS = ('none', 'rtscts')
 PEERS = {'none': 0, 'dsr': 32, 'dcd': 128, 'both': 160}
 MAX_FILE = 0x7FFFFFFF
@@ -507,6 +508,43 @@ class Client:
 
     def diagnostics(self, *, cancellable=True):
         return self._diagnostics(self.request(INFO, cancellable=cancellable))
+
+    def _clock_request(self, payload=b''):
+        try:
+            data = self.request(CLOCK, payload, cancellable=False)
+        except RemoteError as exc:
+            if str(exc) == 'Unknown command':
+                raise VersionError('Date/time sync needs DOS server 3.2.1 or newer. Update NUXFER and restart it.') from exc
+            raise
+        try:
+            year, month, day, hour, minute, second, hundredth = struct.unpack('<H6B', data)
+            if not 1980 <= year <= 2099 or hundredth > 99:
+                raise ValueError('Out of range')
+            return datetime.datetime(year, month, day, hour, minute, second, hundredth*10000)
+        except (ValueError, struct.error) as exc:
+            raise LinkError('Invalid DOS clock readback; check the DOS date/time.') from exc
+
+    def read_clock(self):
+        return self._clock_request()
+
+    def sync_clock(self):
+        # DOS stores local wall time, with no timezone. Sample in the worker,
+        # immediately before transmission, not when the UI button was drawn.
+        target = datetime.datetime.now()
+        if not 1980 <= target.year <= 2099:
+            raise ValueError('Linux date is outside the DOS clock range (1980-2099).')
+        started = time.monotonic()
+        actual = self._clock_request(struct.pack('<H6B', target.year, target.month, target.day,
+            target.hour, target.minute, target.second, target.microsecond//10000))
+        if abs((actual-target).total_seconds()) > 2:
+            raise LinkError('DOS clock update was not verified; check the DOS date/time.')
+        # A cached ACK after a retry describes the original update. Read again
+        # with a new sequence to confirm that the clock is still ticking there.
+        actual = self.read_clock()
+        elapsed = time.monotonic()-started
+        if abs((actual-target).total_seconds()-elapsed) > 2:
+            raise LinkError('DOS clock differs after sync; check the DOS date/time and try again.')
+        return actual
 
     def _diagnostics(self, data):
         fmt = '<8B6I2IHHB'

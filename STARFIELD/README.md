@@ -1,8 +1,7 @@
 # Starfield 1.0
 
-Stars flying past, nice and simple. No sound or text while it runs. Change
-the speed, star count and resolution, and give the 8087 something to do when
-one is installed.
+Fly through an endless field of stars. Adjust the speed, number of stars and
+resolution to suit your machine. No sound or text while it runs.
 
 - **Run:** copy `STAR.EXE` to DOS; start with `STAR`.
 - **Hardware:** V20/80186 or later, VGA/SVGA; optional 8087 used to generate perspective tables.

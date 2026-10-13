@@ -40,7 +40,7 @@ class Tip:
 
 def build_interface(app, settings):
     a, root = app, app.root
-    root.title('NuXT Link 3.2 - serial file manager')
+    root.title('NuXT Link 3.2.1 - serial file manager')
     root.geometry(f'{min(1180, root.winfo_screenwidth()-40)}x{min(820, root.winfo_screenheight()-80)}')
     root.minsize(960, 700)
     root.protocol('WM_DELETE_WINDOW', a.close_window)
@@ -65,7 +65,7 @@ def build_interface(app, settings):
     header = ttk.Frame(outer)
     header.pack(fill='x', pady=(0, 4))
     ttk.Label(header, text='NuXT Link', style='Title.TLabel').pack(side='left')
-    ttk.Label(header, text='3.2  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
+    ttk.Label(header, text='3.2.1  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
     profiles = ttk.Frame(header)
     profiles.pack(side='right')
     ttk.Label(profiles, text='Profile').pack(side='left', padx=5)
@@ -110,6 +110,9 @@ def build_interface(app, settings):
     a.connection_label.pack(side='left', padx=10, fill='x', expand=True)
     a.diag_button = ttk.Button(options, text='Diagnostics', command=a.diagnostics)
     a.diag_button.pack(side='right')
+    a.clock_button = ttk.Button(options, text='Sync DOS Date/Time', command=a.sync_clock)
+    a.clock_button.pack(side='right', padx=(5,0))
+    Tip(a.clock_button, 'Set the DOS clock to Linux local date/time and verify it. Available while connected and idle.')
     a.apply_button = ttk.Button(options, text='Apply changes', command=a.apply_connection)
     a.apply_button.pack(side='right', padx=5)
     a.advanced = ttk.Frame(conn)

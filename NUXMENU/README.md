@@ -1,12 +1,12 @@
 # NuXT Menu 1.4
 
-Organise and launch your DOS programs from menus. Browse the drive to add a
-program, sort things into submenus, and star the ones you use most to put them
-in Favourites. Use a keyboard, mouse or joystick to get around.
+A menu for keeping your DOS games and programs in one place. Browse the drive
+to add them, organise them into submenus, and star the ones you use most to put
+them in Favourites. Navigate with a keyboard, mouse or joystick.
 
-Settings cover colours and themes, text rows, joystick calibration, a 12/24-hour
-clock and four simple screensavers. The menu remembers where you were when you
-return from a program. F1 shows the controls without filling the main screen.
+Choose your colours, add a clock or screensaver, and pick up where you left off
+when a program closes. The main screen stays simple, with the extra controls
+in F1 Help.
 
 - **Run:** copy `MENU.EXE` and `NUI.EXE` together to DOS and start `MENU`.
 - **Update:** replace both executables together. Keep your `NUXMENU.DAT` and backup.
@@ -22,8 +22,8 @@ behind to bring it back. Measured overhead under MS-DOS 6.22 was 2.75 KiB for
 an EXE and about 5.8 KiB for a batch file, down from about 30.5 KiB with the old
 launcher. DOS version, environment size and drivers affect these figures.
 
-The owner reports this version working well on the NuXT so far. Development
-checks and their limits are in [TESTING.TXT](TESTING.TXT).
+This version is working well on my NuXT so far. Test results and their limits
+are in [TESTING.TXT](TESTING.TXT).
 
 Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
 for build dependencies. Project-authored material is MIT licensed; see

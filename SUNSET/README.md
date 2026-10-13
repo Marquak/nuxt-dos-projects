@@ -1,9 +1,8 @@
 # Sunset 3.2  -  Neon Coast
 
-A car heading towards the sunset, wireframe palms going by and an AdLib
-synthwave tune. No text during the demo and no ending. Just let it play.
-320x200 is the sensible starting point on the NuXT; the bigger modes are
-there if you want to try them.
+A car cruising towards a neon sunset, with palm trees passing by and an AdLib
+synthwave soundtrack. No text on screen and no ending. Just let it play.
+Start at 320x200 on the NuXT, or try the higher resolutions for fun.
 
 - **Run:** copy `SUNSET.EXE` to DOS; start with `SUNSET`.
 - **Hardware:** V20/80186 or later, VGA/SVGA; optional 8087 and AdLib. Start at 320x200 for speed.

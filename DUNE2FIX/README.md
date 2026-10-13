@@ -1,10 +1,10 @@
 # Dune II fixes for NuXT
 
-The combined fix for my US 1.07 copy of Dune II. Both fixes are working well
-on the NuXT: it keeps the XMS workaround and skips the manual-word check.
+A patch for the US 1.07 version of Dune II. It fixes the XMS startup error
+with UMB-only memory managers and skips the manual-word copy protection.
+Both fixes have been tested on my NuXT.
 
-A small patching tool for a specific pair of DOS executables. It fixes
-startup failure with UMB-only memory managers that advertise an XMS interface:
+The startup error looks like this:
 
 ```text
 *** Himem.Sys Error (80) *** Run setup and remove XMS and HMA usage.

@@ -4,6 +4,7 @@ Run under an X display (e.g. xvfb-run python3 -m unittest discover -s tests).
 Without a display these tests skip; the protocol tests still run normally.
 """
 import os
+import datetime
 import sys
 import tempfile
 import threading
@@ -83,6 +84,26 @@ class UITests(unittest.TestCase):
             time.sleep(.01)
         self.assertFalse(self.app.busy, 'worker did not complete')
         self.root.update()
+
+    def test_sync_clock_button_idle_only_and_reports_readback(self):
+        a=self.app
+        self.assertTrue(a.clock_button.instate(['disabled']))
+        self.connect_fixture()
+        calls=[]
+        def sync():
+            calls.append(True)
+            return datetime.datetime(2026,10,13,21,45,12)
+        a.client.sync_clock=sync
+        a.busy=True;a.update_controls()
+        self.assertTrue(a.clock_button.instate(['disabled']))
+        a.clock_button.invoke();self.assertEqual(calls,[])
+        a.busy=False;a.update_controls()
+        a.clock_button.invoke()
+        self.assertTrue(a.cancel_button.instate(['disabled']))
+        self.settle()
+        self.assertEqual(calls,[True])
+        self.assertIn('2026-10-13 21:45:12',a.status.get())
+        self.assertFalse(a.clock_button.instate(['disabled']))
 
     def test_each_pane_keeps_its_sort_across_directories_and_refresh(self):
         self.connect_fixture()

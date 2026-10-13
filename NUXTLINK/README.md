@@ -1,24 +1,24 @@
-# NuXT Link 3.2
+# NuXT Link 3.2.1
 
-A way to get files to and from the NuXT without swapping cards or floppies.
-Queue files from different folders, back up a drive, and keep the DOS dates
-and attributes intact. CRC verification stays on.
+Move files between Linux and DOS over a serial cable. Browse folders, queue
+transfers and back up a DOS drive without swapping cards or floppies. Transfers
+are verified and preserve DOS timestamps and attributes. There's also a button
+to set the DOS clock from Linux.
 
-The DOS server targets 8088/8086 and NEC V20. The Linux GUI needs Python
-3.10+ and Tkinter. No pip packages are required.
+The DOS server runs on an 8088/8086 or V20. The Linux client needs Python 3.10+
+and Tkinter, with no pip packages to install.
 
 ## Upgrade and start
 
-Replace the complete Linux folder, including the new `transfer_queue.py`, and
-restart the client. Saved profiles still work. Copy `NUXFER32.COM` to DOS using
-your current server, disconnect, then press Esc on DOS before starting the new
+Replace the complete Linux folder and restart the client. Saved profiles still
+work. Copy `NUX321.COM` to DOS using your current server, disconnect, then press Esc on DOS before starting the new
 server. The versioned filename lets you keep the old program as a fallback.
 
 ```dos
-C:\NET\NUXFER32 COM1
+C:\NET\NUX321 COM1
 ```
 
-Use the actual directory where you copied it. The default is now **9600 baud**
+Use the actual directory where you copied it. The server starts at **9600 baud**
 for the initial handshake. In Linux, keep your preferred transfer settings,
 for example **115200, rtscts, peer both, block 512** with your full-handshake
 cable. Connect negotiates those settings after finding the server.
@@ -27,12 +27,13 @@ cable. Connect negotiates those settings after finding the server.
 sh linux/launch.sh
 ```
 
-`NUXFER.COM`, `NUXFER32.COM` and `dos/NUXFER.COM` are identical. Update both sides
-for all 3.2 fixes; the wire protocol remains v3. Versions 1 and 2 need both sides
-upgraded. No floppy image is included in this release.
+`NUXFER.COM`, `NUXFER32.COM`, `NUX321.COM` and `dos/NUXFER.COM` are identical.
+The folder and older aliases are retained so existing launchers keep working.
+Update both sides for date/time sync. The wire protocol remains v3; versions
+1 and 2 need both sides upgraded. No floppy image is included in this release.
 
 The server shares the **whole drive containing its executable**. Launching
-`C:\NET\NUXFER32` from an `A:\` prompt shares `C:\`. Launching the floppy copy
+`C:\NET\NUX321` from an `A:\` prompt shares `C:\`. Launching the floppy copy
 shares `A:\`. The Linux browser starts at that drive's root.
 
 Choose the serial device before Connect. A USB-to-RS-232 adapter and null-modem
@@ -48,9 +49,32 @@ Connection options reveals peer checks, packet size, FTDI latency and the DOS
 port reminder. Changes stay marked pending until Apply changes succeeds.
 Diagnostics shows individual UART/error counters and handshake lines.
 
+## Sync DOS date/time
+
+Click **Sync DOS Date/Time** beside Diagnostics while connected and idle.
+It sets the DOS system clock to the Linux machine's current local date and time,
+then reads the DOS clock back and shows the result in the status bar and log.
+No NIC, NTP client or additional DOS program is needed.
+
+This is a manual sync, not a background service. Linux's timezone and daylight
+saving setting determine the wall time sent; DOS stores no timezone. The button
+is disabled during other operations. Existing files retain their timestamps and
+attributes. The DOS date range is 1980-2099; invalid values are rejected before
+any change. Expect normal DOS clock resolution and serial latency, not exact
+subsecond synchronization.
+
+Both sides need this update. Older v3 servers can still transfer files, but the
+button explains that the DOS server needs updating. Upload `NUX321.COM` beside
+your old server, disconnect, exit the old server with Esc and run `NUX321 COM1`.
+Restart the Linux client to load the updated UI.
+
+The server uses DOS's date/time APIs, which also update the hardware clock on
+supported DOS/BIOS systems. RTC persistence depends on the BIOS and clock driver;
+it has not been verified on the physical NuXT for this release.
+
 ## Connection settings and full-handshake cables
 
-Start DOS with `NUXFER32 COM1` for a 9600-baud handshake. The client tries
+Start DOS with `NUX321 COM1` for a 9600-baud handshake. The client tries
 9600 first, then the selected speed and other supported speeds if needed. This
 also finds an older server, a manually selected baud, or a server left at its
 transfer speed after a crash. Discovery can take longer in those cases.
@@ -298,7 +322,8 @@ The disk and DOS environment must remain available during transfers.
 
 ## Build and test
 
-`dos/NUXFER.COM`, the package-root copy, and `NUXFER32.COM` are the same compiled server.
+`dos/NUXFER.COM`, `NUXFER.COM`, `NUXFER32.COM` and `NUX321.COM` are the same
+compiled server.
 Build from source with Open Watcom:
 
 ```sh

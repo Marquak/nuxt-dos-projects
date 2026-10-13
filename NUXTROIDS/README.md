@@ -1,8 +1,8 @@
 # NuXTroids 1.3
 
-A little asteroid shooter for the NuXT. Turn, thrust, coast, and try not to
-fly straight into the rock you just split in half. Faded planets and stars
-sit behind the action, with AdLib effects and a two-tone heartbeat.
+An Asteroids-style game for the NuXT. Turn, thrust and shoot the rocks into
+smaller pieces while trying not to hit them. Faded planets and stars sit behind
+the action, with AdLib effects and a two-note heartbeat.
 
 Copy **NUXTROID.EXE** to DOS and run `NUXTROID`. That's the only runtime file.
 The default is 640x480 with 16 greyscale shades. `/L` selects 320x200, `/8`

@@ -1,3 +1,19 @@
+# NuXT Link 3.2.1 - 13 October 2026
+
+- Add Sync DOS Date/Time beside Diagnostics. Sends Linux local date/time while
+  idle, reads the DOS clock back and reports the result in the status bar/log.
+- Validate calendar/time fields before changing the DOS clock. Preserve retry
+  safety, reject sync during file operations, and explain when an older DOS
+  server needs updating. File timestamps and transfer verification are unchanged.
+- Include NUX321.COM for uploading beside a running older server. Existing
+  folder paths and binary aliases remain available.
+
+Original implementation using documented DOS APIs. References checked:
+[FreeDOS clock source](https://github.com/FDOS/kernel/blob/master/kernel/systime.c),
+[RBIL set date](https://fd.lod.bz/rbil/interrup/dos_kernel/212b.html), and
+[RBIL set time](https://fd.lod.bz/rbil/interrup/dos_kernel/212d.html).
+No external source was copied and no runtime dependency was added.
+
 # NuXT Link 3.2 - 11 October 2026
 
 - Start at 9600, find the server, then negotiate the chosen transfer settings.
@@ -30,7 +46,7 @@ Older release notes follow.
 
 ---
 
-# NuXT Link 3.1 - Linux UI refresh, 8 October 2026
+# NuXT Link 3.1 — Linux UI refresh, 8 October 2026
 
 - Each file pane retains its own sort column and direction across folder changes,
   refreshes and filters. Folders remain first in either direction; numeric sizes
@@ -55,7 +71,7 @@ Replace the entire Linux folder, including the new `interface.py` layout module.
 
 ---
 
-# NuXT Link 3.1 - original DOS receive-overrun fix
+# NuXT Link 3.1 — original DOS receive-overrun fix
 
 Protocol remains v3; the Linux client is unchanged. The existing file formats,
 CRC checks, verified resume and metadata checks remain unchanged too.

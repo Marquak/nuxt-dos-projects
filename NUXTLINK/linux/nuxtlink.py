@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NuXT Link 3.2: full-drive browser and reviewable serial transfer queues."""
+"""NuXT Link 3.2.1: full-drive browser and reviewable serial transfer queues."""
 import os
 import stat
 import argparse
@@ -141,7 +141,7 @@ class App:
         connected=self.client is not None
         for w in (self.send_button,self.folder_button,self.get_button,self.backup_button,
                   self.up_button,self.go_button,self.refresh_button,self.path_box,self.partial_button,
-                  self.mkdir_button,self.rename_button,self.delete_button,self.apply_button,self.diag_button):
+                  self.mkdir_button,self.rename_button,self.delete_button,self.apply_button,self.diag_button,self.clock_button):
             w.configure(state='normal' if connected and not self.busy else 'disabled')
         for w in (self.verify_button,self.save_button,self.remove_profile_button,self.ftdi_button):w.configure(state='disabled' if self.busy else 'normal')
         self.connect_button.configure(text='Disconnect' if connected else 'Connect',state='disabled' if self.busy else 'normal')
@@ -447,6 +447,7 @@ class App:
                         if value[0]=='diagnostics':
                             d=value[1];lat=read_latency(self.device.get())
                             messagebox.showinfo('Connection diagnostics',f"DOS COM{d['com']} · {d['baud']} baud · {d['flow']}\nPeer checks: {d['peer']} · block {d['block_size']} · FIFO {bool(d['fifo'])}\n\nCTS {bool(d['msr']&16)} · DSR {bool(d['msr']&32)} · DCD {bool(d['msr']&128)}\nCRC errors: {d['crc_errors']}\nUART overruns: {d['overruns']}\nParity errors: {d['parity_errors']}\nFraming errors: {d['framing_errors']}\nBreaks: {d['breaks']}\nTransmit/handshake timeouts: {d['flow_timeouts']}\nClient retries: {self.client.retries}\nFTDI latency: {str(lat)+' ms' if lat is not None else 'unavailable'}\nFree DOS space: {d['free_bytes']:,} bytes")
+                    elif value[0]=='clock':self.status.set('DOS date/time synced: '+value[1].strftime('%Y-%m-%d %H:%M:%S')+' (Linux local time).')
                     elif value[0]=='latency':self.status.set(f'FTDI latency set to {value[1]} ms; previous setting retained for restoration.')
                     elif value[0]=='disconnected':
                         self.client=None;self.latency_session=None;self.info={};self.disk_space.set('')
@@ -633,6 +634,10 @@ class App:
         self.remote_frame.configure(text='DOS files · '+self.disk_space.get())
         self.doscom.set('COM'+str(info['com']))
         self.connection_state()
+
+    def sync_clock(self):
+        if self.busy or not self.client:return
+        self.work('Syncing DOS date/time...',lambda:('clock',self.client.sync_clock()),cancellable=False)
 
     def diagnostics(self):
         if self.busy or not self.client:return

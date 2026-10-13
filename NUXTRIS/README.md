@@ -1,7 +1,8 @@
 # ИuXTяis 1.2
 
-A bit of old-school block dropping for the NuXT. Coloured outlines, a next-piece
-window, and a big fading TETRIS! with a short fanfare when you clear four lines.
+Fit the falling blocks together and clear rows. Play an endless game or try
+to clear 25 lines, then save your score with your name. Coloured outline blocks,
+a next-piece preview, and a short fanfare when you get a Tetris.
 
 Copy **NUXTRIS.EXE** to a writable DOS folder and run `NUXTRIS`. Only the EXE is
 needed. Keep your NUXTRIS.DAT and NUXTRIS.BAK when updating; those hold your
@@ -25,7 +26,7 @@ update still needs its physical NuXT check.
 
 V20/V30 or an 80186-compatible CPU, DOS 3.3+, and VGA 640x480 in 16 colours.
 The 8087 isn't needed. This is the completed single-player version; serial and
-LAN multiplayer aren't implemented. The owner is happy with it on the NuXT.
+LAN multiplayer aren't implemented. Earlier builds have been played on the NuXT.
 
 [README.TXT](README.TXT) has the rules, controls, saves and technical details.
 [TESTS.TXT](TESTS.TXT) separates current checks from earlier test runs.
