@@ -1,3 +1,33 @@
+NUXTRIS 1.2 - verification, 2026-10-13
+
+129 checks passed in DOSBox-X, including all 105 previous checks.
+- Eight-character keyboard name ends at a valid insertion position.
+- Backspace removes the final character; typing can refill that position.
+- Ninth character is ignored without changing existing letters.
+- Arrow/gamepad navigation and editing handle the full-name position.
+- Repeated Backspace cannot move before the start of the name buffer.
+- Initial and incremental menus/name screens match full-render reference
+  four-plane framebuffer hashes, including shorter strings and erasure.
+- Menu selection changes no text glyphs and performs no full clear.
+- One deleted name character updates one glyph and performs no full clear.
+- Name cursor movement updates no glyphs and performs no full clear.
+- Unchanged screens perform no glyph updates or full clears.
+- Changing/removing centred status notices leaves no old text.
+- An external screen clear invalidates caches for calibration return.
+
+The independent UI references in UITEST.H retain the old full redraw
+approach. The new checks call actual name-input/rendering routines; they
+do not depend on playing a whole game to reach score entry. No game rules,
+save format, audio or assembly renderer changes. No 86Box testing.
+
+Built in a private folder using the existing Open Watcom flags. Release
+DGROUP is 10,864 bytes including its 4 KiB stack, within the 64 KiB limit.
+Source/test changes, build and reports: work/nuxtris-v12/.
+These checks verify drawing work avoided, not physical NuXT speed.
+User scores and multiplayer files were not modified.
+
+Earlier validation follows. It was not all repeated for version 1.2.
+
 NUXTRIS 1.1 - verification, 2026-10-11
 
 Release build: Open Watcom 2, DOS small model, V20/80186 instructions.

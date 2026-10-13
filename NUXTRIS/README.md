@@ -1,4 +1,4 @@
-# ИuXTяis 1.1
+# ИuXTяis 1.2
 
 A bit of old-school block dropping for the NuXT. Coloured outlines, a next-piece
 window, and a big fading TETRIS! with a short fanfare when you clear four lines.
@@ -16,7 +16,12 @@ scores and settings.
 Left/right moves, Down soft-drops, Up/X/Space rotates clockwise, and Z rotates
 the other way. P or Esc pauses. F1 changes the theme and F2 changes the sound.
 The score display updates when a piece lands, avoiding extra redraws during
-a soft drop. AdLib effects and the four-line fanfare are louder in 1.1.
+a soft drop.
+
+Version 1.2 fixes Backspace after an eight-character score name. Menus and
+name entry now redraw only changed text and cursor pixels. Gameplay, sound
+and the save format are unchanged. All 129 checks passed in DOSBox-X; this
+update still needs its physical NuXT check.
 
 V20/V30 or an 80186-compatible CPU, DOS 3.3+, and VGA 640x480 in 16 colours.
 The 8087 isn't needed. This is the completed single-player version; serial and

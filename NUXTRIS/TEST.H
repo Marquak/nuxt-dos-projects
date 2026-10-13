@@ -209,6 +209,7 @@ static void hud_checks(void) {
           "Type B result retains the full final score");
     opttype = 0; begin();
 }
+#include "UITEST.H"
 static int selftests(void) {
     int x, y, i;
     unsigned long hash, blank;
@@ -227,6 +228,7 @@ static int selftests(void) {
         fclose(report);
         return 2;
     }
+    ui_checks();
     hud_checks();
     wipe();
     blank = planehash();

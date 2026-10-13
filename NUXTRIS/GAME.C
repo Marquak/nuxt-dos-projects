@@ -1,4 +1,4 @@
-/* NUXTRIS 1.1. V20 DOS, VGA 640x480x16. See CREDITS.TXT. */
+/* NUXTRIS 1.2. V20 DOS, VGA 640x480x16. See CREDITS.TXT. */
 #include <conio.h>
 #include <dos.h>
 #include <io.h>
@@ -47,6 +47,21 @@ static unsigned hudglyphs, hudformats;
 #endif
 static unsigned hudlevel, hudlines, hudsound;
 static unsigned long frames;
+/* Cache only menu/name text; any full clear invalidates both screens. */
+static int uiscreen = -1, shownmenusel = -1, showncursor = -1;
+static char menutext[6][40], menunotice[60], nametext[9];
+#ifdef SELFTEST
+static unsigned uiclears, uiglyphs;
+#endif
+static void screen_wipe(void) {
+    wipe();
+    uiscreen = -1;
+#ifdef SELFTEST
+    ++uiclears;
+#endif
+}
+#define wipe screen_wipe
+
 static const char *themenames[4] = {"WHITE", "RED", "GREEN", "AMBER"};
 static const char *soundnames[4] = {"SILENT", "ADLIB", "SPEAKER", "BOTH"};
 static void rect(int x, int y, int w, int h) {
@@ -90,6 +105,31 @@ static void textxy(int x, int y, const char *s, int color, int size) {
         x += 6 * size;
         ++s;
     }
+}
+/* XOR only changed glyph pixels over the existing black UI background.
+ * The fixed cell spacing keeps neighboring glyphs and borders untouched. */
+static void text_delta(int x, int y, char *old, const char *s, int size) {
+    int i, r, c, a, b, olen = strlen(old), nlen = strlen(s);
+    unsigned bits;
+    if (!strcmp(old, s)) return;
+    raster(0x18);
+    ink(15);
+    for (i = 0; i < olen || i < nlen; ++i) {
+        char before = i < olen ? old[i] : ' ', after = i < nlen ? s[i] : ' ';
+        if (before == after) continue;
+        for (r = 0; r < 7; ++r) {
+            bits = glyph(before, r) ^ glyph(after, r);
+            for (c = 0; c < 5; ++c)
+                if (bits & (128 >> c))
+                    for (a = 0; a < size; ++a)
+                        for (b = 0; b < size; ++b)
+                            dot(x + i * 6 * size + c * size + a, y + r * size + b);
+        }
+#ifdef SELFTEST
+        ++uiglyphs;
+#endif
+    }
+    strcpy(old, s);
 }
 static void centered(int y, const char *s, int color) {
     textxy((width - (int)strlen(s) * 12) / 2, y, s, color, 2);
@@ -391,10 +431,26 @@ static void scene(void) {
 static void menu_draw(void) {
     char s[60];
     int i;
-    wipe();
-    logo(26);
-    ink(15);
-    rect(150, 94, 340, 238);
+    const char *notice = "";
+    if (uiscreen != MENU) {
+        wipe();
+        logo(26);
+        ink(15);
+        rect(150, 94, 340, 238);
+        centered(350, "UP/DOWN SELECT - LEFT/RIGHT CHANGE", 15);
+        centered(378, "ENTER OR BUTTON 1: PLAY", 15);
+        centered(410, "H SCORES  J CALIBRATE  ESC EXIT", 15);
+        memset(menutext, 0, sizeof(menutext));
+        menunotice[0] = 0;
+        shownmenusel = -1;
+        uiscreen = MENU;
+    }
+    raster(0x18);
+    if (shownmenusel != menusel) {
+        if (shownmenusel >= 0) textxy(176, 112 + shownmenusel * 36, ">", 15, 2);
+        textxy(176, 112 + menusel * 36, ">", 15, 2);
+        shownmenusel = menusel;
+    }
     for (i = 0; i < 6; ++i) {
         switch (i) {
         case 0:
@@ -416,19 +472,23 @@ static void menu_draw(void) {
             sprintf(s, "INPUT   %s", joyenabled ? "JOYSTICK" : "KEYBOARD");
             break;
         }
-        textxy(176, 112 + i * 36, i == menusel ? ">" : " ", 15, 2);
-        textxy(202, 112 + i * 36, s, 15, 2);
+        text_delta(202, 112 + i * 36, menutext[i], s, 2);
     }
-    centered(350, "UP/DOWN SELECT - LEFT/RIGHT CHANGE", 15);
-    centered(378, "ENTER OR BUTTON 1: PLAY", 15);
-    centered(410, "H SCORES  J CALIBRATE  ESC EXIT", 15);
     if (savefailed)
-        centered(450, "SAVE FAILED - CHECK DISK SPACE/WRITE ACCESS", 15);
+        notice = "SAVE FAILED - CHECK DISK SPACE/WRITE ACCESS";
     else if (recovered)
-        centered(450, "SCORES RECOVERED FROM BACKUP", 15);
+        notice = "SCORES RECOVERED FROM BACKUP";
     else if (!audiofound && (soundmode & 1))
-        centered(450, "NO ADLIB DETECTED - SPEAKER AVAILABLE", 15);
+        notice = "NO ADLIB DETECTED - SPEAKER AVAILABLE";
+    if (strcmp(menunotice, notice)) {
+        /* Notices have different centred origins, so erase at the old origin. */
+        raster(0x18);
+        if (menunotice[0]) centered(450, menunotice, 15);
+        if (notice[0]) centered(450, notice, 15);
+        strcpy(menunotice, notice);
+    }
 }
+
 static void scores_draw(void) {
     char s[80];
     int i;
@@ -456,25 +516,36 @@ static void scores_draw(void) {
         centered(449, "SAVE FAILED - SCORES STILL IN MEMORY", 15);
 }
 static void name_draw(void) {
-    char s[60];
-    int i;
-    wipe();
-    logo(32);
-    centered(102, won ? "TYPE B COMPLETE!" : "GAME OVER", 15);
-    sprintf(s, "SCORE %lu  -  HIGH SCORE %d", (unsigned long)game.score, pendingplace + 1);
-    centered(145, s, 15);
-    centered(204, "ENTER YOUR NAME", 15);
-    for (i = 0; i < 8; ++i) {
-        char a[2];
-        a[0] = player[i] ? player[i] : ' ';
-        a[1] = 0;
-        textxy(230 + i * 24, 249, a, 15, 3);
+    char s[60], cell[2], old[2];
+    int i, cursor = namepos < 8 ? namepos : 7;
+    if (uiscreen != NAME) {
+        wipe();
+        logo(32);
+        centered(102, won ? "TYPE B COMPLETE!" : "GAME OVER", 15);
+        sprintf(s, "SCORE %lu  -  HIGH SCORE %d", (unsigned long)game.score, pendingplace + 1);
+        centered(145, s, 15);
+        centered(204, "ENTER YOUR NAME", 15);
+        centered(321, "TYPE A NAME - ENTER SAVES", 15);
+        centered(350, "PAD: LEFT/RIGHT CURSOR, UP/DOWN LETTER", 15);
+        centered(379, "BUTTON 1 SAVES - ESC USES CURRENT NAME", 15);
+        memset(nametext, ' ', 8);
+        nametext[8] = 0;
+        showncursor = -1;
+        uiscreen = NAME;
     }
-    ink(15);
-    segment(228 + namepos * 24, 278, 246 + namepos * 24, 278);
-    centered(321, "TYPE A NAME - ENTER SAVES", 15);
-    centered(350, "PAD: LEFT/RIGHT CURSOR, UP/DOWN LETTER", 15);
-    centered(379, "BUTTON 1 SAVES - ESC USES CURRENT NAME", 15);
+    for (i = 0; i < 8; ++i) {
+        old[0] = nametext[i]; old[1] = 0;
+        cell[0] = player[i] ? player[i] : ' '; cell[1] = 0;
+        text_delta(230 + i * 24, 249, old, cell, 3);
+        nametext[i] = cell[0];
+    }
+    if (showncursor != cursor) {
+        raster(0x18); ink(15);
+        if (showncursor >= 0)
+            segment(228 + showncursor * 24, 278, 246 + showncursor * 24, 278);
+        segment(228 + cursor * 24, 278, 246 + cursor * 24, 278);
+        showncursor = cursor;
+    }
 }
 #include "JOYSTICK.H"
 static void inputs_flush(void) {
@@ -665,7 +736,7 @@ static void name_tick(int lr, int ud, int enter, int esc) {
             c = i == 11 ? '0' : '1' + i - 2;
     if (edge(57))
         c = ' ';
-    if (c) {
+    if (c && (namefresh || namepos < 8)) {
         if (namefresh) {
             memset(player, 0, sizeof(player));
             namepos = 0;
@@ -675,8 +746,7 @@ static void name_tick(int lr, int ud, int enter, int esc) {
             if (!player[i])
                 player[i] = ' ';
         player[namepos] = c;
-        if (namepos < 7)
-            ++namepos;
+        ++namepos; /* 8 is the insertion point after a full name. */
         redraw = 1;
     }
     if (edge(14)) {
@@ -687,11 +757,12 @@ static void name_tick(int lr, int ud, int enter, int esc) {
         redraw = 1;
     }
     if (lr) {
-        namepos = (namepos + 8 + lr) % 8;
+        namepos = namepos == 8 ? (lr < 0 ? 7 : 0) : (namepos + 8 + lr) % 8;
         namefresh = 0;
         redraw = 1;
     }
     if (ud) {
+        if (namepos == 8) namepos = 7;
         namefresh = 0;
         for (i = 0; i <= namepos; ++i)
             if (!player[i])
@@ -860,7 +931,7 @@ int main(int argc, char **argv) {
             testshow = 1;
 #endif
         else {
-            puts("NUXTRIS 1.1\nNUXTRIS [/J] [/A | /P | /B | /S]\n/J "
+            puts("NUXTRIS 1.2\nNUXTRIS [/J] [/A | /P | /B | /S]\n/J "
                  "joystick calibration  /A AdLib  /P speaker  /B both  /S silent\nRun without "
                  "switches for menu. Scores/settings saved beside EXE.");
             return 0;
@@ -921,7 +992,7 @@ int main(int argc, char **argv) {
     outp(0x61, (inp(0x61) & 0xfc) | speakerbits);
     biosmode(oldmode);
     savescores();
-    puts("NUXTRIS 1.0 - thanks for playing!");
+    puts("NUXTRIS 1.2 - thanks for playing!");
     if (savefailed)
         printf("Could not save %s. New scores were not saved.\n", savepath);
     else

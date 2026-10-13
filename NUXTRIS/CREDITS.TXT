@@ -1,4 +1,4 @@
-NUXTRIS 1.1 - source and reference credits
+NUXTRIS 1.2 - source and reference credits
 
 Game rules adapted from olzhasar/sdl-tetris (MIT):
   https://github.com/olzhasar/sdl-tetris
@@ -35,3 +35,6 @@ Additional DOS source reference:
 
 Built with Open Watcom 2. See OWLIC.TXT for runtime terms.
 Developed with Codex, with design direction and hardware testing by Marquak.
+
+Version 1.2: original menu/name glyph-difference updates and name-edit fix.
+No new third-party code incorporated.

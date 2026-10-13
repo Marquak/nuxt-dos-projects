@@ -1,7 +1,10 @@
-NUXTRIS 1.1
+NUXTRIS 1.2
 
-Score display updates on landing; AdLib effects and fanfare are louder.
-PC speaker sounds and existing score/settings files are unchanged.
+Fixed Backspace after an eight-character high-score name. Menus and name
+entry now redraw only changed text/cursor pixels. Game rules, timing,
+sound and existing score/settings files are unchanged.
+
+UPDATING: replace NUXTRIS.EXE. Keep your NUXTRIS.DAT and NUXTRIS.BAK.
 
 A bit of old-school block dropping for the NuXT.
 
@@ -111,6 +114,8 @@ SCORES AND SETTINGS
   when sharing the game unless you also want to share your scores.
   Scores are saved after name entry; menu settings are saved on clean exit.
   Eight-character names use A-Z, 0-9 and spaces. Enter accepts the name.
+  Backspace removes the preceding letter, including after a full name.
+  Extra typing at the end of a full name is ignored; use arrows to edit.
   Esc from name entry accepts the current name too. Abandoned rounds do
   not qualify for the table.
 
@@ -129,15 +134,19 @@ UNDER THE HOOD
   lowered, soft-drop points do not reformat or redraw the score panel.
   Landing updates only changed glyph pixels with batched VGA byte writes.
   Other counters use the same glyph updates and bounded decimal conversion.
-  Palette-only theme changes and celebration
-  fades avoid repainting the screen. Full redraws are limited to menus,
-  pause/calibration and entering/leaving the celebration.
+  Menu selections update only the arrow and changed labels. Name editing
+  updates only changed letters and the underline cursor. Screen changes
+  and returning from calibration rebuild the appropriate screen.
+  Palette-only theme changes and celebration fades avoid repainting.
+  Pause and entering/leaving the celebration still rebuild the scene.
   Fixed 36.4 Hz game timing, with the BIOS timer chained at its normal rate.
   On exit the keyboard/timer handlers and previous video mode are restored.
 
 TESTED
-  See TESTS.TXT. DOSBox and QEMU only. Physical NuXT and gameport behaviour
-  still need your test; emulator cycle settings are not a V20 benchmark.
+  See TESTS.TXT. Version 1.2: focused DOSBox-X regression checks. Earlier
+  builds were tested in DOSBox/QEMU and by the user on the physical NuXT.
+  These new changes still need a physical check; emulator cycles are not
+  a V20 performance measurement.
 
 BUILD FROM SOURCE
   Open Watcom 2, Linux host:
@@ -150,7 +159,3 @@ BUILD FROM SOURCE
 
 Source and game-specific assets are MIT licensed; see LICENSE.TXT and
 UPSTREAM.TXT. Open Watcom runtime terms are in OWLIC.TXT.
-
-OWNER UPDATE, 11 OCTOBER 2026
-The owner is happy with this release on the NuXT and considers the
-single-player game complete. Historical test limits above are retained.

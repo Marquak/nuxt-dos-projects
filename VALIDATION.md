@@ -1,8 +1,23 @@
-# Snapshot checks, 2026-10-12
+# Snapshot checks, 2026-10-13
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
+
+## NuXTris 1.2 update
+
+Updated the single-player executable, source and documentation. This fixes
+Backspace after a full eight-character score name and limits menu/name-entry
+redraws to changed text and cursor pixels. Gameplay, sound and saves are unchanged.
+Multiplayer is not part of this update.
+
+Development checks passed in DOSBox-X: 129 checks, including 24 new name-entry
+and UI regression checks. Incremental screens matched the reference renderer's
+four-plane framebuffer hashes. These checks do not establish physical NuXT
+performance. See NUXTRIS/TESTS.TXT for details.
+
+Publication files were checked against the tested local release and snapshot
+checksums were refreshed. No additional emulator runs were needed.
 
 ## Sunset 3.2 update
 
