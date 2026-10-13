@@ -1,3 +1,89 @@
+F10-only exit follow-up, 2026-10-13
+Esc no longer exits at Home. Help/readme updated.
+Focused MS-DOS 6.22/QEMU check passed: repeated Esc stays at Home,
+Esc returns from submenus/Favourites, Esc cancels Settings, and F10 exits.
+
+NuXT Menu 1.4 - validation, 2026-10-13
+
+DOSBox-X: 38 configuration checks and 75 UI/input checks passed. Includes:
+- Legacy v1/v2 migration to v3; custom palette and favourite bits preserved.
+- Options roundtrip, invalid saver/timeout/history/calibration rejected.
+- Virtual Favourites submenu spans all folders, protects itself from edits,
+  consumes no entry slot and returns to Home. Submenu scroll/selection retained.
+- 12-hour midnight/noon, 24-hour formatting and BIOS midnight timer wrap.
+- Unchanged clock produces no screen writes; wake keys are consumed and
+  every saver restores the screen. Joystick action tests cover neutral
+  settling, direction repeat, button edges and held-button suppression.
+- Existing duplication, browse safety, backup recovery and launch-job tests.
+- In 25/43/50 rows, a selection update wrote 125 cells out of 2000/3440/4000;
+  unchanged screens wrote zero. Frame/shadow/video comparisons matched.
+
+Private MS-DOS 6.22/QEMU integration:
+- EXE, COM, BAT (including a nested EXE) and F9 DOS prompt launch/return.
+- EXE arguments /A and 123; batch arguments hello/world; working directory.
+- Favourite launch returns to Favourites. Settings survive child programs.
+- DOS EXEC out-of-memory failure reports an error and returns to the menu.
+- All four saver previews, moving frames and screen restoration inspected.
+- Actual one-minute idle timeout blanks the display; Enter wakes without
+  opening the selected submenu. Missing gameport fails calibration cleanly.
+- Exit confirmation cancels correctly; last-menu startup restores selection.
+- Exiting restores C:\APPS, the directory the menu was originally run from.
+
+Controlled free-memory comparison using the same probe EXE and boot:
+  Direct launch:     35,628 paragraphs
+  EXE through menu:  35,452 paragraphs
+  BAT through menu:  35,257 paragraphs
+Difference: 2,816 bytes / 5,936 bytes respectively. Earlier launcher overhead
+was measured at 31,184 bytes. Environment size, DOS and drivers affect results.
+The 2,480-byte assembly EXE includes its 512-byte stack. It shrinks its memory
+block before EXEC. The complete UI, clock/savers and screen cache are absent
+while the child runs. A nonzero MZ MAXALLOC avoids DOS's special high placement
+before shrinking; batch and prompt return paths were checked after this fix.
+
+Build uses Open Watcom warnings-as-errors for the UI, GNU binutils restricted
+to 8086 instructions for the supervisor, and Python to write its MZ header.
+The UI's small-model data group is within 64 KiB; the directory cache is in a
+separate far segment. No compiler runtime remains resident in the supervisor.
+
+No physical NuXT or 86Box tests. Actual gameport/card calibration, timing and
+responsiveness remain for the owner to check. New work and integration reports
+are under work/nuxmenu-v14; TEST.SH reproduces the DOSBox-X checks in isolation.
+Existing user menu/save files were never modified. Earlier results follow;
+they apply to those releases, not automatically to this update.
+
+NuXT Menu 1.3 - current validation (2026-10-12)
+
+Built with Open Watcom warnings as errors. Production UI uses a 4 KiB stack;
+link map is within the small-model data-segment limit. Shadow screen memory
+is allocated separately with _fmalloc and released when NUI exits.
+
+DOSBox-X: 35 data checks and 48 UI checks passed through TEST.SH.
+- Legacy version-1 configuration migrates to version 2 with a valid CRC.
+- Favourite/pause bits roundtrip and unknown bits are rejected.
+- Moving preserves destination order, handles maximum ranks, leaves a
+  same-parent move unchanged, and rejects self/descendant destinations.
+- Browsing into A&B and cancelling preserves the saved path and saves.
+- Favourites span submenus, sort names, and return to the previous menu.
+- Duplicate preserves launch fields and flags; cancelling adds nothing.
+- Independent copy edits leave the original untouched.
+- Favourite does not accidentally add PAUSE to the generated launch job.
+- In actual 25, 43 and 50 row modes, selection changed 71 cells; only those
+  cells were written. Full screens contain 2000, 3440 and 4000 cells.
+- Old highlight clears; frame, shadow and VGA contents match. An unchanged
+  frame writes zero cells. Mode changes initialize the entire screen.
+- Button coordinates fit without overlap. Appearance Save/Cancel checked.
+These are focused regression tests, not a physical NuXT speed benchmark.
+
+MS-DOS 6.22/QEMU with CuteMouse on emulated COM2: real mouse events checked
+Back, star/Favourites, Duplicate and its Save/Cancel, explicit Save, Exit,
+and program launch/return. Preview inspected. This used a private test image;
+no user menu configuration or physical disk was changed. No 86Box testing.
+
+Current reports: work/nuxtmenu/v13/. TEST.SH reproduces data/UI checks in a
+new temporary directory using DOSBox-X, with serial ports disabled.
+
+Earlier-release validation follows for context; it was not all repeated.
+
 NuXT Menu 1.2 - validation
 
 Build: Open Watcom, 16-bit real mode, -0 -ms -os -fpc, warnings as errors.
@@ -83,4 +169,4 @@ Version 1.2 validation:
 - Rendering/CRC benchmarks use DOSBox at fixed 3000 cycles, with identical
   compiler flags and fixtures. See REVIEW.TXT for results and limitations.
 
-Private development screenshots and emulator images are not bundled.
+Development reports and screenshots: work/nuxtmenu/ and work/nuxtmenu/review/.

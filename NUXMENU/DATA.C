@@ -36,12 +36,18 @@ int child_of(int node,int ancestor){
 }
 static int valid_fields(void){
  unsigned i,j,n;int p;
- if(memcmp(cfg.magic,"NUXMENU1",8)||cfg.version!=1||cfg.mode>2||cfg.theme>6||!text_ok(cfg.browse,PATHLEN))return 0;
+ if(memcmp(cfg.magic,"NUXMENU1",8)||(cfg.version<1||cfg.version>3)||cfg.mode>2||cfg.theme>(cfg.version<3?6:CUSTOM_THEME)||!text_ok(cfg.browse,PATHLEN))return 0;
  if(!absolute_path(cfg.browse))return 0;
+ if(cfg.version==3){
+  Options *o=&cfg.opt;
+  if(o->clock_on>1||o->clock24>1||o->saver>4||o->timeout<1||o->timeout>60||o->joy>1||o->start_last>1||o->confirm_exit>1||o->repeat>2||o->lastfav>1)return 0;
+  if(o->joy&&(!o->xmin||o->xmin>=o->xmax||o->xmax>=2386||!o->ymin||o->ymin>=o->ymax||o->ymax>=2386))return 0;
+  for(i=0;i<130;i++)if((o->selection[i]>=ITEMS&&o->selection[i]!=ROOT&&o->selection[i]!=FAV_ID)||o->scroll[i]>ITEMS)return 0;
+ }
  for(i=0;i<ITEMS;i++){
   Item *e=&cfg.item[i];
   if(!e->kind)continue;
-  if(e->pause>1||e->kind>PROGRAM||!text_ok(e->name,32)||!e->name[0]||!text_ok(e->program,PATHLEN)||!text_ok(e->cwd,PATHLEN)||!text_ok(e->args,80))return 0;
+  if(e->pause>(cfg.version==1?1:3)||e->kind>PROGRAM||!text_ok(e->name,32)||!e->name[0]||!text_ok(e->program,PATHLEN)||!text_ok(e->cwd,PATHLEN)||!text_ok(e->args,80))return 0;
   if(e->kind==PROGRAM&&(!absolute_path(e->program)||!runnable(e->program)||!absolute_path(e->cwd)))return 0;
   p=i;n=0;
   while(p!=ROOT){
@@ -56,17 +62,47 @@ static int valid_fields(void){
 int valid_config(void){
  return valid_fields()&&cfg.crc==checksum(&cfg,(unsigned)offsetof(Config,crc));
 }
+static void option_defaults(void){
+ memset(&cfg.opt,0,sizeof(cfg.opt));cfg.opt.clock_on=1;cfg.opt.timeout=5;cfg.opt.repeat=1;
+ memset(cfg.opt.selection,ROOT,sizeof(cfg.opt.selection));
+}
 void defaults(const char *directory){
  unsigned i;static const unsigned char colors[8]={0x17,0x1f,0x70,0x1b,0x3f,0x17,0x0f,0x19};
  static const char *names[3]={"Games","Demos","Utilities"};
- memset(&cfg,0,sizeof(cfg));memcpy(cfg.magic,"NUXMENU1",8);cfg.version=1;cfg.current=ROOT;cfg.selected=0;
+ memset(&cfg,0,sizeof(cfg));memcpy(cfg.magic,"NUXMENU1",8);cfg.version=3;option_defaults();cfg.current=ROOT;cfg.selected=0;
  memcpy(cfg.colors,colors,8);strcpy(cfg.browse,directory);
  for(i=0;i<3;i++){cfg.item[i].kind=FOLDER;cfg.item[i].parent=ROOT;cfg.item[i].rank=(unsigned short)i;strcpy(cfg.item[i].name,names[i]);}
  cfg.crc=checksum(&cfg,(unsigned)offsetof(Config,crc));
 }
 static int read_one(const char *path){
- FILE *f=fopen(path,"rb");int ok;if(!f)return 0;
- ok=fread(&cfg,1,sizeof(cfg),f)==sizeof(cfg);if(fgetc(f)!=EOF)ok=0;fclose(f);return ok&&valid_config();
+ FILE *f=fopen(path,"rb");int ok;unsigned short oldcrc;
+ unsigned prefix=(unsigned)offsetof(Config,opt);
+ if(!f)return 0;
+ memset(&cfg,0,sizeof(cfg));ok=fread(&cfg,1,prefix,f)==prefix;
+ if(ok&&cfg.version<=2){
+  ok=fread(&oldcrc,1,2,f)==2&&oldcrc==checksum(&cfg,prefix)&&valid_fields();
+  if(ok){if(cfg.theme==6)cfg.theme=CUSTOM_THEME;option_defaults();cfg.version=3;}
+ }else if(ok)ok=fread(&cfg.opt,1,sizeof(Options)+2,f)==sizeof(Options)+2&&valid_config();
+ if(fgetc(f)!=EOF)ok=0;fclose(f);
+ if(!ok)return 0;cfg.crc=checksum(&cfg,(unsigned)offsetof(Config,crc));return 1;
+}
+/* Normalize only the destination, preserving rank order and slot tie-breaks.
+   The small insertion-sorted index also handles old duplicate/maximum ranks. */
+void append_rank(int id,int parent){
+ int ids[ITEMS],n=0,i,j,x;
+ for(i=0;i<ITEMS;i++)if(i!=id&&cfg.item[i].kind&&cfg.item[i].parent==parent){
+  x=i;j=n;
+  while(j&&cfg.item[ids[j-1]].rank>cfg.item[x].rank){ids[j]=ids[j-1];j--;}
+  ids[j]=x;n++;
+ }
+ for(i=0;i<n;i++)cfg.item[ids[i]].rank=(unsigned short)i;
+ cfg.item[id].rank=(unsigned short)n;
+}
+int move_entry(int id,int parent){
+ if(id<0||id>=ITEMS||!cfg.item[id].kind)return 0;
+ if(parent!=ROOT&&(parent<0||parent>=ITEMS||cfg.item[parent].kind!=FOLDER||child_of(parent,id)))return 0;
+ if(cfg.item[id].parent==parent)return 1;
+ append_rank(id,parent);cfg.item[id].parent=(unsigned char)parent;return 1;
 }
 int load_config(const char *base){
  char p[PATHLEN+16];int exists;preserve_backup=0;sprintf(p,"%sNUXMENU.DAT",base);
@@ -78,7 +114,7 @@ int load_config(const char *base){
 int save_config(const char *base){
  char target[PATHLEN+16],temp[PATHLEN+16],bak[PATHLEN+16];FILE *f;int ok,existed;
  sprintf(target,"%sNUXMENU.DAT",base);sprintf(temp,"%sNUXMENU.NEW",base);sprintf(bak,"%sNUXMENU.BAK",base);
- if(!valid_fields())return 0;
+ if(cfg.version!=3||!valid_fields())return 0;
  cfg.crc=checksum(&cfg,(unsigned)offsetof(Config,crc));
  f=fopen(temp,"wb");if(!f)return 0;
  ok=fwrite(&cfg,1,sizeof(cfg),f)==sizeof(cfg);

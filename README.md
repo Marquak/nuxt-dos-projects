@@ -17,7 +17,7 @@ publishers in here.
 
 | Project | Current release | DOS files to copy | Purpose |
 | --- | --- | --- | --- |
-| [NUXMENU](NUXMENU/) | 1.2 | `MENU.EXE` and `NUI.EXE` together | Organise and launch DOS programs from menus, with a file browser for adding them. |
+| [NUXMENU](NUXMENU/) | 1.4 | `MENU.EXE` and `NUI.EXE` together | Organise and launch DOS programs from menus, with a file browser for adding them. |
 | [ORBIT87](ORBIT87/) | 2.0 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | Watch an animated space demo set to an AdLib techno soundtrack. |
 | [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Fly through an endless field of stars in a silent animated demo. |
 | [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Fill the screen with falling green characters inspired by The Matrix. |

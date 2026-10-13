@@ -12,6 +12,7 @@
 #include <io.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <malloc.h>
 
 #define UP 0x4800
 #define DOWN 0x5000
@@ -33,6 +34,10 @@
 #define F9 0x4300
 #define F10 0x4400
 #define CLICK 0x1000
+#define BACK_CLICK 0x1001
+#define FAV_VIEW 6
+#define DUPLICATE 4
+#define SAVE 19
 #define MAXFILES 384
 #define DESK 0
 #define PANEL 1
@@ -44,30 +49,48 @@
 #define BORDER 7
 
 static unsigned short frame[80*50];
+static unsigned short __far *shown;
+static int screen_valid;
+static unsigned last_writes;
+typedef struct {unsigned char x,y,w;int action;} Button;
+static Button buttons[32];
+static int button_count;
+static int favourites;
+static int menu_valid,menu_selection,menu_top,menu_count,menu_current,menu_favourites;
+static char menu_status[79];
 static int rows=25,vga=0,mono=0,original_rows=25,mouse_ok=0,mouse_visible=0,mx,my;
 static int click_guard=0,guard_x,guard_y;
 static clock_t guard_time;
-static int current=ROOT,selected=0,top=0,members[ITEMS],count=0,dirty=0;
-static char home[PATHLEN],status[79]="F2: browse your drive and add a program. F1: help.";
-static const char *theme_names[7]={"Classic blue","Amber terminal","Matrix green","Neon coast","Slate","Paper","Custom"};
-static const unsigned char themes[6][8]={
+static int current=ROOT,selected=0,top=0,members[ITEMS+1],count=0,dirty=0;
+static char home[PATHLEN],status[79]="";
+static const char *theme_names[11]={"Classic blue","Amber terminal","Matrix green","Neon coast","Slate","Paper","Phosphor","Ice Station","Plum CRT","Red Alert","Custom"};
+static const unsigned char themes[10][8]={
  {0x17,0x1f,0x70,0x1b,0x3f,0x17,0x0f,0x19},
  {0x06,0x0e,0x60,0x0f,0x60,0x06,0x0e,0x06},
  {0x02,0x0a,0x20,0x0f,0x20,0x02,0x0a,0x02},
  {0x10,0x1b,0x5f,0x1d,0x5f,0x13,0x0b,0x15},
  {0x08,0x07,0x3f,0x0b,0x70,0x08,0x0f,0x08},
- {0x70,0x70,0x1f,0x71,0x1f,0x78,0x0f,0x78}
+ {0x70,0x70,0x1f,0x71,0x1f,0x78,0x0f,0x78},
+ {0x00,0x02,0x20,0x0a,0x02,0x08,0x0a,0x02},
+ {0x10,0x1b,0x3f,0x1f,0x30,0x13,0x0f,0x1b},
+ {0x50,0x5e,0x70,0x5f,0x70,0x57,0x0e,0x5d},
+ {0x00,0x07,0x4f,0x0c,0x4f,0x08,0x0f,0x04}
 };
 static const char *roles[8]={"Desktop","Panel text","Selection","Accent","Title bar","Muted text","Input field","Borders"};
 typedef struct {char name[13];unsigned char dir;unsigned long size;} DirItem;
-static DirItem files[MAXFILES];
+static DirItem __far files[MAXFILES];
+static int file_order[MAXFILES];
 static int visible[MAXFILES],file_count,visible_count,limited,filter_dirty=1;
 
+static int saver_active,allow_idle,joy_context,wake_mouse;
+static unsigned long activity_tick,ui_tick;
+static int clock_hour=-1,clock_minute=-1,clock_format=-1;
+static int clock_draw(int force);
 static void idle(void);
 #pragma aux idle = "sti" "hlt";
 static int __far hard(unsigned a,unsigned b,unsigned __far *c){(void)a;(void)b;(void)c;_hardresume(_HARDERR_FAIL);return 0;}
 static void mouseshow(int yes){
- union REGS r;if(!mouse_ok||yes==mouse_visible)return;
+ union REGS r;if(saver_active)yes=0;if(!mouse_ok||yes==mouse_visible)return;
  r.x.ax=yes?1:2;int86(0x33,&r,&r);mouse_visible=yes;
 }
 static void cursor(int yes,int x,int y){
@@ -76,7 +99,7 @@ static void cursor(int yes,int x,int y){
 }
 static void mode(int wanted){
  union REGS r;unsigned char actual;
- mouseshow(0);if(!vga)wanted=0;
+ mouseshow(0);screen_valid=menu_valid=0;if(!vga)wanted=0;
  if(vga){r.x.ax=(wanted==1)?0x1201:0x1202;r.x.bx=0x0030;int86(0x10,&r,&r);}
  r.x.ax=mono?7:3;int86(0x10,&r,&r);
  if(wanted){r.x.ax=0x1112;r.x.bx=0;int86(0x10,&r,&r);}
@@ -121,43 +144,48 @@ static void box(int x,int y,int w,int h,const char *title){
  if(title){put(x+2,y,' ',ACCENT);text(x+3,y,title,w-7,ACCENT);put(x+3+(int)strlen(title),y,' ',ACCENT);}
 }
 static void desktop(const char *title){
- char b[80];fill(0,0,80,rows,176,DESK);fill(0,0,80,2,' ',TITLE);
- text(2,0,"NuXT Menu",20,TITLE);text(17,0,title,60,TITLE);
+ char b[80];button_count=0;menu_valid=0;fill(0,0,80,rows,176,DESK);fill(0,0,80,2,' ',TITLE);
+ text(2,0,"NuXT Menu",20,TITLE);text(17,0,title,49,TITLE);clock_draw(1);
  sprintf(b,"80 x %d  |  %s  |  %s",rows,theme_names[cfg.theme],mouse_ok?"Keyboard + mouse":"Keyboard");text(2,1,b,76,TITLE);
  fill(0,rows-2,80,2,' ',TITLE);
 }
+static void button(int x,int y,const char *label,int action){
+ int w=(int)strlen(label);text(x,y,label,w,TITLE);
+ if(button_count<32){Button *b=&buttons[button_count++];b->x=(unsigned char)x;b->y=(unsigned char)y;b->w=(unsigned char)w;b->action=action;}
+}
+static int hit_button(int x,int y){
+ int i;for(i=0;i<button_count;i++)if(y==buttons[i].y&&x>=buttons[i].x&&x<buttons[i].x+buttons[i].w)return buttons[i].action;
+ return CLICK;
+}
 static void flush(void){
- mouseshow(0);_fmemcpy(MK_FP(mono?0xb000:0xb800,0),frame,rows*160);mouseshow(1);
+ unsigned i,end,n=(unsigned)rows*80;unsigned short __far *video=MK_FP(mono?0xb000:0xb800,0);
+ last_writes=0;
+ /* Compare ordinary RAM, never read slow video RAM or the mouse cursor.
+    The shadow belongs to NUI only and is released before a child launches. */
+ if(!screen_valid||!shown){
+  mouseshow(0);_fmemcpy(video,frame,n*2);if(shown)_fmemcpy(shown,frame,n*2);
+  last_writes=n;screen_valid=1;mouseshow(1);return;
+ }
+ for(i=0;i<n;){
+  if(shown[i]==frame[i]){i++;continue;}
+  end=i+1;while(end<n&&shown[end]!=frame[end])end++;
+  if(!last_writes)mouseshow(0);
+  _fmemcpy(video+i,frame+i,(end-i)*2);_fmemcpy(shown+i,frame+i,(end-i)*2);
+  last_writes+=end-i;i=end;
+ }
+ if(last_writes)mouseshow(1);
 }
 /* Swallow the second half of a double-click after opening a folder so it
    cannot activate a child underneath the same pointer position. */
 static void guard_click(void){click_guard=1;guard_x=mx;guard_y=my;guard_time=clock();}
-static int key(void){
- union REGS r;unsigned k;
- for(;;){
-  if(_bios_keybrd(_KEYBRD_READY)){click_guard=0;k=_bios_keybrd(_KEYBRD_READ);return (k&255)&&(k&255)!=224?(int)(k&255):(int)(k&0xff00);}
-  if(mouse_ok){
-   /* Driver release counters retain clicks that occur between polls/redraws.
-      Act on release, so a held button never repeats through nested menus. */
-   r.x.ax=6;r.x.bx=1;int86(0x33,&r,&r);
-   if(r.x.bx){click_guard=0;return 8;}
-   r.x.ax=6;r.x.bx=0;int86(0x33,&r,&r);
-   if(r.x.bx){
-    mx=r.x.cx/8;my=r.x.dx/8;
-    if(click_guard&&mx==guard_x&&my==guard_y&&clock()-guard_time<CLOCKS_PER_SEC/2)continue;
-    click_guard=0;return CLICK;
-   }
-  }
-  idle();
- }
-}
+#include "IDLE.H"
 static void notice(const char *s){strncpy(status,s,sizeof(status)-1);status[sizeof(status)-1]=0;}
 static void message(const char *title,const char *s){
- desktop("Program organiser");box(7,7,66,10,title);wrapped(10,10,s,59,4,PANEL);text(10,14,"Press any key",50,ACCENT);flush();key();
+ desktop("Program organiser");box(7,7,66,10,title);wrapped(10,10,s,59,4,PANEL);button(10,14,"[ OK ]",27);flush();key();
 }
 static int yesno(const char *title,const char *s){
- int k;desktop("Program organiser");box(7,7,66,10,title);wrapped(10,10,s,59,3,PANEL);text(10,14,"Y = yes    N / Esc = cancel",50,ACCENT);flush();
- do{k=key();}while(k!='y'&&k!='Y'&&k!='n'&&k!='N'&&k!=27&&k!=13&&k!=8);return k=='y'||k=='Y';
+ int k;desktop("Program organiser");box(7,7,66,10,title);wrapped(10,10,s,59,3,PANEL);button(10,14,"[ Yes ]",'y');button(24,14,"[ Cancel ]",27);flush();
+ do{k=key();}while(k!='y'&&k!='Y'&&k!='n'&&k!='N'&&k!=27&&k!=13&&k!=8&&k!=BACK_CLICK);return k=='y'||k=='Y';
 }
 static int input(const char *title,const char *prompt,char *s,unsigned cap){
  unsigned pos=(unsigned)strlen(s),n,offset;int k;char b[82];
@@ -165,27 +193,34 @@ static int input(const char *title,const char *prompt,char *s,unsigned cap){
   n=(unsigned)strlen(s);offset=pos>=58?pos-57:0;
   desktop("Edit item");box(6,6,68,12,title);text(9,8,prompt,61,PANEL);fill(9,10,61,1,' ',FIELD);text(9,10,s+offset,60,FIELD);
   sprintf(b,"%u/%u  Enter: accept   Esc: cancel   Ctrl-U: clear",n,cap-1);text(9,13,b,61,DIM);
-  text(9,15,"Home/End, arrows, Backspace and Delete edit the field.",61,DIM);flush();cursor(1,9+(int)(pos-offset),10);k=key();cursor(0,0,0);
-  if(k==13)return 1;if(k==27)return 0;
+  text(9,15,"Home/End, arrows, Backspace and Delete edit the field.",61,DIM);button(9,16,"[ Save ]",13);button(22,16,"[ Cancel ]",27);button(37,16,"[ Clear ]",21);flush();cursor(1,9+(int)(pos-offset),10);k=key();cursor(0,0,0);
+  if(k==13)return 1;if(k==27||k==BACK_CLICK)return 0;
   if(k==LEFT&&pos)pos--;else if(k==RIGHT&&pos<n)pos++;else if(k==HOME)pos=0;else if(k==END)pos=n;
   else if(k==21){s[0]=0;pos=0;}else if(k==8&&pos){memmove(s+pos-1,s+pos,n-pos+1);pos--;}
   else if(k==DEL&&pos<n)memmove(s+pos,s+pos+1,n-pos);
   else if(k>=32&&k<=126&&n+1<cap){memmove(s+pos+1,s+pos,n-pos+1);s[pos++]=(char)k;}
  }
 }
+static int place_index(void){return favourites?129:current==ROOT?128:current;}
+static void remember_place(void){int n=place_index();cfg.opt.selection[n]=count?(unsigned char)members[selected]:ROOT;cfg.opt.scroll[n]=(unsigned char)top;}
 static int commit(void){
- dirty=1;cfg.current=(unsigned char)current;cfg.selected=count?(unsigned char)members[selected]:ROOT;
+ remember_place();cfg.opt.lastfav=(unsigned char)favourites;menu_valid=0;dirty=1;cfg.current=(unsigned char)current;cfg.selected=count&&members[selected]!=FAV_ID?(unsigned char)members[selected]:ROOT;
  if(save_config(home)){dirty=0;notice("Saved.");return 1;}
  message("Could not save","Check free space and write protection. Changes remain in memory. The previous configuration has been retained.");notice("Unsaved changes - check disk space/write protection.");return 0;
 }
 static int cmp_members(const void *a,const void *b){
- int x=*(const int *)a,y=*(const int *)b;return cfg.item[x].rank==cfg.item[y].rank?x-y:(cfg.item[x].rank<cfg.item[y].rank?-1:1);
+ int x=*(const int *)a,y=*(const int *)b;
+ if(favourites){int n=stricmp(cfg.item[x].name,cfg.item[y].name);return n?n:x-y;}
+ return cfg.item[x].rank==cfg.item[y].rank?x-y:(cfg.item[x].rank<cfg.item[y].rank?-1:1);
 }
 static void list_menu(int wanted){
- int i;count=0;for(i=0;i<ITEMS;i++)if(cfg.item[i].kind&&cfg.item[i].parent==current)members[count++]=i;
- qsort(members,count,sizeof(int),cmp_members);selected=0;
+ int i;menu_valid=0;count=0;for(i=0;i<ITEMS;i++)if(favourites?(cfg.item[i].kind==PROGRAM&&(cfg.item[i].pause&FAVOURITE)):(cfg.item[i].kind&&cfg.item[i].parent==current))members[count++]=i;
+ qsort(members,count,sizeof(int),cmp_members);if(!favourites&&current==ROOT){memmove(members+1,members,count*sizeof(int));members[0]=FAV_ID;count++;}selected=0;
  for(i=0;i<count;i++)if(members[i]==wanted)selected=i;
  if(top>selected)top=selected;
+}
+static void enter_menu(int parent,int fav){
+ int n;remember_place();joy_settle=1;current=parent;favourites=fav;n=place_index();top=cfg.opt.scroll[n];list_menu(cfg.opt.selection[n]);
 }
 static void scroll(int *sel,int *start,int n,int page,int k){
  if(k==UP&&*sel>0)(*sel)--;if(k==DOWN&&*sel<n-1)(*sel)++;
@@ -194,27 +229,45 @@ static void scroll(int *sel,int *start,int n,int page,int k){
  if(*sel<0)*sel=0;if(*sel>=n)*sel=n?n-1:0;
  if(*start>*sel)*start=*sel;if(*sel>=*start+page)*start=*sel-page+1;
 }
+static void menu_row(int row){
+ int id=members[top+row],role=top+row==selected?SELECT:PANEL;Item *e;
+ fill(4,5+row,34,1,' ',role);
+ if(id==FAV_ID){text(5,5+row,"> Favourites",32,role);return;}e=&cfg.item[id];
+ text(5,5+row,e->kind==FOLDER?"> ":(e->pause&FAVOURITE)?"* ":"  ",2,role);
+ text(7,5+row,e->name,30,role);
+}
+static void menu_details(void){
+ Item *e;fill(43,4,34,rows-9,' ',PANEL);if(!count)return;
+ if(members[selected]==FAV_ID){text(45,5,"SUBMENU",30,ACCENT);text(45,7,"Favourites",29,PANEL);text(45,11,"Your starred programs.",29,PANEL);return;}
+ e=&cfg.item[members[selected]];text(45,5,e->kind==FOLDER?"SUBMENU":"PROGRAM",30,ACCENT);wrapped(45,7,e->name,29,2,PANEL);
+ if(e->kind==PROGRAM){
+  text(45,10,"File",29,DIM);wrapped(45,11,e->program,29,3,PANEL);
+  text(45,14,"Working folder",29,DIM);wrapped(45,15,e->cwd,29,2,PANEL);
+  if(rows>25){text(45,18,"Arguments",29,DIM);wrapped(45,19,e->args[0]?e->args:"(none)",29,3,PANEL);}
+ }else{text(45,11,"Click or Enter to open.",29,PANEL);text(45,13,"Backspace returns to parent.",29,PANEL);}
+}
 static void draw_menu(void){
- int i,page=rows-10,id;char b[110];Item *e;
- scroll(&selected,&top,count,page,0);desktop(current==ROOT?"Home":cfg.item[current].name);
- box(2,3,38,rows-7,current==ROOT?"Your menus":cfg.item[current].name);box(42,3,36,rows-7,"Selected item");
- if(!count){text(5,6,"This menu is empty.",32,DIM);text(5,8,"F2 adds a program.",32,PANEL);text(5,9,"F3 creates a submenu.",32,PANEL);}
- for(i=0;i<page&&top+i<count;i++){
-  id=members[top+i];e=&cfg.item[id];fill(4,5+i,34,1,' ',top+i==selected?SELECT:PANEL);
-  text(5,5+i,e->kind==FOLDER?"> ":"  ",2,top+i==selected?SELECT:ACCENT);text(7,5+i,e->name,30,top+i==selected?SELECT:PANEL);
+ int i,page=rows-10;char b[110];
+ scroll(&selected,&top,count,page,0);
+ if(menu_valid&&menu_top==top&&menu_count==count&&menu_current==current&&menu_favourites==favourites&&!strcmp(menu_status,status)){
+  if(menu_selection!=selected){menu_row(menu_selection-top);menu_row(selected-top);menu_details();}
+ }else{
+  desktop(favourites?"Favourites":current==ROOT?"Home":cfg.item[current].name);
+  box(2,3,38,rows-7,favourites?"Favourites":current==ROOT?"Your menus":cfg.item[current].name);box(42,3,36,rows-7,"Selected item");
+  if(!count){text(5,6,favourites?"No favourites yet.":"This menu is empty.",32,DIM);text(5,8,favourites?"Use * to star a program.":"F2 adds a program.",32,PANEL);if(!favourites)text(5,9,"F3 creates a submenu.",32,PANEL);}
+  for(i=0;i<page&&top+i<count;i++)menu_row(i);
+  menu_details();
+  fill(0,rows-4,80,1,' ',DESK);sprintf(b," %d item%s | %s",count,count==1?"":"s",status);text(1,rows-4,b,78,PANEL);
+  fill(0,rows-3,80,1,' ',TITLE);
+  button(1,rows-3,"[Back]",BACK_CLICK);button(8,rows-3,"[^]",UP);button(12,rows-3,"[v]",DOWN);
+  button(16,rows-3,"[PgUp]",PGUP);button(23,rows-3,"[PgDn]",PGDN);
+  button(1,rows-1,"F1 Help",F1);button(16,rows-1,"F5 Settings",F5);
+  button(35,rows-1,"F9 DOS prompt",F9);button(57,rows-1,"F10 Exit",F10);
  }
- if(count){
-  e=&cfg.item[members[selected]];text(45,5,e->kind==FOLDER?"SUBMENU":"PROGRAM",30,ACCENT);wrapped(45,7,e->name,29,2,PANEL);
-  if(e->kind==PROGRAM){text(45,10,"File",29,DIM);wrapped(45,11,e->program,29,3,PANEL);text(45,14,"Working folder",29,DIM);wrapped(45,15,e->cwd,29,2,PANEL);
-   if(rows>25){text(45,18,"Arguments",29,DIM);wrapped(45,19,e->args[0]?e->args:"(none)",29,3,PANEL);}
-  }else{text(45,11,"Click or Enter to open.",29,PANEL);text(45,13,"Backspace returns to parent.",29,PANEL);}
- }
- fill(0,rows-4,80,1,' ',DESK);sprintf(b," %d item%s | %s",count,count==1?"":"s",status);text(1,rows-4,b,78,PANEL);
- text(1,rows-2,"F1 Help  F2 Add  F3 Submenu  F4 Edit  F5 Theme/screen  F6 Move",78,TITLE);
- text(1,rows-1,"F7/F8 Reorder   Del Remove   F9 DOS prompt   F10 Exit   Esc/Back: up",78,TITLE);flush();
+ menu_valid=1;menu_selection=selected;menu_top=top;menu_count=count;menu_current=current;menu_favourites=favourites;strcpy(menu_status,status);flush();
 }
 static int cmp_files(const void *a,const void *b){
- const DirItem *x=a,*y=b;if(x->dir!=y->dir)return x->dir?-1:1;return stricmp(x->name,y->name);
+ DirItem x,y;_fmemcpy(&x,&files[*(const int *)a],sizeof(x));_fmemcpy(&y,&files[*(const int *)b],sizeof(y));if(x.dir!=y.dir)return x.dir?-1:1;return stricmp(x.name,y.name);
 }
 static int contains(const char *s,const char *part){
  unsigned i,j;if(!*part)return 1;for(i=0;s[i];i++){for(j=0;part[j]&&s[i+j]&&toupper(s[i+j])==toupper(part[j]);j++);if(!part[j])return 1;}return 0;
@@ -227,42 +280,44 @@ static int scan(const char *path){
  while(!error){
   if(strcmp(f.name,".")&&strcmp(f.name,"..")&&!(f.attrib&_A_VOLID)){
    if(file_count==MAXFILES){limited=1;break;}
-   strncpy(files[file_count].name,f.name,12);files[file_count].name[12]=0;
+   _fmemcpy(files[file_count].name,f.name,13);file_order[file_count]=file_count;files[file_count].name[12]=0;
    files[file_count].dir=(f.attrib&_A_SUBDIR)!=0;files[file_count].size=f.size;file_count++;
   }
   error=_dos_findnext(&f);
  }
- qsort(files,file_count,sizeof(DirItem),cmp_files);return 1;
+ qsort(file_order,file_count,sizeof(int),cmp_files);return 1;
 }
 static void filter_files(int all,const char *filter){
- static int last_all;static char last_filter[32];int i;
+ static int last_all;static char last_filter[32];int i,j;DirItem f;
  if(!filter_dirty&&all==last_all&&!strcmp(filter,last_filter))return;
  filter_dirty=0;last_all=all;strcpy(last_filter,filter);
- visible_count=0;for(i=0;i<file_count;i++)if(files[i].dir||((all||runnable(files[i].name))&&contains(files[i].name,filter)))visible[visible_count++]=i;
+ visible_count=0;for(i=0;i<file_count;i++){j=file_order[i];_fmemcpy(&f,&files[j],sizeof(f));if(f.dir||((all||runnable(f.name))&&contains(f.name,filter)))visible[visible_count++]=j;}
 }
 static void parent_path(char *path){char *p;unsigned n=(unsigned)strlen(path);while(n>3&&path[n-1]=='\\')path[--n]=0;p=strrchr(path,'\\');if(p&&p>path+2)*p=0;else path[3]=0;}
 static int browser(char *result){
- char path[PATHLEN],next[PATHLEN],filter[32]="",drive[3],b[100];int sel=0,start=0,k,i,all=0,page,previous=-1;clock_t last=0;DirItem *f;
+ char path[PATHLEN],next[PATHLEN],filter[32]="",drive[3],b[100];int sel=0,start=0,k,i,all=0,page,previous=-1;clock_t last=0;DirItem entry,*f=&entry;
  strcpy(path,cfg.browse);if(!scan(path)){strcpy(path,home);if(!scan(path)){message("Drive unavailable","The menu folder cannot be read.");return 0;}}
  for(;;){
   filter_files(all,filter);page=rows-10;scroll(&sel,&start,visible_count,page,0);desktop("Find a program");box(2,3,76,rows-6,"Drive explorer");
   text(5,4,path,70,ACCENT);sprintf(b,"%-13s  %-11s  %s", "Name","Size",all?"All files":"EXE / COM / BAT");text(5,5,b,70,DIM);
   for(i=0;i<page&&start+i<visible_count;i++){
-   f=&files[visible[start+i]];fill(4,6+i,72,1,' ',sel==start+i?SELECT:PANEL);
+   _fmemcpy(f,&files[visible[start+i]],sizeof(*f));fill(4,6+i,72,1,' ',sel==start+i?SELECT:PANEL);
    if(f->dir)sprintf(b,"> %-12s  <DIR>",f->name);else sprintf(b,"  %-12s  %10lu bytes",f->name,f->size);
    text(5,6+i,b,69,sel==start+i?SELECT:PANEL);
   }
   sprintf(b,"%d shown%s | Filter: %s",visible_count,limited?" (384-entry limit)":"",filter[0]?filter:"none");text(4,rows-4,b,72,DIM);
-  text(1,rows-2,"Enter Open/add   F3 Filter   F4 All/programs   F5 Refresh   F6 Drive",78,TITLE);
+  fill(0,rows-3,80,1,' ',TITLE);
+  button(1,rows-3,"[Back]",8);button(10,rows-3,"[^]",UP);button(15,rows-3,"[v]",DOWN);button(20,rows-3,"[PgUp]",PGUP);button(29,rows-3,"[PgDn]",PGDN);button(65,rows-3,"[Cancel]",27);
+  button(1,rows-2,"[Open/add]",13);button(13,rows-2,"F3 Filter",F3);button(25,rows-2,"F4 All/programs",F4);button(44,rows-2,"F5 Refresh",F5);button(58,rows-2,"F6 Drive",F6);
   text(1,rows-1,"Backspace Parent folder   Home/End/PgUp/PgDn Scroll   Esc Cancel",78,TITLE);flush();k=key();if(k!=CLICK)previous=-1;
-  if(k==27)return 0;
+  if(k==27)return 0;if(k==BACK_CLICK)k=8;
   if(k==CLICK){
-   i=my-6;if(mx>=4&&mx<76&&i>=0&&i<page&&start+i<visible_count){sel=start+i;if(files[visible[sel]].dir){k=13;guard_click();}else if(previous==sel&&clock()-last<CLOCKS_PER_SEC)k=13;previous=sel;last=clock();}
+   i=my-6;if(mx>=4&&mx<76&&i>=0&&i<page&&start+i<visible_count){sel=start+i;if(files[visible[sel]].dir){k=13;guard_click();}else if(previous==sel&&clock()-last<CLOCKS_PER_SEC)k=13;previous=sel;last=clock();}else previous=-1;
   }
   if(k==13&&visible_count){
-   f=&files[visible[sel]];if(strlen(path)+strlen(f->name)+2>sizeof(next)){message("Path too long","This version supports DOS paths up to 79 characters.");continue;}
+   _fmemcpy(f,&files[visible[sel]],sizeof(*f));if(strlen(path)+strlen(f->name)+2>sizeof(next)){message("Path too long","This version supports DOS paths up to 79 characters.");continue;}
    sprintf(next,"%s%s%s",path,path[strlen(path)-1]=='\\'?"":"\\",f->name);
-   if(f->dir){if(scan(next)){strcpy(path,next);strcpy(cfg.browse,path);sel=start=0;previous=-1;}else{scan(path);message("Cannot open folder","The folder or drive is unavailable.");}}
+   if(f->dir){if(scan(next)){strcpy(path,next);sel=start=0;previous=-1;}else{scan(path);message("Cannot open folder","The folder or drive is unavailable.");}}
    else if(!runnable(next))message("Choose a program","Select an EXE, COM or BAT file to add to the menu.");
    else if(!absolute_path(next))message("Unsupported path","Use a DOS 8.3 path without spaces, percent signs or shell control characters.");
    else{strcpy(result,next);strcpy(cfg.browse,path);return 1;}
@@ -279,38 +334,54 @@ static int browser(char *result){
  }
 }
 static int free_item(void){int i;for(i=0;i<ITEMS;i++)if(!cfg.item[i].kind)return i;message("Menu full","This version holds 128 programs and submenus in total.");return -1;}
-static void rank_new(Item *e){int i;for(i=0;i<count;i++)cfg.item[members[i]].rank=(unsigned short)i;e->rank=(unsigned short)count;}
+
 static void add_program(void){
  Item e;int id=free_item();char *p;if(id<0)return;memset(&e,0,sizeof(e));if(!browser(e.program))return;
  strcpy(e.cwd,e.program);parent_path(e.cwd);p=strrchr(e.program,'\\');strncpy(e.name,p?p+1:e.program,31);p=strrchr(e.name,'.');if(p)*p=0;
  if(!input("Add program","Menu name:",e.name,sizeof(e.name))||!e.name[0])return;
  if(!input("Add program","Command-line arguments (optional):",e.args,sizeof(e.args)))return;
- e.kind=PROGRAM;e.parent=(unsigned char)current;rank_new(&e);cfg.item[id]=e;list_menu(id);commit();
+ e.kind=PROGRAM;e.parent=(unsigned char)current;if(favourites)e.pause|=FAVOURITE;cfg.item[id]=e;append_rank(id,current);list_menu(id);commit();
 }
 static void add_folder(void){
  Item e;int id=free_item();if(id<0)return;memset(&e,0,sizeof(e));
  if(!input("New submenu","Submenu name:",e.name,sizeof(e.name))||!e.name[0])return;
- e.kind=FOLDER;e.parent=(unsigned char)current;rank_new(&e);cfg.item[id]=e;list_menu(id);commit();
+ e.kind=FOLDER;e.parent=(unsigned char)current;cfg.item[id]=e;append_rank(id,current);list_menu(id);commit();
 }
 static void edit_item(void){
- Item e;char pause[2];int id;if(!count)return;id=members[selected];e=cfg.item[id];
+ Item e;char pause[2];int id;if(!count)return;id=members[selected];if(id==FAV_ID)return;e=cfg.item[id];
  if(!input("Edit item","Menu name:",e.name,sizeof(e.name))||!e.name[0])return;
  if(e.kind==PROGRAM){
   if(!input("Edit program","Full DOS program path:",e.program,sizeof(e.program)))return;
   if(!input("Edit program","Command-line arguments:",e.args,sizeof(e.args)))return;
   if(!input("Edit program","Working directory:",e.cwd,sizeof(e.cwd)))return;
-  pause[0]=e.pause?'Y':'N';pause[1]=0;if(!input("Edit program","Pause after exit? Y or N:",pause,sizeof(pause)))return;e.pause=toupper(pause[0])=='Y';
+  pause[0]=(e.pause&PAUSE_EXIT)?'Y':'N';pause[1]=0;if(!input("Edit program","Pause after exit? Y or N:",pause,sizeof(pause)))return;e.pause=(unsigned char)((e.pause&FAVOURITE)|(toupper(pause[0])=='Y'?PAUSE_EXIT:0));
   if(!absolute_path(e.program)||!runnable(e.program)||!absolute_path(e.cwd)){message("Check the paths","Use full DOS 8.3 paths, e.g. C:\\GAMES\\GAME.EXE and C:\\GAMES.");return;}
  }
- cfg.item[id]=e;commit();
+ cfg.item[id]=e;list_menu(id);commit();
 }
 static void delete_item(void){
- int i,id;if(!count)return;id=members[selected];for(i=0;i<ITEMS;i++)if(cfg.item[i].kind&&cfg.item[i].parent==id){message("Submenu is not empty","Move or remove its entries first. No program files will be deleted.");return;}
+ int i,id;if(!count)return;id=members[selected];if(id==FAV_ID)return;for(i=0;i<ITEMS;i++)if(cfg.item[i].kind&&cfg.item[i].parent==id){message("Submenu is not empty","Move or remove its entries first. No program files will be deleted.");return;}
  if(!yesno("Remove menu item?","This removes only the menu entry. The program and its files stay on disk."))return;
  cfg.item[id].kind=0;list_menu(ROOT);commit();
 }
+static void duplicate_item(void){
+ int id,source;Item e;char name[32];if(!count)return;source=members[selected];if(source==FAV_ID)return;
+ if(cfg.item[source].kind!=PROGRAM){notice("Select a program to duplicate.");return;}
+ id=free_item();if(id<0)return;e=cfg.item[source];
+ sprintf(name,"%.24s (copy)",e.name);
+ if(!input("Duplicate program","Name for the copy:",name,sizeof(name))||!name[0])return;
+ strcpy(e.name,name);cfg.item[id]=e;append_rank(id,e.parent);list_menu(id);commit();
+}
+static void toggle_favourites(void){
+ if(favourites)enter_menu(ROOT,0);else enter_menu(ROOT,1);
+}
+static void star_item(void){
+ int id;if(!count)return;id=members[selected];if(id==FAV_ID)return;
+ if(cfg.item[id].kind!=PROGRAM){notice("Select a program to add to favourites.");return;}
+ cfg.item[id].pause^=FAVOURITE;list_menu(id);commit();
+}
 static void move_item(void){
- int choices[ITEMS+1],n=1,i,id,sel=0,start=0,k,page;char b[100];if(!count)return;id=members[selected];choices[0]=ROOT;
+ int choices[ITEMS+1],n=1,i,id,sel=0,start=0,k,page;char b[100];if(!count)return;id=members[selected];if(id==FAV_ID)return;choices[0]=ROOT;
  for(i=0;i<ITEMS;i++)if(cfg.item[i].kind==FOLDER&&!child_of(i,id))choices[n++]=i;
  for(i=0;i<n;i++)if(choices[i]==cfg.item[id].parent)sel=i;
  for(;;){
@@ -319,81 +390,70 @@ static void move_item(void){
    int f=choices[start+i];if(f==ROOT)strcpy(b,"Home");else sprintf(b,"%s / %s",cfg.item[f].parent==ROOT?"Home":cfg.item[cfg.item[f].parent].name,cfg.item[f].name);
    fill(8,5+i,64,1,' ',sel==start+i?SELECT:PANEL);text(9,5+i,b,61,sel==start+i?SELECT:PANEL);
   }
-  text(2,rows-2,"Enter: move here     Esc: cancel",76,TITLE);flush();k=key();if(k==27)return;
-  if(k==13){int parent=choices[sel];unsigned rank=0;for(i=0;i<ITEMS;i++)if(cfg.item[i].kind&&cfg.item[i].parent==parent)cfg.item[i].rank=(unsigned short)rank++;
-   cfg.item[id].parent=(unsigned char)parent;cfg.item[id].rank=(unsigned short)rank;list_menu(ROOT);commit();return;
-  }
+  button(2,rows-2,"[Save]",13);button(12,rows-2,"[Cancel]",27);button(24,rows-2,"[^]",UP);button(30,rows-2,"[v]",DOWN);button(36,rows-2,"[PgUp]",PGUP);button(45,rows-2,"[PgDn]",PGDN);
+  flush();k=key();if(k==27||k==BACK_CLICK)return;
+  if(k==CLICK){i=my-5;if(mx>=8&&mx<72&&i>=0&&i<page&&start+i<n)sel=start+i;}
+  if(k==13){move_entry(id,choices[sel]);list_menu(id);commit();return;}
   scroll(&sel,&start,n,page,k);
  }
 }
-static void settings(void){
- unsigned char oldmode=cfg.mode,oldtheme=cfg.theme,oldcolors[8];int sel=0,k,i,change;char b[90];memcpy(oldcolors,cfg.colors,8);
- for(;;){
-  desktop("Appearance");box(5,3,70,17,"Screen and colours");
-  for(i=0;i<10;i++){
-   if(i==0)sprintf(b,"Screen layout       80 x %d%s",cfg.mode==1?43:cfg.mode==2?50:25,vga?"":" (VGA needed for 43/50)");
-   else if(i==1)sprintf(b,"Theme               %s",theme_names[cfg.theme]);
-   else sprintf(b,"%-18s  Ink %2u  Paper %2u    Sample text",roles[i-2],cfg.colors[i-2]&15,cfg.colors[i-2]>>4);
-   fill(7,5+i,66,1,' ',i==sel?SELECT:PANEL);text(8,5+i,b,62,i==sel?SELECT:PANEL);
-   if(i>=2)text(48,5+i," Sample text ",14,i-2);
-  }
-  text(8,17,"Left/right: choice or ink   PgUp/PgDn: paper colour",62,DIM);text(8,18,"S or F10: save    Esc: undo appearance changes",62,ACCENT);
-  text(2,rows-2,"Arrow keys select settings. Changes preview immediately.",76,TITLE);flush();k=key();
-  if(k==27){cfg.mode=oldmode;cfg.theme=oldtheme;memcpy(cfg.colors,oldcolors,8);mode(cfg.mode);return;}
-  if(k=='s'||k=='S'||k==F10){commit();return;}
-  if(k==UP&&sel)sel--;if(k==DOWN&&sel<9)sel++;
-  if(k==CLICK&&mx>=7&&mx<73&&my>=5&&my<15)sel=my-5;
-  change=(k==RIGHT||k==13)?1:k==LEFT?-1:0;
-  if(sel==0&&change){if(vga){cfg.mode=(unsigned char)((cfg.mode+change+3)%3);mode(cfg.mode);}}
-  else if(sel==1&&change){cfg.theme=(unsigned char)((cfg.theme+change+7)%7);if(cfg.theme<6)memcpy(cfg.colors,themes[cfg.theme],8);}
-  else if(sel>=2){
-   if(change){cfg.colors[sel-2]=(unsigned char)((cfg.colors[sel-2]&0xf0)|((cfg.colors[sel-2]+change)&15));cfg.theme=6;}
-   if(k==PGUP||k==PGDN){cfg.colors[sel-2]=(unsigned char)(cfg.colors[sel-2]+(k==PGUP?16:-16));cfg.theme=6;}
-  }
- }
-}
+#include "SETTINGS.H"
 static int launch(int shell){
- Item *e=count?&cfg.item[members[selected]]:NULL;struct find_t f;char job[100],wd[PATHLEN],*command;FILE *out;int ok;
+ /* Fixed wire layout shared with the tiny assembly supervisor. */
+ struct {char magic[4];unsigned char pause,reserved;char program[80],cwd[80],args[128];} job;
+ Item *e=count&&members[selected]!=FAV_ID?&cfg.item[members[selected]]:NULL;
+ struct find_t f;char batch[100],control[100],wd[PATHLEN],*command;FILE *out;int ok,isbat=0;
+ memset(&job,0,sizeof(job));memcpy(job.magic,"NM14",4);
  if(!shell){
   if(!e||e->kind!=PROGRAM)return 0;
-  if(strlen(e->program)+strlen(e->args)+(e->args[0]?1:0)+(!stricmp(strrchr(e->program,'.'),".BAT")?5:0)>125){message("Command line too long","Shorten the program path or arguments. DOS COMMAND.COM has a limited batch command-line length.");return 0;}
+  isbat=!stricmp(strrchr(e->program,'.'),".BAT");
+  if(strlen(e->program)+strlen(e->args)+(e->args[0]?1:0)+(isbat?5:0)>125){message("Command line too long","Shorten the program path or arguments.");return 0;}
   if(_dos_findfirst(e->program,_A_NORMAL|_A_RDONLY|_A_HIDDEN|_A_SYSTEM|_A_SUBDIR|_A_ARCH,&f)||(f.attrib&_A_SUBDIR)){message("Program not found","Edit this entry with F4, or browse to the correct file with F2.");return 0;}
   if(!getcwd(wd,sizeof(wd))){message("Directory error","Cannot read the working directory.");return 0;}
-  {unsigned n=(unsigned)strlen(e->cwd);while(n>3&&e->cwd[n-1]=='\\')e->cwd[--n]=0;}
   ok=!_chdrive(toupper(e->cwd[0])-'A'+1)&&!chdir(e->cwd);_chdrive(toupper(wd[0])-'A'+1);chdir(wd);
-  if(!ok){message("Working folder unavailable","Check the working directory with F4 and verify that its disk is inserted.");return 0;}
- }
- if(!commit())return 0;
- sprintf(job,"%sNM-RUN.BAT",home);out=fopen(job,"wt");if(!out){message("Launch failed","Cannot create NM-RUN.BAT in the menu folder.");return 0;}
- fprintf(out,"@echo off\n");
- if(shell){command=getenv("COMSPEC");if(!command||!safe_path(command)){fclose(out);remove(job);message("COMSPEC error","COMSPEC must contain a DOS path to COMMAND.COM.");return 0;}fprintf(out,"%s\n",command);}
- else{
-  fprintf(out,"%c:\ncd %s\n",toupper(e->cwd[0]),e->cwd);
-  fprintf(out,"%s%s%s%s\n",!stricmp(strrchr(e->program,'.'),".BAT")?"call ":"",e->program,e->args[0]?" ":"",e->args);
-  if(e->pause)fprintf(out,"pause\n");
- }
- ok=!ferror(out);if(fclose(out))ok=0;if(!ok){remove(job);message("Launch failed","Could not write the launch job. Check disk space.");return 0;}return 1;
+  if(!ok){message("Working folder unavailable","Check the working directory and verify that its disk is inserted.");return 0;}
+  strcpy(job.cwd,e->cwd);job.pause=e->pause&PAUSE_EXIT;
+ }else strcpy(job.cwd,home);
+ sprintf(batch,"%sNM-RUN.BAT",home);sprintf(control,"%sNM-RUN.DAT",home);
+ if(shell||isbat){
+  command=getenv("COMSPEC");if(!command||strlen(command)>=sizeof(job.program)||!absolute_path(command)){message("COMSPEC error","COMSPEC must contain a full DOS path to COMMAND.COM.");return 0;}
+  strcpy(job.program,command);
+  if(isbat){
+   out=fopen(batch,"wt");if(!out){message("Launch failed","Cannot create NM-RUN.BAT in the menu folder.");return 0;}
+   fprintf(out,"@echo off\n%s%s%s\n",e->program,e->args[0]?" ":"",e->args);
+   ok=!ferror(out);if(fclose(out))ok=0;if(!ok){remove(batch);message("Launch failed","Could not write the batch job. Check disk space.");return 0;}
+   sprintf(job.args,"/C %s",batch);
+  }
+ }else{strcpy(job.program,e->program);strcpy(job.args,e->args);}
+ if(!commit()){remove(batch);return 0;}
+ out=fopen(control,"wb");if(!out){remove(batch);message("Launch failed","Cannot create NM-RUN.DAT in the menu folder.");return 0;}
+ ok=fwrite(&job,1,sizeof(job),out)==sizeof(job);if(fclose(out))ok=0;
+ if(!ok){remove(control);remove(batch);message("Launch failed","Could not write the launch job. Check disk space.");return 0;}return 1;
 }
-static void help(void){
- int k;desktop("Quick guide");box(4,3,72,18,"NuXT Menu 1.2");
- text(7,5,"Enter opens a submenu or launches a selected program.",65,PANEL);
- text(7,6,"Click folders; double-click programs; right-click goes back.",65,PANEL);
- text(7,8,"F2  Browse drives and add EXE / COM / BAT files.",65,ACCENT);
- text(7,9,"F3  Create a submenu inside the current menu.",65,PANEL);
- text(7,10,"F4  Edit name, file, arguments, working folder and pause.",65,PANEL);
- text(7,11,"F5  Choose 80x25 / 43 / 50, theme and custom colours.",65,PANEL);
- text(7,12,"F6  Move entry.  F7 / F8 reorder it within this menu.",65,PANEL);
- text(7,13,"Del removes the entry only; no program files are deleted.",65,PANEL);
- text(7,15,"F9 opens DOS. Type EXIT to return. F10 exits the menu.",65,ACCENT);
- text(7,16,"Typed letters jump to an entry. Ctrl-U clears edit fields.",65,PANEL);
- text(7,18,"Configuration saves next to MENU.EXE, with a .BAK copy.",65,DIM);
- text(7,19,"Run MENU /SAFE to recover readable default colours/layout.",65,DIM);
- text(2,rows-2,"Press any key to return.",76,TITLE);flush();k=key();(void)k;
+static int help(void){
+ int k;
+ desktop("Help");box(3,3,74,19,"NuXT Menu 1.4");
+ text(5,5,"Arrows/Home/End/PgUp/PgDn: select   Enter: open / launch",70,PANEL);
+ text(5,6,"Esc/Backspace/Left: back   F10: exit (Esc stays at Home)",70,PANEL);
+ text(5,7,"Mouse: click folders, double-click programs; right-click back",70,PANEL);
+ text(5,8,"Joystick: navigate; button 1 opens, button 2 goes back",70,PANEL);
+ text(5,10,"F2 Add program   F3 New submenu   F4 Edit entry",70,ACCENT);
+ text(5,11,"F5 Settings   F6 Move entry   F7/F8 Earlier/later",70,PANEL);
+ text(5,12,"Delete: remove entry only (keeps program files)",70,PANEL);
+ text(5,13,"* Favourite   Ctrl-F Favourites   Ctrl-D Duplicate",70,PANEL);
+ text(5,14,"Ctrl-S Save   Letters: jump to an entry by name",70,PANEL);
+ text(5,16,"F9 DOS prompt (EXIT returns)   F10 Save and exit",70,ACCENT);
+ text(5,17,"Changes save automatically. Keep NUXMENU.DAT and .BAK.",70,DIM);
+ text(5,18,"MENU /SAFE restores readable colours and disables joystick.",70,DIM);
+ button(5,20,"[Add]",F2);button(12,20,"[Submenu]",F3);button(23,20,"[Edit]",F4);
+ button(31,20,"[Move]",F6);button(39,20,"[Remove]",DEL);button(49,20,"[*]",'*');button(54,20,"[Duplicate]",DUPLICATE);
+ button(2,rows-2,"[Back]",27);button(13,rows-2,"[Save]",SAVE);flush();k=key();
+ if(k==F2||k==F3||k==F4||k==F5||k==F6||k==F7||k==F8||k==F9||k==F10||k==DEL||k=='*'||k==DUPLICATE||k==SAVE||k==FAV_VIEW)return k;return 0;
 }
 int main(int argc,char **argv){
- union REGS r;char exe[260],*p;int i,k,rc=0,driver=0,safe=0,override=-1,loaded,previous=-1;clock_t last=0;
+ union REGS r;char exe[260],*p;int i,k,rc=0,driver=0,safe=0,returning=0,override=-1,loaded,previous=-1;clock_t last=0;
  for(i=1;i<argc;i++){
-  if(!stricmp(argv[i],"/DRIVER"))driver=1;else if(!stricmp(argv[i],"/SAFE"))safe=1;
+  if(!stricmp(argv[i],"/DRIVER"))driver=1;else if(!stricmp(argv[i],"/RETURN"))returning=1;else if(!stricmp(argv[i],"/SAFE"))safe=1;
   else if(!stricmp(argv[i],"/25"))override=0;else if(!stricmp(argv[i],"/43"))override=1;else if(!stricmp(argv[i],"/50"))override=2;
   else{puts("NuXT Menu: MENU [/25|/43|/50] [/SAFE]\nKeep MENU.EXE and NUI.EXE together. VGA enables 43/50 rows.");return 0;}
  }
@@ -403,29 +463,35 @@ int main(int argc,char **argv){
  _harderr(hard);loaded=load_config(home);
  if(loaded<0){puts("NUXMENU.DAT and its backup are unreadable. Restore a backup, or rename\nNUXMENU.DAT to start a new menu. Existing files were not changed.");return 1;}
  if(!loaded)defaults(home);if(loaded==2)notice("Recovered configuration from NUXMENU.BAK.");
- if(safe){cfg.mode=0;cfg.theme=0;memcpy(cfg.colors,themes[0],8);}if(override>=0)cfg.mode=(unsigned char)override;
- current=cfg.current;list_menu(cfg.selected);
+ if(safe){cfg.opt.joy=0;cfg.opt.saver=0;cfg.mode=0;cfg.theme=0;memcpy(cfg.colors,themes[0],8);}if(override>=0)cfg.mode=(unsigned char)override;
+ current=(returning||cfg.opt.start_last)?cfg.current:ROOT;
+ favourites=(returning||cfg.opt.start_last)?cfg.opt.lastfav:0;
+ top=cfg.opt.scroll[place_index()];list_menu(cfg.opt.selection[place_index()]);
+ activity_tick=ui_tick=now_ticks();joy_settle=1;
  r.h.ah=15;int86(0x10,&r,&r);mono=(r.h.al&127)==7;
  r.x.ax=0x1a00;int86(0x10,&r,&r);vga=r.h.al==0x1a;
  if(vga){original_rows=*(unsigned char __far *)MK_FP(0x40,0x84)+1;if(original_rows!=43&&original_rows!=50)original_rows=25;}
  {unsigned char __far *vector=(unsigned char __far *)_dos_getvect(0x33);
   if(vector&&*vector!=0xcf){r.x.ax=0;int86(0x33,&r,&r);mouse_ok=r.x.ax==0xffff;}
- }mode(cfg.mode);
+ }shown=_fmalloc(80U*50U*2U);mode(cfg.mode);
  for(;;){
-  draw_menu();k=key();if(k!=CLICK)previous=-1;
+  draw_menu();allow_idle=joy_context=1;k=key();allow_idle=joy_context=0;if(k==F1)k=help();if(k!=CLICK)previous=-1;
   if(k==CLICK){
-   i=my-5;if(mx>=4&&mx<38&&i>=0&&i<rows-10&&top+i<count){selected=top+i;if(cfg.item[members[selected]].kind==FOLDER){k=13;guard_click();}else if(previous==selected&&clock()-last<CLOCKS_PER_SEC)k=13;previous=selected;last=clock();}
-   else if(my==rows-2){if(mx<9)k=F1;else if(mx<17)k=F2;else if(mx<29)k=F3;else if(mx<38)k=F4;else if(mx<56)k=F5;else k=F6;}
+   i=my-5;if(mx>=4&&mx<38&&i>=0&&i<rows-10&&top+i<count){selected=top+i;if(members[selected]==FAV_ID||cfg.item[members[selected]].kind==FOLDER){k=13;guard_click();}else if(previous==selected&&clock()-last<CLOCKS_PER_SEC)k=13;previous=selected;last=clock();}
+   else previous=-1;
   }
-  if(k==F10||(k==27&&current==ROOT)){
+  if(k==F10){
+   if(cfg.opt.confirm_exit&&!yesno("Exit to DOS?","Leave NuXT Menu?"))continue;
    if(commit()||yesno("Exit without saving?","Your latest edits could not be saved. Discard those unsaved edits and exit?"))break;
-  }else if(k==27||k==8||k==LEFT){if(current!=ROOT){i=current;current=cfg.item[current].parent;top=0;list_menu(i);}}
-  else if((k==13||k==RIGHT)&&count){i=members[selected];if(cfg.item[i].kind==FOLDER){current=i;top=0;list_menu(ROOT);previous=-1;}else if(k==13&&launch(0)){rc=10;break;}}
-  else if(k==F1)help();else if(k==F2)add_program();else if(k==F3)add_folder();else if(k==F4)edit_item();
+  }else if(k==27||k==8||k==LEFT||k==BACK_CLICK){if(favourites)toggle_favourites();else if(current!=ROOT){i=cfg.item[current].parent;enter_menu(i,0);}}
+  else if((k==13||k==RIGHT)&&count){i=members[selected];if(i==FAV_ID){enter_menu(ROOT,1);previous=-1;}else if(cfg.item[i].kind==FOLDER){enter_menu(i,0);previous=-1;}else if(k==13&&launch(0)){rc=10;break;}}
+  else if(k==FAV_VIEW)toggle_favourites();else if(k=='*')star_item();else if(k==DUPLICATE)duplicate_item();else if(k==SAVE)commit();
+  else if(k==F2)add_program();else if(k==F3){if(favourites)toggle_favourites();add_folder();}else if(k==F4)edit_item();
   else if(k==F5)settings();else if(k==F6)move_item();else if(k==DEL)delete_item();else if(k==F9&&launch(1)){rc=10;break;}
-  else if((k==F7||k==F8)&&count){i=selected+(k==F7?-1:1);if(i>=0&&i<count){unsigned short rank=cfg.item[members[i]].rank;cfg.item[members[i]].rank=cfg.item[members[selected]].rank;cfg.item[members[selected]].rank=rank;i=members[selected];list_menu(i);commit();}}
-  else if(k>=32&&k<=126&&count){for(i=1;i<=count;i++){int n=(selected+i)%count;if(toupper(cfg.item[members[n]].name[0])==toupper(k)){selected=n;break;}}}
+  else if((k==F7||k==F8)&&favourites)notice("Reorder programs in their submenu; favourites sort by name.");
+  else if((k==F7||k==F8)&&count&&members[selected]!=FAV_ID){i=selected+(k==F7?-1:1);if(i>=0&&i<count&&members[i]!=FAV_ID){unsigned short rank=cfg.item[members[i]].rank;cfg.item[members[i]].rank=cfg.item[members[selected]].rank;cfg.item[members[selected]].rank=rank;i=members[selected];list_menu(i);commit();}}
+  else if(k>=32&&k<=126&&count){for(i=1;i<=count;i++){int n=(selected+i)%count;if(toupper(members[n]==FAV_ID?'F':cfg.item[members[n]].name[0])==toupper(k)){selected=n;break;}}}
   else scroll(&selected,&top,count,rows-10,k);
  }
- mouseshow(0);mode(original_rows==43?1:original_rows==50?2:0);if(vga){r.x.ax=0x1003;r.x.bx=1;int86(0x10,&r,&r);}cursor(1,0,0);return rc;
+ mouseshow(0);mode(original_rows==43?1:original_rows==50?2:0);if(vga){r.x.ax=0x1003;r.x.bx=1;int86(0x10,&r,&r);}cursor(1,0,0);if(shown)_ffree(shown);return rc;
 }

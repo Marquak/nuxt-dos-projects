@@ -39,5 +39,22 @@ int main(void){
  check(runnable("C:\\ABC.COM")&&runnable("a.bat")&&!runnable("X.TXT"),"executable extension");
  remove("NUXMENU.BAK");check(load_config("")==0,"missing config");
  f=fopen("NUXMENU.BAK","wb");fputs("bad",f);fclose(f);check(load_config("")==-1,"do not silently replace corrupt backup");remove("NUXMENU.BAK");
+ defaults("C:\\MENU\\");cfg.version=1;
+ {unsigned short crc=checksum(&cfg,(unsigned)offsetof(Config,opt));
+ f=fopen("NUXMENU.DAT","wb");fwrite(&cfg,1,offsetof(Config,opt),f);fwrite(&crc,1,2,f);fclose(f);}
+ check(load_config("")==1&&cfg.version==3&&valid_config(),"legacy v1 migrates with valid CRC");
+ check(cfg.opt.clock_on&&!cfg.opt.clock24&&cfg.opt.timeout==5&&!cfg.opt.joy,"safe option defaults for old files");
+ cfg.version=2;cfg.theme=6;cfg.item[0].pause=3;
+ {unsigned short crc=checksum(&cfg,(unsigned)offsetof(Config,opt));
+ f=fopen("NUXMENU.DAT","wb");fwrite(&cfg,1,offsetof(Config,opt),f);fwrite(&crc,1,2,f);fclose(f);}
+ check(load_config("")==1&&cfg.version==3&&cfg.theme==CUSTOM_THEME&&cfg.item[0].pause==3,"legacy v2 custom theme and flags retained");
+ cfg.opt.clock24=1;cfg.opt.saver=4;cfg.opt.timeout=60;cfg.opt.selection[128]=FAV_ID;
+ check(save_config("")&&load_config("")==1&&cfg.opt.clock24&&cfg.opt.saver==4&&cfg.opt.timeout==60&&cfg.opt.selection[128]==FAV_ID,"new options roundtrip");
+ cfg.opt.timeout=0;seal();check(!valid_config(),"zero idle timeout rejected");cfg.opt.timeout=5;
+ cfg.opt.joy=1;seal();check(!valid_config(),"uncalibrated enabled joystick rejected");cfg.opt.joy=0;
+ cfg.opt.saver=5;seal();check(!valid_config(),"unknown saver rejected");cfg.opt.saver=0;
+ cfg.opt.selection[0]=200;seal();check(!valid_config(),"invalid menu history rejected");cfg.opt.selection[0]=ROOT;
+ cfg.item[0].pause=4;seal();check(!valid_config(),"unknown flags rejected");
+ remove("NUXMENU.DAT");remove("NUXMENU.BAK");
  printf("DATA: %d checks, %d failures\n",checks,failures);return failures!=0;
 }

@@ -1,3 +1,68 @@
+NuXT Menu 1.4 - 2026-10-13
+
+User-requested Home/Favourites navigation, joystick launch/back, quieter
+footer and expanded Settings. Added four themes, optional corner clock,
+four text-mode screensavers, startup location and exit confirmation.
+
+The interface retains the existing changed-cell video cache. Clock polls
+once per second and only flushes when the displayed minute changes. Savers
+erase/draw their previous/current cells; they do not repaint the whole
+screen per animation step. Their full-screen save exists only while active.
+The far directory cache avoids crowding the 64 KiB small-model data group.
+
+Replaced the C supervisor with original 8086 assembly and direct DOS EXEC.
+EXE/COM programs no longer need a second COMMAND.COM. The UI is not a TSR
+and exits completely before launch. Measured overhead fell from about 30.5
+KiB to 2.75 KiB for direct programs, about 5.8 KiB for batch launches.
+These are DOS memory-allocation measurements, not hardware speed claims.
+
+Checked zmenu/FreeDOS FreeCOM references and Microsoft DOS EXEC/MZ loading
+information plus RBIL. No third-party implementation was copied. Standard
+gameport calibration follows the approach used in our existing games, with
+bounded PIT-timed reads, neutral settling and button-edge handling. The
+physical controller still needs testing on the owner's NuXT.
+
+New sources: LAUNCH.S/LAUNCH.LD replace LAUNCH.C; IDLE.H holds clock,
+input and saver logic; SETTINGS.H holds settings/calibration. The new
+294-byte temporary launch job is shared between NUI and the supervisor.
+Do not mix launcher and UI binaries from different versions.
+
+Earlier review follows:
+
+NuXT Menu 1.3 update - 2026-10-12
+
+Fixed three review findings:
+1. Moving an entry no longer rebuilds sibling order from storage slots.
+   Destination ranks are normalized in their existing display order.
+   Moving to the same parent leaves the order untouched.
+2. Visiting a DOS folder with shell-unsafe characters no longer writes that
+   path into the saved configuration. Only a valid selected program updates
+   the browser starting folder, so cancelling cannot poison later saves.
+3. Changed cells alone are copied to video memory. A RAM shadow avoids slow
+   video reads; selection composition updates the affected rows and details.
+   Static screen content is retained, and mouse visibility is untouched on
+   a no-op refresh. Mode changes still force a complete initial draw.
+
+Added clickable navigation, scroll, Save/Cancel, favourites across submenus,
+and duplicate program entries. Right-click in a text field now cancels;
+it no longer acts like Backspace. Scroll buttons accept quick repeat clicks.
+The existing browser filter remains; no new search feature was added.
+
+Config structure size and CRC algorithm are unchanged. Version 2 stores
+pause/favourite flags in the old pause byte. Version-1 files are validated
+before migration; version 1.3 saves version 2. Older menu releases cannot
+read version 2. No existing user DAT/BAK files were changed during development.
+
+One selection fixture writes 71 cells instead of 2000 at 80x25. This is a
+96.45% reduction in video writes for that action, not a claimed speedup for
+the whole program. Comparing the shadow still scans RAM. Physical NuXT
+responsiveness remains for the user to assess. No 8087 operations needed.
+
+Research checked Total DOS Launcher and FreeDOS FreeCOM as design/source
+references during review. No third-party code was incorporated.
+
+Previous review follows:
+
 NuXT Menu 1.2 - code review and optimization pass
 2026-10-08
 
@@ -53,7 +118,7 @@ initial-only /SAFE, browser cache invalidation, and the existing CuteMouse
 COM2 serial-mouse regression workflow. No 86Box or physical-media changes.
 QEMU's VGA BIOS still supplies 50 rows for the 43-row request; actual BIOS
 geometry is used for drawing and mouse bounds. Native 43-row mode remains
-a hardware check. See TESTING.TXT for the recorded results.
+a hardware check. See TESTING.TXT and work/nuxtmenu/review/ for reports.
 
 RECOMMENDED NEXT ADDITIONS (NOT IMPLEMENTED IN THIS PASS)
 1. Consistent mouse controls: a visible Back button, scroll arrows, and

@@ -45,7 +45,7 @@ all possible third-party claims.
 
 ## Open Watcom runtime
 
-NUXMENU, ORBIT87, STARFIELD, MATRIX, NUXTLINK, SUNSET, NUXTROIDS and NUXTRIS binaries are linked
+NUXMENU/NUI.EXE, ORBIT87, STARFIELD, MATRIX, NUXTLINK, SUNSET, NUXTROIDS and NUXTRIS binaries are linked
 using Open Watcom 2.0. Their compiler/runtime portions are not relicensed by
 the repository's MIT license. The Sybase Open Watcom Public License 1.0 is
 retained as OWLIC.TXT in those projects and licenses/OPEN-WATCOM.txt here.
@@ -62,7 +62,7 @@ See VALIDATION.md for the compiler version used for the snapshot rebuild.
 
 ## Development tools, not vendored dependencies
 
-GNU binutils builds INVADERS and NUXTDASH without a C runtime. Python and Tkinter run the
+GNU binutils builds INVADERS, NUXTDASH and NUXMENU/MENU.EXE without a C runtime. Python and Tkinter run the
 Linux client and patcher. Pillow is an optional art-generation dependency;
 Unicorn, DOSBox and QEMU are optional test tools. Furnace can import the SBI
 instruments and audition S3M; its executable/source is not bundled. Installing

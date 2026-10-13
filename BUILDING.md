@@ -4,8 +4,8 @@
 
 - Open Watcom C/C++ 2.0, Linux x86-64 host tools (`wcl`, `wcc`, `wasm`, `wlink`):
   https://github.com/open-watcom/open-watcom-v2/releases
-- GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS and NUXTDASH.
-- Python 3.10+ for the host utilities and DUNE2FIX; Tkinter for NuXTLink.
+- GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS, NUXTDASH and the NUXMENU launcher.
+- Python 3.10+ for the host utilities, NUXMENU build and DUNE2FIX; Tkinter for NuXTLink.
 - Optional: Pillow to regenerate SUNSET procedural artwork; Furnace to edit
   the included OPL instrument audition. Neither is needed to compile/run DOS binaries.
 - Optional tests: DOSBox, a host C compiler, Xvfb for headless GUI tests, and

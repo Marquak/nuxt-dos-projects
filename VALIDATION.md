@@ -4,6 +4,28 @@ This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
 
+## NuXT Menu 1.4 update
+
+Updated the menu source, executables, preview and documentation. This includes
+Favourites as a submenu, joystick navigation, expanded settings, clock and
+screensavers, remembered menu positions, and F10-only exit. Esc goes back or
+cancels; it cannot exit from Home.
+
+The assembly launcher replaces the old C supervisor and unloads the UI before
+launching programs. A same-boot MS-DOS 6.22/QEMU comparison measured 2,816 bytes
+of overhead for an EXE and 5,936 for a batch file, versus 31,184 with the older
+launcher. These figures depend on DOS, environment size and drivers.
+
+Development validation passed 38 data checks and 75 UI/input checks in DOSBox-X.
+Focused MS-DOS 6.22/QEMU checks covered EXE/COM/BAT launch and return, the DOS
+prompt, saved settings, favourites, screensaver wake behaviour, missing joystick,
+and F10/Esc handling. See NUXMENU/TESTING.TXT for details. The owner subsequently
+reported this release working well on the physical NuXT so far; this is not
+exhaustive validation of every setting or device combination.
+
+Publication files match the tested local release. Snapshot checksums were
+refreshed. No additional emulator runs were needed for publication.
+
 ## NuXTris 1.2 update
 
 Updated the single-player executable, source and documentation. This fixes
