@@ -66,3 +66,9 @@ must supply your own matching Dune II executables. Their copyright is not
 covered by this repository's license. Names of hardware and other games are
 used descriptively; this is an independent hobby project, not an official
 Monotech, Microsoft, Westwood, Taito or other vendor release.
+
+---
+
+I'm not affiliated with the NuXT project or Monotech in any way. I'm just a big
+fan and a hobbyist who enjoys tinkering with this machine. Check out
+[Monotech's website](https://monotech.fwscart.com/) for the NuXT and their other projects.
