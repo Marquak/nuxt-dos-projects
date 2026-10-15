@@ -3,6 +3,10 @@
 Fly through an endless field of stars. Adjust the speed, number of stars and
 resolution to suit your machine. No sound or text while it runs.
 
+![Stars moving towards the viewer.](SCREENSHOT.PNG)
+
+*Stars moving towards the viewer.*
+
 - **Run:** copy `STAR.EXE` to DOS; start with `STAR`.
 - **Hardware:** V20/80186 or later, VGA/SVGA; optional 8087 used to generate perspective tables.
 - **Full instructions:** [README.TXT](README.TXT).

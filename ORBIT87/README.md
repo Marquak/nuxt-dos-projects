@@ -4,6 +4,10 @@ An animated space demo with an AdLib techno soundtrack. It moves through a
 series of scenes, using the 8087 when one is installed. Includes a V20 build
 and a separate build for a stock 8088/8086.
 
+![Neon Ocean scene. ORBIT87 and ORBITV20 share the same visuals.](SCREENSHOT.PNG)
+
+*Neon Ocean scene. ORBIT87 and ORBITV20 share the same visuals.*
+
 - **Run:** use `ORBITV20 /AUTO` on a V20, or `ORBIT87 /AUTO` on an 8088/8086.
 - **Hardware:** VGA/SVGA; optional 8087 and AdLib. Both CPU builds share this source tree.
 - **Full instructions:** [README.TXT](README.TXT).

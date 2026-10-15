@@ -4,6 +4,10 @@ A patch for the US 1.07 version of Dune II. It fixes the XMS startup error
 with UMB-only memory managers and skips the manual-word copy protection.
 Both fixes have been tested on my NuXT.
 
+![Dune II setup running after the XMS fix. Original game files are required.](SCREENSHOT.PNG)
+
+*Dune II setup running after the XMS fix. Original game files are required.*
+
 The startup error looks like this:
 
 ```text

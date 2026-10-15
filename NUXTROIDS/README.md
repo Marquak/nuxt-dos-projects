@@ -4,6 +4,10 @@ An Asteroids-style game for the NuXT. Turn, thrust and shoot the rocks into
 smaller pieces while trying not to hit them. Faded planets and stars sit behind
 the action, with AdLib effects and a two-note heartbeat.
 
+![Asteroids, the player ship and distant planets.](SCREENSHOT.PNG)
+
+*Asteroids, the player ship and distant planets.*
+
 Copy **NUXTROID.EXE** to DOS and run `NUXTROID`. That's the only runtime file.
 The default is 640x480 with 16 greyscale shades. `/L` selects 320x200, `/8`
 selects 800x600 on compatible hardware, and `/M` makes the objects monochrome.

@@ -74,3 +74,15 @@ Commercial DOS/Windows files, BIOS ROMs, complete disk images, third-party game
 files, external audio/video, user CF backups, hardware diagnostic dumps, serial
 adapter identities, saved transfer histories and user menu databases are not
 part of this snapshot. The supplied preview PNGs are program/procedural output.
+
+## Screenshots
+
+Project screenshots are captures from development runs. NuXTLink uses
+sample queue data rather than a saved user transfer history. NuXT Dash
+shows an emulator, so its hardware results are illustrative.
+
+`DUNE2FIX/SCREENSHOT.PNG` shows the original Westwood Studios setup program
+running with our patch applied. Dune II and its artwork/interface remain
+the property of their respective rights holders. That screenshot is
+included to illustrate the fix and is excluded from our MIT license.
+No commercial game executable or data archive is included.

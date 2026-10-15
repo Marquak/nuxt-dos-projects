@@ -4,6 +4,10 @@ Check what's in your NuXT and what DOS can see. Dash shows CPU speed, memory,
 video, ports, BIOS information and drives. It's handy for checking the turbo
 speed or seeing how much upper memory is free.
 
+![The Drives page in an emulator. Hardware details will differ on your NuXT.](SCREENSHOT.PNG)
+
+*The Drives page in an emulator. Hardware details will differ on your NuXT.*
+
 Copy **DASH.COM** to your DOS machine and run `DASH`. No installation or
 configuration file needed. This version is working well on my NuXT.
 

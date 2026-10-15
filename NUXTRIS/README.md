@@ -4,6 +4,10 @@ Fit the falling blocks together and clear rows. Play an endless game or try
 to clear 25 lines, then save your score with your name. Coloured outline blocks,
 a next-piece preview, and a short fanfare when you get a Tetris.
 
+![Type B play with the amber theme.](SCREENSHOT.PNG)
+
+*Type B play with the amber theme.*
+
 Copy **NUXTRIS.EXE** to a writable DOS folder and run `NUXTRIS`. Only the EXE is
 needed. Keep your NUXTRIS.DAT and NUXTRIS.BAK when updating; those hold your
 scores and settings.

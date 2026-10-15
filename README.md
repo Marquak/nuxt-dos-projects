@@ -32,6 +32,9 @@ ORBIT87 and ORBITV20 share one source tree and are both built by its build
 script. Each program's README.TXT contains
 its controls, switches, supported video modes and hardware caveats.
 
+[Browse screenshots of every project](SCREENSHOTS.md). Each project page
+also has its own screenshot.
+
 ## Run
 
 Copy the listed files to a writable DOS folder and launch the program there.
@@ -60,10 +63,10 @@ retains its own license: see [THIRD_PARTY.md](THIRD_PARTY.md) and each OWLIC.TXT
 Research references are retained in the project documentation. External music
 and pictures used as inspiration are not bundled.
 
-DUNE2FIX contains only a patching script, tests, hashes and instructions. You
-must supply your own matching Dune II executables. Their copyright is not
-covered by this repository's license. Names of hardware and other games are
-used descriptively; this is an independent hobby project, not an official
+DUNE2FIX contains a patching script, tests, hashes, instructions and a setup
+screenshot. You must supply your own matching Dune II executables. The game
+and its screenshot are not covered by this repository's MIT license. Names
+of hardware and other games are used descriptively; this is an independent hobby project, not an official
 Monotech, Microsoft, Westwood, Taito or other vendor release.
 
 ---

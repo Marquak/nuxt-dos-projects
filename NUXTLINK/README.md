@@ -5,6 +5,10 @@ transfers and back up a DOS drive without swapping cards or floppies. Transfers
 are verified and preserve DOS timestamps and attributes. There's also a button
 to set the DOS clock from Linux.
 
+![Linux client with an example transfer queue and the Sync DOS Date/Time button.](SCREENSHOT.PNG)
+
+*Linux client with an example transfer queue and the Sync DOS Date/Time button.*
+
 The DOS server runs on an 8088/8086 or V20. The Linux client needs Python 3.10+
 and Tkinter, with no pip packages to install.
 
