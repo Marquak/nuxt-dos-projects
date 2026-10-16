@@ -7,6 +7,7 @@ for project in NUXMENU ORBIT87 STARFIELD MATRIX INVADERS SUNSET NUXTDASH NUXTROI
     printf '\nBuilding %s\n' "$project"
     (cd "$project" && sh BUILD.SH)
 done
+(cd TEXTMODE && sh BUILD.SH)
 (cd NUXTLINK && sh dos/BUILD.SH)
 cp NUXTLINK/dos/NUXFER.COM NUXTLINK/NUX321.COM
 cp NUXTLINK/dos/NUXFER.COM NUXTLINK/NUXFER32.COM

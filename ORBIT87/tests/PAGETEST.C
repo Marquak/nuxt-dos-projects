@@ -83,11 +83,51 @@ static void compose_frames(void)
   }
  }
 }
+/* A statistics toggle while paused must not clear retained scene geometry.
+ * Character-cache tests cover shorter labels and unchanged text on each page. */
+static void footer_tests(void)
+{
+ unsigned p,count[2],list[2],saved_page=draw_page;
+ unsigned long before[2];char label[70];
+ paused=1;
+ for(p=0;p<(buffered?2U:1U);p++){
+  video_select_page(p);before[p]=video_checksum();
+  list[p]=page_lines[p];count[p]=line_count[list[p]];
+ }
+ video_select_page(saved_page);toggle_hud();toggle_hud();
+ for(p=0;p<(buffered?2U:1U);p++){
+  video_select_page(p);
+  expect(video_checksum()==before[p],"paused statistics round trip preserves entire frame");
+  expect(page_lines[p]==list[p]&&line_count[list[p]]==count[p],"statistics preserve retained line history");
+  footer_label(label);
+  footer_write(p,"LONGER TEMPORARY STATISTICS TEXT / FRAMES 12345 / NOTES 4512");
+  footer_write(p,"SHORT");footer_write(p,label);
+  expect(video_checksum()==before[p],"footer shortening erases old tail exactly");
+  footer_write(p,label);
+  expect(video_checksum()==before[p],"unchanged footer leaves exact frame");
+ }
+ paused=0;video_select_page(saved_page);
+}
+static void ring_tests(void)
+{
+ unsigned d,j,ok=1,cap;
+ enter_scene(3);
+ /* Fill/wrap, then reduce detail with the old head beyond the new end. */
+ for(d=3;d>0;d--){
+  detail=d-1;cap=detail==2?320:detail==1?224:128;
+  for(j=0;j<80;j++){
+   begin_lines();attractor(j);
+   if(nebula_head>=cap||nebula_count>cap||nebula_capacity!=cap)ok=0;
+  }
+ }
+ detail=2;begin_lines();attractor(0);
+ expect(ok&&nebula_head==12&&nebula_count==12,"nebula ring stays bounded across detail changes and wraps");
+}
 int main(void)
 {
  unsigned res,i;int opened=0,have87=math_detect();
  test_log=fopen("PAGETEST.TXT","w");if(!test_log)return 2;
- fprintf(test_log,"ORBIT87 page-memory and retained-scene integration (DOSBox S3)\n");
+ fprintf(test_log,"ORBIT87 page-memory, retained-scene and footer integration (DOSBox-X S3)\n");
  math_init(have87);music_start(1);music_pause(1);
  for(res=0;res<2;res++){
   opened=video_open(res);expect(opened,"video mode opens");if(!opened)continue;
@@ -100,7 +140,7 @@ int main(void)
   for(i=0;i<=480;i++)ys[i]=(int)((unsigned long)i*screen_h/480);
   cy=ys[257];seed=1987;detail=2;hud=0;paused=0;muted=0;
   for(i=0;i<28;i++){stars[i][0]=xs[35+random16()%570];stars[i][1]=ys[102+random16()%306];star_ink[i]=i%4?1:2;}
-  isolate_pages();compose_frames();video_close();
+  isolate_pages();compose_frames();footer_tests();ring_tests();video_close();
  }
  music_stop();math_end();fprintf(test_log,"TOTAL %u passed, %u failed\n",test_passed,test_failed);fclose(test_log);return test_failed?1:0;
 }

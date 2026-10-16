@@ -1,4 +1,102 @@
-# ORBIT 87 2.0 validation
+# ORBIT 87 2.1 validation
+
+Review completed 2026-10-15. Tests use DOSBox-X 2026.10.01, normal core,
+S3 VGA. No 86Box testing was used.
+
+## Changes and correctness
+
+- Statistics toggling now updates the footer on each page instead of
+  rebuilding both scenes. In 2.0, toggling F while paused erased the animation.
+- Footer updates redraw changed character cells and erase a shorter string's
+  tail. Each page keeps its own cache. Text is bounded before the separate
+  sound-status label, including at 640x480.
+- Visible line endpoints bypass the clipping routine. Pages wholly inside a
+  video aperture bypass repeated per-line bank calculations. Clipped and
+  bank-crossing lines retain the existing safe paths.
+- Nebula ring traversal uses compare/wrap instead of repeated modulus
+  operations. Colour boundaries are calculated once per frame. The ring
+  explicitly resets if its capacity changes with detail.
+- Unchanged palette values are cached; entering a scene invalidates the cache.
+
+MATH.C, MATH87.ASM and MUSIC.C are unchanged from 2.0. The original 8087
+instructions and the existing assembly pixel kernels are retained.
+
+VIDTEST matched the reference C renderer at 640x480, 800x600 and 1024x768,
+including clipping extremes, bank boundaries and drawing after CRC readback.
+Frame and post-readback CRCs are the same as the 2.0 values below.
+
+PAGETEST passed **89 checks, zero failures**: page isolation, retained
+geometry versus a complete rebuild, all five scenes, paused footer toggles,
+shorter/unchanged text, and nebula ring bounds across detail changes.
+The new footer tests caught an overlap at 640x480 during development;
+bounding the footer before the sound-status label fixed it.
+
+## Measured scene workloads
+
+`tests/REVIEWBENCH.C` runs 60 frames per scene at maximum detail, 640x480,
+with 8087 maths, retained geometry and palette updates. Scene five also
+renders its scrolling credits. It measures rendering work without normal
+frame pacing or page-flip waits. Both versions ran at fixed 3000 DOSBox-X
+cycles with the normal core, and the same input sequence.
+
+| Build | Act | 2.0 BIOS ticks | 2.1 BIOS ticks | Frame CRC32, both versions |
+|---|---:|---:|---:|---|
+| 8088 | 1 | 123 | 77 | `0ced5185` |
+| 8088 | 2 | 59 | 43 | `9ac46a8b` |
+| 8088 | 3 | 114 | 83 | `5bcb4fbe` |
+| 8088 | 4 | 79 | 48 | `cb2c4aeb` |
+| 8088 | 5 | 204 | 192 | `bff6d413` |
+| V20 | 1 | 112 | 70 | `0ced5185` |
+| V20 | 2 | 56 | 40 | `9ac46a8b` |
+| V20 | 3 | 107 | 77 | `5bcb4fbe` |
+| V20 | 4 | 72 | 43 | `cb2c4aeb` |
+| V20 | 5 | 193 | 183 | `bff6d413` |
+
+The combined workload uses about 24% fewer ticks in either build. The
+V20-targeted nebula workload improves most (about 40% fewer ticks), while
+its text-heavy finale improves only about 5%. These are emulator workloads,
+not whole-demo FPS measurements or predictions for the physical NuXT.
+
+The owner subsequently compared the old and new demos on the NuXT and
+reported that the new version is visibly faster. No numerical hardware FPS
+measurement was taken.
+
+## Release checks and sizes
+
+- ORBIT87.EXE: 41,376 bytes, 85,440-byte linked memory image.
+- ORBITV20.EXE: 40,800 bytes, 84,864-byte linked memory image.
+- Both retain an 8,192-byte stack and DGROUP below 64 KiB.
+- Final V20 executable: `/QUICK /LOOP /TICKS:650 /REPORT /HUD` completed all
+  five scenes, looped back to the first, and returned with zero line overflow.
+- Final generic executable: `/QUICK /NO87 /SILENT /REPORT` completed all five
+  scenes and returned with zero line overflow.
+- These fast headless graphics runs used the silent path. A separate explicit
+  OPL2 configuration without DOSBox-X's `-silent` switch detected AdLib.
+  MUSIRQ checked 36/36 BIOS/music ticks, 15 note triggers, pause/mute, the
+  silent clock, restored vectors and restoration of the normal PIT divisor.
+  The final V20 executable also completed a 90-tick run with 36 musical
+  triggers and zero line overflow.
+
+Native Trident display-start code is unchanged. The owner previously
+confirmed working double buffering without flicker with 2.0. The new 2.1
+renderer work still needs a physical NuXT check; DOSBox-X checks the generic
+VGA/VBE paths and memory contents.
+
+## Reproduction and references
+
+`WATCOM=/path/to/watcom sh BUILDTEST.SH` also builds BENCH0.EXE and BENCH1.EXE
+from REVIEWBENCH.C. Each writes BENCH.TXT; preserve the report before running
+the other executable. Use fixed 3000 cycles for comparisons. CRC-heavy
+VIDTEST/PAGETEST can run at higher cycles. None of the test executables is
+needed to run the demo.
+
+Reviewed [Little Game Engine's graphics source](https://github.com/mills32/Little-Game-Engine-for-VGA-EGA/blob/master/lt_gfx.c)
+for selective updates and page-buffer design. No third-party source was
+copied. Hardware references and the original 2.0 validation follow.
+
+---
+
+# Historical ORBIT 87 2.0 validation
 
 ## Builds and target
 

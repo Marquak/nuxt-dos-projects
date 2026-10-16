@@ -1,3 +1,31 @@
+NuXT Menu 1.5 - validation, 2026-10-13
+
+Built with Open Watcom warnings as errors. DOSBox-X tests passed:
+38 configuration checks and 141 UI/input checks (179 total).
+
+New checks exercise the actual edit dialogs, nested file/folder browser,
+Tab/Shift-Tab confirmation focus, default-Cancel discard, preservation of
+unsaved fields, ascending/descending menu sorting and config persistence.
+Scrollbar endpoints, track paging, pointer-local wheel scrolling and
+selection visibility are checked in all three text layouts.
+An isolated simulated INT 33 driver checks API detection, signed wheel
+counts, ordinary clicks, quick press/release clicks between polls, held
+thumb dragging, and consuming the release without launching a program.
+These driver tests are not physical mouse-wheel compatibility tests.
+
+Menu and focused edit-form frames were inspected using the emulator's VGA
+font and character/attribute buffer. Clock placement and control bounds
+were checked. On 25/43/50-row screens, a selection update still writes
+125 cells; unchanged screens/scrollbars write zero cells.
+
+MENU.EXE is byte-identical to 1.4; resident relauncher cost is unchanged.
+Config remains version 3; existing menus and joystick/settings data retain
+their format. No source changes to DATA.C or MENU.H. The generated inventory
+config remains compatible. Physical NuXT testing remains with the owner.
+No 86Box runs or changes to live menu/config files.
+
+Earlier release results follow and are not new measurements for 1.5.
+
 F10-only exit follow-up, 2026-10-13
 Esc no longer exits at Home. Help/readme updated.
 Focused MS-DOS 6.22/QEMU check passed: repeated Esc stays at Home,

@@ -1,4 +1,4 @@
-NuXT Menu 1.4
+NuXT Menu 1.5
 Fast DOS program launcher, submenus and drive explorer
 
 QUICK START
@@ -8,8 +8,8 @@ QUICK START
     C:\NUXMENU\MENU
 
 UPDATING: replace MENU.EXE and NUI.EXE, but keep your NUXMENU.DAT and
-NUXMENU.BAK files. Version 1.4 reads existing menus and upgrades them on the next save.
-Older versions cannot read the upgraded format; keep using 1.4 afterwards.
+NUXMENU.BAK files. Version 1.5 keeps the 1.4 data format. Menus from older releases are upgraded
+on the next save; versions before 1.4 cannot read that upgraded format.
 
 Both EXEs are required. No installation, TSR, sound driver or 8087 is needed.
 You can start MENU from another directory or drive. It finds its own files
@@ -19,6 +19,15 @@ The first run creates empty Games, Demos and Utilities submenus. Open one,
 press F2, browse to a program, then choose its display name and arguments.
 The program's directory becomes its working directory automatically.
 
+NEW IN 1.5
+  Scrollbars with draggable thumbs and clickable arrows/tracks.
+  Mouse wheel scrolling where the DOS mouse driver supports it.
+  A single F4 edit form with program and working-folder Browse buttons.
+  Tab/Shift-Tab focus with highlighted buttons, and safer confirmations.
+  The clock is centred vertically in the three-row top bar.
+  Sort each menu by name A-Z or Z-A, optionally with folders first.
+  Configuration format and the small relauncher are unchanged from 1.4.
+
 MAIN MENU
   Up/Down, Home/End, PgUp/PgDn  Select / scroll
   Enter                       Open submenu or launch program
@@ -27,6 +36,7 @@ MAIN MENU
   *                           Add/remove selected program from favourites
   Ctrl-F                      Favourites / return to Home
   Ctrl-D                      Duplicate selected program
+  Ctrl-O                      Sort current menu
   Ctrl-S                      Save now
   Letters                     Jump to an entry starting with that letter
   F1                          Help
@@ -46,7 +56,8 @@ the menu to DOS; it goes back or cancels a dialog.
 The main footer keeps just F1 Help, F5 Settings, F9 DOS prompt and F10 Exit.
 F1 lists editing shortcuts and provides clickable editing buttons. Back and
 scroll buttons remain on the main screen. Each submenu remembers its selected
-entry and scroll position, including after launching a program.
+entry and scroll position, including after launching a program. After moving an entry, its destination
+menu opens with that entry selected.
 
 With a DOS mouse driver: single-click a submenu or browser folder to open
 it. Single-click a program to select it; double-click to launch/add it.
@@ -54,9 +65,18 @@ Right-click goes back. Toolbar labels and bracketed buttons are clickable.
 Back, arrow and page buttons navigate without using the keyboard.
 Clicks take effect when you release the button. A second quick click after
 opening a folder is ignored to avoid accidentally opening a child entry.
-Edit dialogs have Save, Cancel and Clear buttons; typing still uses the
-keyboard. Save accepts the current field. Later Cancel leaves the original
-entry unchanged. Appearance changes also have Save and Cancel buttons.
+Tab and Shift-Tab move between fields/buttons with a highlighted focus.
+Enter activates the focused button. Confirmations start on Cancel, including
+removing entries and discarding unsaved edits. Editing still uses the keyboard.
+F1 Help also has keyboard-focusable buttons, including Sort.
+
+Scrollbars appear beside menus, file lists, move destinations and Settings.
+Click arrows to scroll a row, click the track to page, or drag the thumb.
+The selected row stays visible. A wheel scrolls three rows per detent over
+the list under the pointer; it does nothing over unrelated panels.
+Wheel input requires a mouse driver/device exposing the CuteMouse Wheel API.
+It is detected automatically; regular two-button drivers still work normally.
+There is no extra TSR supplied or required by the menu.
 
 BROWSING
   Enter               Open folder or select EXE / COM / BAT
@@ -65,6 +85,7 @@ BROWSING
   F4                  Toggle executable files / all files
   F5                  Refresh directory
   F6                  Select drive letter (A through Z)
+  F2                  Use current folder (working-folder picker only)
   Esc                 Cancel and return to menu
 
 Folders sort first, then names alphabetically. Hidden/system entries can
@@ -86,14 +107,29 @@ The copy keeps the original pause and favourite settings. No program files
 are copied. Submenu trees are not duplicated.
 
 PROGRAM SETTINGS
-F4 edits the name, full program path, command-line arguments, working
-folder, and whether to pause after the program finishes. Enable that pause
-for tools whose printed output you want to read before returning.
+F4 opens a single form for name, full program path, arguments, working
+folder, and pause after exit. Enable that pause for tools whose output you
+want to read before returning. Browse beside Program selects an EXE/COM/BAT;
+Browse beside Working folder selects a directory, including empty folders.
+Browsing starts at the entry's current location when it is available.
+F2 opens Browse when a path field or its Browse button has focus.
+Selecting a different program offers to change its working folder too.
+Other edited fields are retained while browsing. Ctrl-S or the Save button
+commits the complete entry. Esc/Cancel asks before discarding changed fields.
+The original entry is untouched until Save.
 
 Edit fields support arrows, Home/End, Delete, Backspace and Ctrl-U (clear).
 Enter accepts; Esc cancels the edit. Submenus can be renamed or moved,
 including their contents. A submenu must be empty before it can be removed.
 Moves that would put a submenu inside itself or its children are excluded.
+
+SORTING
+Ctrl-O or F1 Help -> Sort opens sorting for the current menu. Choose Name
+A-Z or Name Z-A and toggle Folders first if wanted. Only that menu changes;
+submenus retain their own order. Favourites stays alphabetical, with its
+virtual entry first on Home. The resulting order saves in NUXMENU.DAT.
+This is an arrange-on-request action: new entries still append, and F7/F8
+still move entries manually. Sorting preserves the selected entry.
 
 SETTINGS (F5)
 Use arrows to select/change an option. Enter changes an option or starts
@@ -209,6 +245,7 @@ in an isolated DOSBox-X directory, including UI regression checks. Source is inc
 See TESTING.TXT for validation and REVIEW.TXT for the optimization review. No 86Box test was used.
 
 Design references checked (no code or artwork copied):
+  https://github.com/FDOS/mouse/blob/master/wheelapi.txt
   https://archive.org/details/3DMENUPLUSDOS
   https://github.com/zirkoni/zmenu
   https://github.com/megatron-uk/x86Launcher

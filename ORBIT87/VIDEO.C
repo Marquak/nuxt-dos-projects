@@ -16,6 +16,7 @@ static int width,height,driver,current_bank=-1,current_color=-1,reference;
 static unsigned char trident_flags;
 static int buffered; /* 1=TVGA9000i native, 2=VBE display start */
 static unsigned draw_page,draw_bank,draw_offset;
+static int page_fits_bank;
 static uint32_t page_base[2];
 static unsigned char trident_module,trident_original_module;
 /* Assembly consumes these two per-line constants, never touched by IRQ code. */
@@ -102,12 +103,13 @@ int video_open(int res){
   configure();if(!probe()){video_close();return 0;}
  }
  bytes=(uint32_t)span_k*1024UL;
+ page_fits_bank=(uint32_t)pitch*height<=bytes;
  for(y=0;y<(unsigned)height;y++){a=(uint32_t)y*pitch;rows[y].bank=(unsigned)(a/bytes);rows[y].off=(unsigned)(a%bytes);}
  video_clear();return 1;
 }
 void video_close(void){
  if(buffered==1){setbank(0);outpw(0x3d4,(trident_original_module<<8)|0x1e);}
- biosmode(3);current_bank=current_color=-1;buffered=0;draw_page=draw_bank=draw_offset=0;page_base[0]=page_base[1]=0;
+ biosmode(3);current_bank=current_color=-1;buffered=page_fits_bank=0;draw_page=draw_bank=draw_offset=0;page_base[0]=page_base[1]=0;
 }
 int video_width(void){return width;}
 int video_height(void){return height;}
@@ -135,6 +137,7 @@ void video_select_page(unsigned page){
  draw_page=buffered?(page&1):0;
  draw_bank=(unsigned)(page_base[draw_page]/bytes);
  draw_offset=(unsigned)(page_base[draw_page]%bytes);
+ page_fits_bank=(uint32_t)draw_offset+(uint32_t)pitch*height<=bytes;
 }
 void video_show_page(unsigned page){
  unsigned flags,tries;int seen;
@@ -333,21 +336,32 @@ static void line_banks(int x,int y,int dx,int dy,int sy){
 }
 void video_line(int x0,int y0,int x1,int y1,unsigned color){
  int t,dx,dy,sy,ymin,ymax;unsigned off,b,lo,hi,blo,bhi;
- if(!clip(&x0,&y0,&x1,&y1))return;
+ /* Most scene endpoints are already bounded by add_line(). Keep arbitrary
+  * callers safe, without building four outcodes for every visible line. */
+ if((unsigned)x0>=(unsigned)width||(unsigned)x1>=(unsigned)width||
+    (unsigned)y0>=(unsigned)height||(unsigned)y1>=(unsigned)height)
+  if(!clip(&x0,&y0,&x1,&y1))return;
  if(x1<x0){t=x0;x0=x1;x1=t;t=y0;y0=y1;y1=t;}
  dx=x1-x0;dy=y1-y0;sy=1;if(dy<0){dy=-dy;sy=-1;}
  ink(color);
- /* The bounding rectangle, rather than only endpoints, must fit one bank. */
- ymin=y0<y1?y0:y1;ymax=y0>y1?y0:y1;
- xy_address(x0,ymin,&lo,&blo);xy_address(x1,ymax,&hi,&bhi);
  if(reference){line_c(x0,y0,dx,dy,sy,color);return;}
  line_step=sy>0?(int)pitch:-(int)pitch;line_major=dx>=dy?dx:dy;
- if(blo!=bhi){
-  if(!draw_offset&&((uint32_t)span_k*1024UL)%pitch==0)line_banks(x0,y0,dx,dy,sy);
-  else line_c(x0,y0,dx,dy,sy,color);
-  return;
+ if(page_fits_bank){
+  /* Standard VGA and each native Trident 640/800 page fit one aperture.
+   * Page selection proved this once; no per-line bounding-bank work. */
+  off=rows[y0].off+draw_offset+((unsigned)x0>>3);b=draw_bank;
+ }else{
+  /* The bounding rectangle, rather than only endpoints, must fit one bank. */
+  ymin=y0<y1?y0:y1;ymax=y0>y1?y0:y1;
+  xy_address(x0,ymin,&lo,&blo);xy_address(x1,ymax,&hi,&bhi);
+  if(blo!=bhi){
+   if(!draw_offset&&((uint32_t)span_k*1024UL)%pitch==0)line_banks(x0,y0,dx,dy,sy);
+   else line_c(x0,y0,dx,dy,sy,color);
+   return;
+  }
+  xy_address(x0,y0,&off,&b);
  }
- xy_address(x0,y0,&off,&b);if(!setbank(b))return;
+ if(!setbank(b))return;
  if(dx>=dy){if(!dy)line_h(off,128U>>(x0&7),dx+1,segment);else if(dy<=((unsigned)dx>>2))line_x_span(off,128U>>(x0&7),dy,dx+1,dx/2,segment);else line_x(off,128U>>(x0&7),dy,dx+1,dx/2,segment);}
  else line_y(off,128U>>(x0&7),dx,dy+1,dy/2,segment);
 }

@@ -11,5 +11,8 @@ wcl -q -cc -za99 -bt=dos -0 -ms -ot -s -fpc -k4096 -w4 -fe=MATMUL.EXE tests/MATM
 wcl -q -cc -za99 -bt=dos -0 -ms -ot -s -fpc -k4096 -w4 -fe=MUSIRQ.EXE tests/MUSIRQ.C MUSIC.C
 wcl -q -cc -za99 -bt=dos -0 -ms -ot -s -fpc -k8192 -w4 -fe=SCENETST.EXE tests/SCENETEST.C VIDEO.C MATH.C MUSIC.C math87.o
 wcl -q -cc -za99 -bt=dos -0 -ms -ot -s -fpc -k8192 -w4 -fe=PAGETEST.EXE tests/PAGETEST.C VIDEO.C MATH.C MUSIC.C math87.o
-rm -f math87.o VIDTEST.o MATHTEST.o MATMUL.o MUSIRQ.o SCENETEST.o PAGETEST.o VIDEO.o MATH.o MUSIC.o
+for cpu in 0 1; do
+ wcl -q -cc -za99 -bt=dos -$cpu -ms -ot -s -fpc -k8192 -w4 -fe=BENCH$cpu.EXE tests/REVIEWBENCH.C VIDEO.C MATH.C MUSIC.C math87.o
+done
+rm -f math87.o REVIEWBENCH.o VIDTEST.o MATHTEST.o MATMUL.o MUSIRQ.o SCENETEST.o PAGETEST.o VIDEO.o MATH.o MUSIC.o
 printf '%s\n' 'DOS test executables built. None is needed to run ORBIT87.EXE.'

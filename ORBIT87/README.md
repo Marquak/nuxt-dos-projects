@@ -1,4 +1,4 @@
-# ORBIT 87 2.0
+# ORBIT 87 2.1
 
 An animated space demo with an AdLib techno soundtrack. It moves through a
 series of scenes, using the 8087 when one is installed. Includes a V20 build
@@ -17,3 +17,7 @@ Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
 and this project's test notes for validation and build dependencies.
 Project-authored material is MIT licensed; see [../LICENSE](../LICENSE) and
 [../THIRD_PARTY.md](../THIRD_PARTY.md) for runtime/dependency terms.
+
+Version 2.1 fixes the statistics toggle while paused and cuts repeated drawing
+and calculation work. The owner reported visibly faster animation on the NuXT.
+Emulator measurements and their limits are in [TESTING.md](TESTING.md).

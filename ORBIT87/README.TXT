@@ -1,4 +1,4 @@
-ORBIT 87 2.0
+ORBIT 87 2.1
 A NuXT space odyssey
 ===================
 
@@ -15,6 +15,14 @@ options. Only your chosen EXE is needed: no graphics or music data files.
 
 Without /AUTO, press ENTER for 640 x 480, 16 colours. The complete show
 lasts about 3 minutes 12 seconds and exits to DOS when finished.
+
+CHANGES IN 2.1
+
+F now updates only the statistics footer, so toggling it while paused
+keeps the scene intact. Statistics redraw only changed character cells.
+The line renderer skips repeated clipping/bank calculations when the
+visible page already proves they are unnecessary. Nebula trails no longer
+use repeated divisions to walk the ring, and unchanged palettes are cached.
 
 LAUNCH OPTIONS
 
@@ -122,11 +130,12 @@ Two 1024x768/16 pages do not fit 512 KB, so the NuXT uses a single page
 at that resolution. Other cards may use VBE page flipping if the BIOS
 and memory checks allow it. Otherwise single-page drawing is retained.
 /SINGLE forces that original path. ORBIT.LOG (/REPORT) records which
-path was selected. Native Trident scanout needs the owner's hardware
-test; the emulator tests validate generic page management and contents.
+path was selected. The owner confirmed double buffering without flicker
+on the NuXT with 2.0. Version 2.1 retains that display-start code; its new
+renderer work has been checked in DOSBox-X and awaits a NuXT test.
 
 Both executables are about 40 KB. Their linked memory images are about
-83 KB, including an 8 KB stack, plus DOS/runtime allocation overhead.
+84 KB, including an 8 KB stack, plus DOS/runtime allocation overhead.
 A normal 640 KB DOS configuration has ample space. No RAM framebuffer
 or full-screen RAM-to-VGA copy is needed for double buffering.
 
@@ -149,7 +158,7 @@ AdLib register writes are cached and pitch words are prepared in advance.
 Animation aims for at most 18.2 updates per second. If several frames
 take too long, the number of particles/grid vertices drops automatically.
 Music and scene timing continue at the same rate. Actual NuXT frame
-rates await the owner's bare-metal test.
+rates depend on the video mode and real hardware.
 
 The second renderer pass, measured at fixed 3000 DOSBox cycles, is about
 11-14% faster on mixed/shallow line tests and 4.7-5.7 times faster on the
@@ -162,6 +171,11 @@ The optional V20 compiler target improved the 100-frame crystal/ocean
 tests by about 7% over the 8088-compatible build, again with identical
 images. Both retain the hand-optimized assembly loops and original 8087
 kernels. Real V20 gains remain a hardware measurement.
+The 2.1 review reduced total rendering time for five identical 60-frame
+scene workloads by about 24% against 2.0 in DOSBox-X (fixed 3000 cycles).
+Both builds produced the same image checksums as before. This is a scene
+workload measurement, not a promised NuXT FPS increase. The soundtrack,
+scene content and animation timing are unchanged.
 See TESTING.md for validation details and remaining hardware checks.
 
 DIAGNOSTIC OPTIONS

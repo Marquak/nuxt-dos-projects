@@ -9,15 +9,15 @@ on a stock 8088/8086. Others take advantage of the V20's extra instructions.
 This collection grew out of trying things on the real machine and fixing
 what didn't work. The test notes say what was checked for each version.
 
-These are the **current versions as of 2026-10-13**. Source, ready-to-run DOS
+These are the **current versions as of 2026-10-15**. Source, ready-to-run DOS
 programs, build scripts and instructions are included. Bring your own DOS.
 There are no commercial OS files, BIOS ROMs or complete games from other
 publishers in here.
 
 | Project | Current release | DOS files to copy | Purpose |
 | --- | --- | --- | --- |
-| [NUXMENU](NUXMENU/) | 1.4 | `MENU.EXE` and `NUI.EXE` together | Organise DOS games and programs into menus and launch them. |
-| [ORBIT87](ORBIT87/) | 2.0 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | An animated space demo with an AdLib techno soundtrack. |
+| [NUXMENU](NUXMENU/) | 1.5 | `MENU.EXE` and `NUI.EXE` together | Organise DOS games and programs into menus and launch them. |
+| [ORBIT87](ORBIT87/) | 2.1 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | An animated space demo with an AdLib techno soundtrack. |
 | [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Fly through an endless field of stars. No sound or text. |
 | [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Falling green characters inspired by The Matrix. |
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Shoot the advancing aliens in an XT take on Space Invaders. |
@@ -27,13 +27,14 @@ publishers in here.
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | A car cruising towards a neon sunset with an AdLib synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Fix the XMS startup error and skip the manual-word check in your US 1.07 copy of Dune II. |
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Check CPU speed, memory, video, ports, BIOS information and drives. |
+| [TEXTMODE](TEXTMODE/) | 1.0 | `TEXTMODE.COM`; optional `IRC50.BAT` | Switch DOS between 25 and 50 text rows without ANSI.SYS. |
 
 ORBIT87 and ORBITV20 share one source tree and are both built by its build
 script. Each program's README.TXT contains
 its controls, switches, supported video modes and hardware caveats.
 
-[Browse screenshots of every project](SCREENSHOTS.md). Each project page
-also has its own screenshot.
+[Browse the screenshot gallery](SCREENSHOTS.md). TEXTMODE is a small
+command-line utility; its page has usage examples.
 
 ## Run
 

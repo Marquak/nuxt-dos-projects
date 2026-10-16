@@ -2,6 +2,15 @@
 #define main menu_main
 #include "UI.C"
 #undef main
+static unsigned char __far *font_ptr(void);
+#pragma aux font_ptr = "push bp" "mov ax,1130h" "mov bh,6" "int 10h" "mov ax,bp" "mov dx,es" "pop bp" value [dx ax] modify [ax bx cx dx es];
+static int fake_x,fake_y,fake_held,fake_wheel,fake_release,fake_rx,fake_ry,fake_api;
+static void __interrupt __far fake_mouse(union INTPACK r){
+ if(r.w.ax==0){r.w.ax=0xffff;r.w.bx=3;}
+ else if(r.w.ax==0x11){r.w.ax=fake_api?0x574d:0;r.w.cx=fake_api?1:0;}
+ else if(r.w.ax==3){r.w.bx=(unsigned)fake_held|((unsigned)(unsigned char)fake_wheel<<8);fake_wheel=0;r.w.cx=fake_x;r.w.dx=fake_y;}
+ else if(r.w.ax==6){r.w.cx=fake_rx;r.w.dx=fake_ry;if(r.w.bx==0){r.w.bx=fake_release;fake_release=0;}else r.w.bx=0;}
+}
 static FILE *report;
 static int checks,failures;
 static void check(int ok,const char *s){checks++;if(!ok){fprintf(report,"FAIL: %s\n",s);failures++;}}
@@ -68,5 +77,80 @@ int main(void){
  {unsigned r[3]={100,100,0};cfg.opt.xmin=cfg.opt.ymin=70;cfg.opt.xmax=cfg.opt.ymax=130;joy_settle=1;joy_old=0;
  check(!joy_action(r,10)&&!joy_settle,"neutral joystick settles");r[1]=50;check(joy_action(r,11)==UP,"joystick up");check(!joy_action(r,12),"joystick repeat delay");check(joy_action(r,16)==UP,"joystick repeat fires");r[1]=100;r[2]=1;check(joy_action(r,17)==13,"button one opens");check(!joy_action(r,18),"held button does not reopen");r[2]=2;check(joy_action(r,19)==BACK_CLICK,"button two goes back");joy_settle=1;check(!joy_action(r,20),"wake held button suppressed");}
  reset();queue(DOWN);queue(DOWN);queue(RIGHT);queue(DOWN);queue(RIGHT);queue(27);settings();check(cfg.opt.clock_on&&!cfg.opt.clock24,"settings cancel restores clock options");
+
+ /* New interactions use actual modal routines, not a second implementation. */
+ reset();queue(13);check(!yesno("Remove?","Test"),"confirmation defaults to Cancel");
+ queue(9);queue(13);check(yesno("Remove?","Test"),"Tab highlights and activates Yes");
+ queue(SHIFT_TAB);queue(13);check(yesno("Remove?","Test"),"Shift-Tab highlights and activates Yes");
+ strcpy(result,"Keep");queue(9);queue(9);queue(13);check(!input("Test","Name",result,sizeof(result)),"input Tab reaches Cancel");
+ strcpy(result,"Clear");queue(SHIFT_TAB);queue(13);queue(13);check(input("Test","Name",result,sizeof(result))&&!result[0],"input Shift-Tab Clear then Save");
+ reset();mkdir("C:\\PICK");mkdir("C:\\OTHER");
+ f=fopen("C:\\PICK\\NEW.EXE","wb");fputs("test",f);fclose(f);
+ queue(F2);check(browse_path(result,"C:\\OTHER",1)&&!strcmp(result,"C:\\OTHER"),"select empty working folder");
+ queue(13);check(browse_path(result,"C:\\PICK",0)&&!strcmp(result,"C:\\PICK\\NEW.EXE"),"program browser starts at entry folder");
+ program(3,0,"Original");
+ {Item e=cfg.item[3],before=cfg.item[3];
+  strcpy(e.program,"C:\\PICK\\OLD.EXE");strcpy(e.cwd,"C:\\OTHER");
+  queue(21);queue('N');queue(9);queue(F2);queue(13);queue('y');queue(SAVE);
+  check(edit_program(&e)&&!strcmp(e.name,"N")&&!strcmp(e.program,"C:\\PICK\\NEW.EXE")&&!strcmp(e.cwd,"C:\\PICK"),"browse preserves edited name and updates working folder on request");
+  check(!memcmp(&cfg.item[3],&before,sizeof(e)),"editor does not commit record before caller saves");
+  e=before;queue('x');queue(27);queue(13);queue(SAVE);
+  check(edit_program(&e)&&!strcmp(e.name,"Originalx"),"discard defaults to Cancel and retains edits");
+  e=before;queue('x');queue(27);queue('y');check(!edit_program(&e)&&!memcmp(&cfg.item[3],&before,sizeof(e)),"confirmed discard leaves stored entry unchanged");
+  e=before;queue(9);queue(F2);queue(27);queue(SAVE);check(edit_program(&e)&&!memcmp(&e,&before,sizeof(e)),"cancel nested browser preserves all entry fields");
+  e=before;strcpy(e.cwd,"C:\\OTHER");queue(9);queue(9);queue(9);queue(9);queue(F2);queue(F2);queue(SAVE);
+  check(edit_program(&e)&&!strcmp(e.cwd,"C:\\OTHER"),"working folder Browse selects directory");
+ }
+ for(layout=0;layout<3;layout++){
+  int sel=0,start=0,page;
+  mode(layout);reset();page=rows-10;bar.capture=0;scrollbar(38,5,page,100,page,0);
+  check(bar_pointer(1,1,38,bar.thumb)==BAR_MOVE&&bar.capture,"thumb press captures scrollbar");
+  check(bar_pointer(1,0,38,100)==BAR_MOVE&&bar.target==100-page,"thumb drag clamps to bottom");
+  pointer_scroll(BAR_MOVE,&sel,&start,100,page,4,5,35);
+  check(start==100-page&&sel>=start&&sel<start+page,"drag keeps selection in viewport");
+  bar.capture=0;scrollbar(38,5,page,100,page,0);
+  check(bar_pointer(1,1,38,5+page-1)==BAR_MOVE&&bar.target==1,"scrollbar down arrow moves one row");
+  bar.capture=0;scrollbar(38,5,page,100,page,0);
+  check(bar_pointer(1,1,38,bar.thumb+bar.size)==BAR_MOVE&&bar.target==page,"scrollbar track pages down");
+  bar.capture=0;start=sel=0;mx=10;my=6;wheel_delta=2;
+  check(pointer_scroll(WHEEL,&sel,&start,100,page,4,5,35)&&start==6,"wheel scrolls three rows per detent");
+  mx=50;check(!pointer_scroll(WHEEL,&sel,&start,100,page,4,5,35)&&start==6,"wheel outside list does nothing");
+  mx=10;wheel_delta=-20;pointer_scroll(WHEEL,&sel,&start,100,page,4,5,35);check(!start,"wheel clamps at top");
+  scrollbar(38,5,page,0,page,0);check(!bar_pointer(1,1,38,6),"empty scrollbar does not capture");
+  for(i=3;i<80;i++)program(i,0,"Many");enter_menu(0,0);selected=70;draw_menu();check(selected>=top&&selected<top+page,"selected entry visible after navigation");
+  check(bar.thumb+bar.size<=bar.y+bar.h-1,"scroll thumb stays inside track");
+  draw_menu();check(!last_writes,"unchanged scrollbar causes no writes");
+  check((frame[1*80+74]&255)!=' '&&(frame[0*80+74]&255)==' ',"clock is centred on three-row header");
+ }
+ reset();program(3,ROOT,"Zulu");program(4,ROOT,"alpha");program(5,ROOT,"Beta");list_menu(3);
+ sort_entries(0,1);check(members[1]==1&&members[2]==0&&members[3]==2&&members[4]==4&&members[5]==5&&members[6]==3,"sort ascending with folders first");
+ check(members[selected]==3&&save_config(home)&&load_config(home)==1,"sorted menu saves without losing selected entry");
+ list_menu(3);sort_entries(1,0);check(members[1]==3&&members[count-1]==4,"descending mixed sort");
+ queue(27);sort_menu();check(members[1]==3,"cancel sort leaves order unchanged");
+ /* Exercise real INT 33 polling with an isolated simulated DOS driver. */
+ {void (__interrupt __far *oldmouse)(void)=_dos_getvect(0x33);
+  _dos_setvect(0x33,fake_mouse);mouse_ok=1;fake_api=1;mode(0);reset();wake_mouse=0;
+  check(wheel_ok,"wheel capability handshake recognized");bar.enabled=0;fake_x=80;fake_y=64;fake_wheel=-2;
+  check(poll_input(0)==WHEEL&&wheel_delta==-2&&mx==10&&my==8,"signed wheel delta and pointer decoded via INT33");
+  check(!poll_input(0),"wheel event consumed once");
+  fake_api=0;mode(0);fake_wheel=3;check(!wheel_ok&&!poll_input(0),"old drivers ignore BH without wheel support");
+  fake_api=1;mode(0);scrollbar(38,5,15,100,15,0);fake_x=38*8;fake_y=bar.thumb*8;fake_held=1;
+  check(poll_input(0)==BAR_MOVE&&bar.capture,"poll captures held thumb");
+  fake_y=18*8;check(poll_input(0)==BAR_MOVE&&bar.target>0,"poll tracks thumb drag");
+  fake_held=0;fake_release=1;fake_rx=38*8;fake_ry=19*8;fake_y=19*8;
+  i=poll_input(0);check((i==0||i==BAR_MOVE)&&!bar.capture&&!fake_release,"release drains drag click without activating entry");
+  check(!poll_input(0),"no leftover click after dragging");
+  scrollbar(38,5,15,100,15,0);fake_release=1;fake_rx=38*8;fake_ry=19*8;
+  check(poll_input(0)==BAR_MOVE&&bar.target==1&&!bar.capture,"quick press-release scroll arrow works between polls");
+  fake_release=1;fake_rx=10*8;fake_ry=8*8;
+  check(poll_input(0)==CLICK,"ordinary list click still reaches UI");
+  _dos_setvect(0x33,oldmouse);mouse_ok=mouse_visible=wheel_ok=mouse_buttons=0;bar.capture=0;
+ }
+ /* Frames for a visual check of the new header, scrollbars and focused form. */
+ mode(0);reset();for(i=3;i<24;i++)program(i,0,"Example program");enter_menu(0,0);draw_menu();
+ f=fopen("MENU.SCR","wb");fwrite(frame,2,2000,f);fclose(f);
+ {Item e=cfg.item[3];queue(9);queue(9);queue(9);queue(9);queue(9);queue(9);queue(9);queue(27);edit_program(&e);}
+ f=fopen("EDIT.SCR","wb");fwrite(frame,2,2000,f);fclose(f);
+ {unsigned char __far *font=font_ptr();f=fopen("FONT.BIN","wb");for(i=0;i<4096;i++)fputc(font[i],f);fclose(f);}
  _ffree(shown);shown=NULL;mode(0);fprintf(report,"UI: %d checks, %d failures\n",checks,failures);fclose(report);return failures!=0;
 }

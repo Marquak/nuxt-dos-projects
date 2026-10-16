@@ -4,11 +4,11 @@
 
 - Open Watcom C/C++ 2.0, Linux x86-64 host tools (`wcl`, `wcc`, `wasm`, `wlink`):
   https://github.com/open-watcom/open-watcom-v2/releases
-- GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS, NUXTDASH and the NUXMENU launcher.
+- GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS, NUXTDASH, TEXTMODE and the NUXMENU launcher.
 - Python 3.10+ for the host utilities, NUXMENU build and DUNE2FIX; Tkinter for NuXTLink.
 - Optional: Pillow to regenerate SUNSET procedural artwork; Furnace to edit
   the included OPL instrument audition. Neither is needed to compile/run DOS binaries.
-- Optional tests: DOSBox, a host C compiler, Xvfb for headless GUI tests, and
+- Optional tests: DOSBox-X, a host C compiler, Xvfb for headless GUI tests, and
   Unicorn for the separate NuXTLink UART emulator test. See each test guide.
 
 Use a toolchain location without spaces. Set WATCOM to the installation root:
@@ -18,7 +18,7 @@ export WATCOM=/path/to/watcom
 sh BUILD_ALL.SH
 ```
 
-This rebuilds all ten DOS projects, including both ORBIT executables,
+This rebuilds all eleven compiled DOS projects, including both ORBIT executables,
 and refreshes NuXTLink's alternate-name binaries. DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
@@ -26,7 +26,8 @@ this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
 For a single project:
 
 ```sh
-(cd NUXTDASH && sh BUILD.SH) # binutils only, no WATCOM required
+(cd TEXTMODE && sh BUILD.SH) # binutils only, no WATCOM required
+(cd NUXTDASH && sh BUILD.SH)
 (cd ORBIT87 && sh BUILD.SH)
 (cd NUXTLINK && sh dos/BUILD.SH)
 ```

@@ -86,3 +86,10 @@ running with our patch applied. Dune II and its artwork/interface remain
 the property of their respective rights holders. That screenshot is
 included to illustrate the fix and is excluded from our MIT license.
 No commercial game executable or data archive is included.
+
+## TEXTMODE
+
+Original assembly, no third-party code incorporated. The BIOS interface and
+[Vidsync source](https://github.com/jhhoward/Vidsync/blob/main/vidsync.s) were
+consulted for mode switching and hook behaviour. GNU binutils is a build tool
+and is not bundled. TEXTMODE does not include Vidsync or mTCP.

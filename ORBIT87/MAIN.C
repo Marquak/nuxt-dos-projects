@@ -24,7 +24,7 @@ static unsigned char wave_a[130],wave_b[130];
 static int xs[641],ys[481],screen_w,screen_h,cx,cy;
 static unsigned stars[28][2],star_ink[28],seed=1987;
 static unsigned detail=2,slow_frames,frame_count,scene_frames[SCENES];
-static unsigned total_notes,pulse,trail_slot,nebula_head,nebula_count;
+static unsigned total_notes,pulse,trail_slot,nebula_head,nebula_count,nebula_capacity;
 static unsigned long dropped_lines,frames_total,render_ticks;
 static unsigned long scene_at,demo_at,scene_duration,limit_ticks;
 static unsigned section,start_section,resolution;
@@ -32,6 +32,8 @@ static int silent,no87,looping,quick,automatic,reference,report,hud,muted,paused
 static int single_page,buffered,musical_timeline;
 static unsigned hud_dirty[2];
 static char hud_text[70];
+static char footer_cache[2][70];
+static unsigned palette_section=NONE,palette_gain,palette_pulse;
 static const unsigned scene_ends[5]={384,768,1024,1536,1792};
 static const unsigned scene_lengths[5]={749,749,499,999,499};
 static volatile int running=1;
@@ -125,6 +127,34 @@ static void present(void)
 static void text(int x,int y,unsigned ink,const char *s,int scale)
 {video_text(xs[x],ys[y],ink,s,scale);}
 
+static void footer_label(char *s)
+{
+ if(hud)sprintf(s,"%s / %s / DETAIL %u",math_uses87()?"8087":"INTEGER",music_present()?"ADLIB":"SILENT",detail+1);
+ else strcpy(s,buffered?"8087 + FM / DOUBLE BUFFERED / 140 BPM":"V20 + 8087 + VGA + FM / 140 BPM");
+}
+/* Each page owns its text history, just like its retained geometry. Clear
+ * only changed character cells, including the tail of a shorter string. */
+static void footer_write(unsigned page,const char *s)
+{
+ unsigned i,oldlen=strlen(footer_cache[page]),len=strlen(s);
+ unsigned limit=(xs[504]-xs[28])/8;char glyph[2];
+ if(limit>=sizeof(footer_cache[page]))limit=sizeof(footer_cache[page])-1;
+ if(len>limit)len=limit;
+ glyph[1]=0;
+ for(i=0;i<oldlen||i<len;i++){
+  char before=i<oldlen?footer_cache[page][i]:' ',after=i<len?s[i]:' ';
+  if(before!=after){glyph[0]=after;video_text(xs[28]+i*8,ys[459],3,glyph,1);}
+ }
+ memcpy(footer_cache[page],s,len);footer_cache[page][len]=0;
+}
+static void toggle_hud(void)
+{
+ unsigned p;char label[70];
+ hud=!hud;footer_label(label);
+ for(p=0;p<(buffered?2U:1U);p++){video_select_page(p);footer_write(p,label);}
+ video_select_page(draw_page);hud_text[0]=0;hud_dirty[0]=hud_dirty[1]=0;
+}
+
 static void status(void)
 {
  text(512,440,11,paused?"PAUSED  ":"        ",1);
@@ -152,6 +182,8 @@ static void scene_palette(unsigned long local)
  unsigned char rgb[48];unsigned i,j,value,gain=64;
  if(local<18)gain=(unsigned)local*64/18;
  if(local+18>scene_duration){unsigned tail=(unsigned)(scene_duration>local?scene_duration-local:0)*64/18;if(tail<gain)gain=tail;}
+ if(palette_section==section&&palette_gain==gain&&palette_pulse==pulse)return;
+ palette_section=section;palette_gain=gain;palette_pulse=pulse;
  for(i=0;i<16;i++)for(j=0;j<3;j++){
   unsigned k=j;
   /* Distinct colour atmospheres, retaining neutral text and navigation. */
@@ -168,7 +200,7 @@ static void scene_palette(unsigned long local)
 
 static void frame(void)
 {
- char buf[50];int i;
+ char buf[70];int i;
  video_clear();
  text(28,18,6,"ORBIT 87",2);
  text(202,25,3,"A NUXT SPACE ODYSSEY",1);
@@ -182,8 +214,7 @@ static void frame(void)
   video_line(xs[x],ys[y],xs[x+dx],ys[y],4);video_line(xs[x],ys[y],xs[x],ys[y+dy],4);
  }
  text(28,440,15,"ESC EXIT   SPACE PAUSE   M MUSIC   N NEXT",1);
- if(hud){sprintf(buf,"%s / %s / DETAIL %u",math_uses87()?"8087":"INTEGER",music_present()?"ADLIB":"SILENT",detail+1);text(28,459,3,buf,1);}
- else text(28,459,3,buffered?"8087 + FM / DOUBLE BUFFERED / 140 BPM":"V20 + 8087 + VGA + FM / 140 BPM",1);
+ footer_label(buf);text(28,459,3,buf,1);
  if(section==4){
   video_text(cx-64,ys[203],6,"NUXT",4);
   video_text(cx-19*4,ys[247],4,"ORIGINAL CODE AND FM",1);
@@ -200,7 +231,7 @@ static void redraw_pages(void)
  page_lines[0]=1;page_lines[1]=2;which=0;
  /* Scene transitions are faded to black before these once-per-act clears.
   * Normal animation only erases the retained geometry on the hidden page. */
- for(p=0;p<(buffered?2U:1U);p++){video_select_page(p);frame();}
+ for(p=0;p<(buffered?2U:1U);p++){video_select_page(p);frame();footer_label(footer_cache[p]);}
  video_show_page(0);draw_page=buffered?1:0;video_select_page(draw_page);
  hud_dirty[0]=hud_dirty[1]=0;hud_text[0]=0;
 }
@@ -210,9 +241,9 @@ static void enter_scene(unsigned next)
  /* 24/24/16/32/16 bars at140 BPM. Automatic changes use the score position,
   * so the breakdown, drop and finale stay aligned despite slow rendering. */
  section=next;scene_at=music_ticks();scene_duration=quick?110UL:scene_lengths[section];
- trail_slot=0;nebula_head=nebula_count=0;
+ trail_slot=0;nebula_head=nebula_count=nebula_capacity=0;
  memset(trail,0,sizeof(trail));memset(nebula,0,sizeof(nebula));
- frame_count=slow_frames=pulse=0;
+ frame_count=slow_frames=pulse=0;palette_section=NONE;
  math_gravity_reset();math_attractor_reset();music_section(section);scene_palette(0);redraw_pages();
 }
 
@@ -304,18 +335,24 @@ static void ocean(unsigned long t)
 static void attractor(unsigned long t)
 {
  unsigned i,n=detail==2?12:detail==1?9:6,cap=detail==2?320:detail==1?224:128;
+ unsigned a,b,split1,split2;
+ /* A detail change uses a different ring modulus. Start a fresh trail
+  * rather than walking old indices with the new capacity. */
+ if(nebula_capacity!=cap){nebula_head=nebula_count=0;nebula_capacity=cap;}
  math_attractor_step(world,n);
  math_matrix((unsigned)(t/8),12,0);math_project(world,projected,n,screen_h,460);
  for(i=0;i<n;i++){
-  nebula[nebula_head]=projected[i];nebula_head=(nebula_head+1)%cap;
+  nebula[nebula_head]=projected[i];if(++nebula_head==cap)nebula_head=0;
   if(nebula_count<cap)nebula_count++;
  }
+ a=nebula_head+cap-nebula_count;if(a>=cap)a-=cap;
+ split1=nebula_count/3;split2=nebula_count*2/3;
  for(i=1;i<nebula_count;i++){
-  unsigned a=(nebula_head+cap-nebula_count+i-1)%cap,b=(a+1)%cap;
-  Vec2 *u=&nebula[a],*v=&nebula[b];
-  if(u->valid&&v->valid)add_line(cx+u->x,cy+u->y,cx+v->x,cy+v->y,i<nebula_count/3?3:i<nebula_count*2/3?8:5);
+  Vec2 *u,*v;b=a+1;if(b==cap)b=0;u=&nebula[a];v=&nebula[b];
+  if(u->valid&&v->valid)add_line(cx+u->x,cy+u->y,cx+v->x,cy+v->y,i<split1?3:i<split2?8:5);
+  a=b;
  }
- if(nebula_count){Vec2 *v=&nebula[(nebula_head+cap-1)%cap];if(v->valid)dot(cx+v->x,cy+v->y,6,1);}
+ if(nebula_count){Vec2 *v=&nebula[nebula_head?nebula_head-1:cap-1];if(v->valid)dot(cx+v->x,cy+v->y,6,1);}
 }
 
 static void arguments(int argc,char **argv)
@@ -356,7 +393,7 @@ int main(int argc,char **argv)
  unsigned i,elapsed;unsigned long last,now,before,local,last_hud=0;int ch,have87,result=0;
  char driver[48],buffer_name[32];
  arguments(argc,argv);have87=!no87&&math_detect();
- puts("\n ORBIT 87 2.0\n A NuXT space odyssey\n");
+ puts("\n ORBIT 87 2.1\n A NuXT space odyssey\n");
  printf(" Build: %s\n",cpu_target);
  printf(" Maths: %s\n",have87?"8087 coprocessor":"integer fallback");
  puts(" Video: VGA 640 x 480 / 16 colours is recommended.");
@@ -387,7 +424,7 @@ int main(int argc,char **argv)
    if(ch==27||ch=='q'||ch=='Q')running=0;
    else if(ch==' '){paused=!paused;music_pause(paused);status_pages();}
    else if(ch=='m'||ch=='M'){muted=!muted;music_mute(muted);status_pages();}
-   else if(ch=='f'||ch=='F'){hud=!hud;redraw_pages();}
+   else if(ch=='f'||ch=='F')toggle_hud();
    else if(ch=='n'||ch=='N'){musical_timeline=0;enter_scene((section+1)%SCENES);last=music_ticks();}
    else if(ch>='1'&&ch<='5'){musical_timeline=0;enter_scene(ch-'1');last=music_ticks();}
   }
@@ -414,7 +451,7 @@ int main(int argc,char **argv)
    sprintf(hud_text,"%s / DETAIL %u / FRAMES %u / NOTES %u    ",have87?"8087":"INTEGER",detail+1,frame_count,music_notes());
    hud_dirty[0]=hud_dirty[1]=1;
   }
-  if(hud&&hud_dirty[draw_page]){video_text(xs[28],ys[459],3,hud_text,1);hud_dirty[draw_page]=0;}
+  if(hud&&hud_dirty[draw_page]){footer_write(draw_page,hud_text);hud_dirty[draw_page]=0;}
   video_show_page(draw_page);
   if(buffered){draw_page^=1;video_select_page(draw_page);}
   now=music_ticks();render_ticks+=now-before;
@@ -422,7 +459,7 @@ int main(int argc,char **argv)
  }
  total_notes=music_notes();now=music_ticks()-demo_at;
  music_stop();_dos_setvect(0x23,old_break);video_close();math_end();
- if(report){FILE *f=fopen("ORBIT.LOG","w");if(f){fprintf(f,"ORBIT 87 2.0\nbuild=%s\nvideo=%s\nbuffering=%s\nresolution=%dx%d\n8087=%d\nreference=%d\nticks=%lu\nframes=%lu\nrender_ticks=%lu\nnotes=%u\ndropped_lines=%lu\nfinal_detail=%u\n",cpu_target,driver,buffer_name,screen_w,screen_h,have87,reference,now,frames_total,render_ticks,total_notes,dropped_lines,detail+1);for(i=0;i<SCENES;i++)fprintf(f,"scene%u=%u\n",i+1,scene_frames[i]);fclose(f);}else{puts("Could not write ORBIT.LOG.");result=1;}}
+ if(report){FILE *f=fopen("ORBIT.LOG","w");if(f){fprintf(f,"ORBIT 87 2.1\nbuild=%s\nvideo=%s\nbuffering=%s\nresolution=%dx%d\n8087=%d\nreference=%d\nticks=%lu\nframes=%lu\nrender_ticks=%lu\nnotes=%u\ndropped_lines=%lu\nfinal_detail=%u\n",cpu_target,driver,buffer_name,screen_w,screen_h,have87,reference,now,frames_total,render_ticks,total_notes,dropped_lines,detail+1);for(i=0;i<SCENES;i++)fprintf(f,"scene%u=%u\n",i+1,scene_frames[i]);fclose(f);}else{puts("Could not write ORBIT.LOG.");result=1;}}
  printf("\nORBIT 87 finished. %lu frames, %u musical notes.\n",frames_total,total_notes);
  puts("Video and timer restored. Thank you for keeping these machines alive.");
  return result;

@@ -16,3 +16,6 @@
 *.png binary
 *.SBI binary
 *.S3M binary
+
+# Keep the ready-to-copy DOS wrapper CRLF even in GitHub ZIP downloads.
+TEXTMODE/*.BAT -text

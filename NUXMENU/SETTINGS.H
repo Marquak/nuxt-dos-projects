@@ -23,7 +23,7 @@ static void calibrate_joy(void){
 }
 static void settings(void){
  unsigned char oldmode=cfg.mode,oldtheme=cfg.theme,oldcolors[8];Options oldopt=cfg.opt;
- int sel=0,start=0,k,i,n,change,page;char b[90];memcpy(oldcolors,cfg.colors,8);
+ int sel=0,start=0,k,i,n,change,page,focus=-1;char b[90];memcpy(oldcolors,cfg.colors,8);
  for(;;){
   page=rows-11;if(page>20)page=20;scroll(&sel,&start,20,page,0);
   desktop("Settings");box(4,3,72,rows-8,"Settings");
@@ -47,13 +47,15 @@ static void settings(void){
    fill(6,5+i,68,1,' ',n==sel?SELECT:PANEL);text(7,5+i,b,65,n==sel?SELECT:PANEL);
    if(n>=12)text(51,5+i," Sample text ",14,n-12);
   }
+  scrollbar(74,5,page,20,page,start);
   text(6,rows-5,"Arrows: select/change   PgUp/PgDn: page (or paper colour)",68,DIM);
   button(1,rows-3,"[Save]",SAVE);button(11,rows-3,"[Cancel]",27);button(23,rows-3,"[^]",UP);button(29,rows-3,"[v]",DOWN);
   button(35,rows-3,"[<]",LEFT);button(41,rows-3,"[>]",RIGHT);button(47,rows-3,"[PgUp]",PGUP);button(56,rows-3,"[PgDn]",PGDN);button(65,rows-3,"[Run]",13);
-  text(2,rows-1,"Enter: change / run   Ctrl-S or F10: save   Esc: cancel",76,TITLE);flush();k=key();
+  text(2,rows-1,"Enter: change / run   Ctrl-S or F10: save   Esc: cancel",76,TITLE);focus_button(focus);flush();k=focus_action(key(),&focus,1);
+  if(pointer_scroll(k,&sel,&start,20,page,6,5,69)){focus=-1;continue;}
   if(k==27||k==BACK_CLICK){cfg.mode=oldmode;cfg.theme=oldtheme;memcpy(cfg.colors,oldcolors,8);cfg.opt=oldopt;joy_settle=1;mode(cfg.mode);return;}
   if(k=='s'||k=='S'||k==F10||k==SAVE){if(commit())return;}
-  if(k==CLICK&&mx>=6&&mx<74&&my>=5&&my<5+page&&start+my-5<20)sel=start+my-5;
+  if(k==CLICK&&mx>=6&&mx<74&&my>=5&&my<5+page&&start+my-5<20){focus=-1;sel=start+my-5;}
   if(k==UP||k==DOWN||k==HOME||k==END||((k==PGUP||k==PGDN)&&sel<12)){scroll(&sel,&start,20,page,k);continue;}
   change=(k==RIGHT||k==13)?1:k==LEFT?-1:0;
   if(sel==0&&change){if(vga){cfg.mode=(unsigned char)((cfg.mode+change+3)%3);mode(cfg.mode);}}

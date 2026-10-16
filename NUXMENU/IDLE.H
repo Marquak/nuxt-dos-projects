@@ -37,32 +37,43 @@ static void time_string(char *s,unsigned hour,unsigned minute,int use24){
 }
 static int clock_draw(int force){
  struct dostime_t t;
- if(!cfg.opt.clock_on){if(force)fill(68,0,11,1,' ',TITLE);clock_hour=-1;return force;}
+ if(!cfg.opt.clock_on){if(force)fill(68,1,11,1,' ',TITLE);clock_hour=-1;return force;}
  _dos_gettime(&t);
  if(force||clock_hour!=t.hour||clock_minute!=t.minute||clock_format!=cfg.opt.clock24){
   char s[12];time_string(s,t.hour,t.minute,cfg.opt.clock24);
-  fill(68,0,11,1,' ',TITLE);text(79-(int)strlen(s),0,s,10,TITLE);
+  fill(68,1,11,1,' ',TITLE);text(79-(int)strlen(s),1,s,10,TITLE);
   clock_hour=t.hour;clock_minute=t.minute;clock_format=cfg.opt.clock24;return 1;
  }return 0;
 }
 /* Input for all screens; joystick navigation is confined to the launcher.
    Mouse movement counts as activity without turning it into an action. */
 static int poll_input(int joystick){
- union REGS r;unsigned k,v[3];unsigned long t=now_ticks();int moved=0;
+ union REGS r;unsigned k,v[3];unsigned long t=now_ticks();int moved=0,held,pressed,event,wheel;
  if(_bios_keybrd(_KEYBRD_READY)){activity_tick=t;click_guard=0;k=_bios_keybrd(_KEYBRD_READ);return (k&255)&&(k&255)!=224?(int)(k&255):(int)(k&0xff00);}
  if(mouse_ok){
   r.x.ax=3;int86(0x33,&r,&r);
-  if((int)r.x.cx!=mouse_lastx||(int)r.x.dx!=mouse_lasty||r.x.bx){activity_tick=t;moved=1;}
+  held=r.h.bl;wheel=wheel_ok?(signed char)r.h.bh:0;pressed=(held&1)&&!(mouse_buttons&1);mouse_buttons=held;
+  mx=r.x.cx/8;my=r.x.dx/8;
+  if((int)r.x.cx!=mouse_lastx||(int)r.x.dx!=mouse_lasty||held||wheel){activity_tick=t;moved=1;}
   mouse_lastx=r.x.cx;mouse_lasty=r.x.dx;
   if(wake_mouse){
-   unsigned held=r.x.bx;
+   unsigned held_buttons=(unsigned)held;
    r.x.ax=6;r.x.bx=0;int86(0x33,&r,&r);r.x.ax=6;r.x.bx=1;int86(0x33,&r,&r);
-   if(!held)wake_mouse=0;
+   if(!held_buttons)wake_mouse=0;
   }else{
+   if(!saver_active){
+    event=bar_pointer(held&1,pressed,mx,my);if(event)return event;
+    if(bar.capture){
+     if(!(held&1)){event=bar_pointer(1,0,mx,my);r.x.ax=6;r.x.bx=0;int86(0x33,&r,&r);bar.capture=0;click_guard=0;return event;}
+     return 0;
+    }
+    if(wheel){wheel_delta=wheel;if(wheel_delta>20)wheel_delta=20;if(wheel_delta< -20)wheel_delta=-20;click_guard=0;return WHEEL;}
+   }
    r.x.ax=6;r.x.bx=1;int86(0x33,&r,&r);if(r.x.bx){activity_tick=t;click_guard=0;return BACK_CLICK;}
    r.x.ax=6;r.x.bx=0;int86(0x33,&r,&r);
    if(r.x.bx){
     activity_tick=t;mx=r.x.cx/8;my=r.x.dx/8;
+    if(!saver_active&&bar_pointer(1,1,mx,my)){bar.capture=0;click_guard=0;return BAR_MOVE;}
     if(click_guard&&mx==guard_x&&my==guard_y&&clock()-guard_time<CLOCKS_PER_SEC/2)return 0;
     click_guard=0;k=(unsigned)hit_button(mx,my);
     if(k!=CLICK&&k!=UP&&k!=DOWN&&k!=PGUP&&k!=PGDN&&k!=LEFT&&k!=RIGHT)guard_click();return k;

@@ -1,8 +1,27 @@
-# Snapshot checks, 2026-10-13
+# Snapshot checks, 2026-10-15
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
+
+## TEXTMODE, NuXT Menu 1.5 and Orbit87 2.1
+
+Added TEXTMODE 1.0, source, reproducible binutils build and an IRCjr wrapper.
+DOSBox-X checks verified 80x50 with an 8x8 font, 80x25 with an 8x16 font,
+invalid/missing arguments and whitespace. The owner confirmed it works on
+the NuXT. FTP text conversion caused extra carriage returns in the batch;
+Binary transfer is documented. The utility is 287 bytes and is not resident.
+
+Updated NuXT Menu to 1.5 and both Orbit87 builds to 2.1 using the tested local
+sources and binaries. The menu development checks passed 179 checks, and
+Orbit's page tests passed 89 checks; their project notes retain details and
+limits. These historical emulator suites were not repeated for publication.
+The owner reported visibly faster Orbit animation on the NuXT.
+
+Other published executables match the current local releases. Existing
+screenshots and newer repository documentation were preserved. Multiplayer
+Tetris and unrelated local projects remain unpublished. Publication checks
+cover file parity, TEXTMODE rebuild, manifest hashes and package integrity.
 
 ## NuXTLink 3.2.1 update and description cleanup
 

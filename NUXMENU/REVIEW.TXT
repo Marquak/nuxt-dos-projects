@@ -1,3 +1,13 @@
+1.5 UI update, 2026-10-13
+Mouse wheel API checked against FDOS/mouse/wheelapi.txt. No external source
+code copied. Polling reads BH only after capability detection, keeps BL
+button state separate, consumes captured scrollbar release events, and
+retains quick clicks through the release-counter path. Scrollbar math uses
+32-bit intermediates for 384-entry lists on a 16-bit compiler.
+
+The RAM shadow still limits video writes to changed cells. Scrollbars,
+clock movement, edit focus and sorting add no resident launcher memory.
+
 NuXT Menu 1.4 - 2026-10-13
 
 User-requested Home/Favourites navigation, joystick launch/back, quieter
