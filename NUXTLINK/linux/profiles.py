@@ -2,18 +2,20 @@
 import json
 import os
 from pathlib import Path
-from link import BAUDS, FLOWS, PEERS, atomic_json
+from link import BAUDS, FLOWS, PEERS, BLOCK_SIZES, atomic_json
 
 DEFAULTS = dict(device='', baud=38400, flow='none', peer='none', block=128,
-                latency=2, com='COM1', local=str(Path.home()), remote='\\')
+                latency=2, compression=True, com='COM1', local=str(Path.home()), remote='\\')
 
 
 def validate(values):
     result = {key: values.get(key, value) for key,value in DEFAULTS.items()}
     if result['baud'] not in BAUDS or result['flow'] not in FLOWS or result['peer'] not in PEERS:
         raise ValueError('Invalid connection profile settings')
-    if result['block'] not in (128,256,512) or result['latency'] not in (0,*range(2,256)):
+    if result['block'] not in BLOCK_SIZES or result['latency'] not in (0,*range(2,256)):
         raise ValueError('Invalid block size or latency')
+    if not isinstance(result['compression'], bool):
+        raise ValueError('Invalid compression setting')
     if result['com'] not in ('COM1','COM2','COM3','COM4'):
         raise ValueError('Invalid DOS COM port')
     if any(not isinstance(result[k], str) for k in ('device','com','local','remote')):

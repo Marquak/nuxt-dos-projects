@@ -1,0 +1,94 @@
+3D CHECKERS 88 1.2.1 - 2026-10-15
+
+FINAL CHECKS
+Open Watcom 2, DOS small memory model, -1 (80186/V20), 8 KB stack.
+Release build compiles without warnings. Separate original-8087 assembly
+uses -fp0 -fpi87, with an integer path when the coprocessor is absent.
+
+Unchanged engine baseline: 813 checks, 0 failures, with AddressSanitizer and UBSan.
+LeakSanitizer was disabled because the host execution environment uses
+ptrace; the checkers engine does not allocate heap memory.
+
+DOSBox-X 2026.10.01: 1150 checks, 0 failures. Includes the shared engine
+checks plus projection, graphics, UI move selection, settings and sound.
+Report: RESULT.TXT. Test runs used temporary files, not user game settings.
+
+Covered: opening move counts through four complete turns (7,49,302,1469),
+forced captures, multi-jump ownership, shorter legal capture routes,
+promotion stopping a chain, backward king moves, no-move positions,
+threefold repetition, quiet-move draw counting, bounded search, original
+board preservation, and deterministic multi-game piece-count invariants.
+
+8087 and integer board projections matched exactly. The FPU control word
+was restored after setup. The release also ran with DOSBox-X fpu=false.
+
+All 64 board cell centres and all cached geometry bounds were checked
+across 24 rotation angles and five elevations (120 views). Off-board
+coordinates were rejected. Keyboard selection completed ordinary moves,
+chained jumps and promotion through the same UI functions used in play.
+A sole destination is focused but never played without confirmation,
+including each leg of a forced chain. Undo covered ordinary turns, a human
+turn plus AI reply, partial/complete multi-jumps, draw-history restoration,
+128-turn ring rollover and the AI opening with a human playing Blue.
+Camera state survived a new game and R restored its default. Music submenu
+navigation, saved independent volumes and migration from 1.0 settings passed.
+
+VGA captures were inspected for the opening board, kings and menu.
+An unchanged board caused zero base/piece/highlight redraws. Cursor/selection
+round trips and drawing/erasing kings across every square restored all
+four VGA planes exactly, checked by whole-screen checksums. An unchanged
+menu was byte-identical. PREVIEW.PNG, KINGS.PNG and DEPTH.PNG are decoded
+VGA captures. New solid-span checks covered single/multiple-byte spans,
+all endpoint alignments, exact plane colours and untouched neighbours.
+Opaque edge drawing restored the normal XOR setup. All 120 camera views
+kept the base inside bounds and exposed only one or two body faces.
+Pieces drawn/erased over the rotated solid frame restored it exactly.
+
+OPL2 detection passed. Timer-driven music advanced while the foreground
+searched or waited. AdLib emulation was enabled with audio sent to a dummy
+host driver; subjective FM timbre and real AdLib volume remain for
+the user's physical test.
+
+Version 1.1 release executable, DOSBox-X AUTOTYPE smoke run: start, select and
+move, undo, rotate/tilt/reset, help, music track/shuffle/volume changes,
+return to menu and confirm exit. It returned
+to DOS, saved a valid configuration, and restored video mode 3 and the
+original INT 08h vector (F000:FEA5 in this emulator). This also exercised
+the integer fallback with fpu=false. The final 1.2 packaged binary also
+passed a launch/rotate/reset/exit smoke check with fpu=false, restoring the
+video mode and timer vector. The successful smoke used two-second key
+spacing; an earlier one-second automated sequence timed out before exit.
+Input queues are cleared before screen redraws, so newly arriving confirmation/menu keystrokes are not discarded.
+
+SOUNDTEST.C exercised the audio player with captured OPL register
+writes: 83 checks, 0 failures. All 2,532 source MIDI note attacks played
+exactly once across the four songs; music never used the FX channel.
+Song boundaries, previous/next wrap, shuffle, hard mute at volume zero,
+independent FX, volume clamping, music off and shutdown had no stuck notes.
+Queued previous/next commands also accumulated and wrapped correctly.
+Peak observed cost was 30 OPL register writes in one 36.4 Hz tick, including
+the exercised controls. No realtime MIDI parsing or disk streaming is used.
+The full playlist is about 8 minutes 12 seconds, including four short gaps.
+
+DOSBox-X was configured at 12000 cycles for these functional checks. That
+setting is not a measurement of a V20. No QEMU or 86Box run was needed.
+
+1.2.1 REVIEW CHECKS
+An extra 100 idle play polls caused zero status-formatting passes or board
+redraws. Another 100 idle menu polls caused zero row-formatting passes.
+Cursor movement updated highlights without reformatting the status area.
+These are work-count checks, not a claim of measured V20 frame rate.
+The final 1.2.1 release also passed launch, rotation/reset, help, menu and
+exit confirmation with fpu=false. Video mode 3 and INT 08h F000:FEA5 were
+restored; DOS returned normally and a 20-byte settings file was saved.
+Simultaneous keyboard and mouse activation performed only one action in
+both the board and menu. Selecting a sole legal move still waited for a
+separate confirmation. The Blue player's initial Undo label showed NONE.
+Board, king, rotated-board, depth and music-menu captures were byte-identical
+to the 1.2 baseline. The main-menu capture uses different test settings.
+
+PHYSICAL CHECKS STILL NEEDED
+NuXT AI response times, real mouse/gameport behaviour, calibration with the
+card's speed dial, and audio balance. Joystick I/O reuses the PIT-timed
+reader already used in NuXTris, but this new game has not been tested on
+the physical NuXT. No claim of measured hardware performance is made.

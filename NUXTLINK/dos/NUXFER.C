@@ -1,4 +1,4 @@
-/* NuXT Link 3.2.1. Open Watcom, 8086 tiny model, DOS 3.31+.
+/* NuXT Link 3.3.1. Open Watcom, 8086 tiny model, DOS 3.31+.
  * The DOS side owns paths and validates every request; the Linux side owns
  * recursion, queues and manifests. No directory tree is held in DOS memory.
  */
@@ -16,7 +16,7 @@
 typedef unsigned char U8;
 typedef unsigned short U16;
 typedef unsigned long U32;
-#define CAP 512
+#define CAP 4096
 #define PATHLEN 66
 #define CACHE "\\NX$CACHE"
 #define SIGN "NuXT Link 2 resume cache\r\n"
@@ -34,7 +34,7 @@ static struct find_t findbuf, original;
 static U32 position, total, scan_to;
 static U16 file_crc, expected_crc;
 static U8 meta[9];
-static unsigned overwrite, old_attr, list_active;
+static unsigned overwrite, old_attr, list_active, upload_verified;
 static unsigned flow, peer, chunksize=128, rx_fault, readpos, readlen;
 static U32 counters[6]; /* CRC, overrun, parity, framing, break, CTS timeout. */
 static unsigned pending, switch_tick, old_speed, old_flow, old_peer, old_chunk;
@@ -66,7 +66,13 @@ static U16 word(const U8 *p){return p[0]|((U16)p[1]<<8);}
 static U32 dword(const U8 *p){return word(p)|((U32)word(p+2)<<16);}
 static void pw(U8 *p,U16 x){p[0]=(U8)x;p[1]=(U8)(x>>8);}
 static void pd(U8 *p,U32 x){pw(p,(U16)x);pw(p+2,(U16)(x>>16));}
-static U16 crc(const U8 *p,unsigned n,U16 c){while(n--)c=(c<<8)^crc_table[(c>>8)^*p++];return c;}
+extern U16 crc_fast(const U8 *p,unsigned n,U16 seed,const U16 *table);
+#pragma aux crc_fast parm [si] [cx] [ax] [di] value [ax] modify [ax bx cx si];
+#define crc(p,n,c) crc_fast((p),(n),(c),crc_table)
+extern unsigned hs_decode(const U8 *p,unsigned n,U8 *out,unsigned size);
+#pragma aux hs_decode parm [si] [cx] [di] [ax] value [ax] modify [ax bx cx dx si di];
+extern unsigned uart_tx_fill(unsigned port,const U8 *p,unsigned n,unsigned mask);
+#pragma aux uart_tx_fill parm [dx] [si] [cx] [bx] value [ax] modify [ax cx dx si di];
 static unsigned ticks(void){return *(volatile U16 __far *)MK_FP(0x40,0x6c);}
 static void keys(void){
     if(*(U16 __far *)MK_FP(0x40,0x1a)!=*(U16 __far *)MK_FP(0x40,0x1c)){
@@ -89,13 +95,19 @@ static int receive(void){
     }while((unsigned)(ticks()-start)<18);
     return -1;
 }
-static int transmit(U8 b){
-    unsigned start=ticks(),mask=peer|(flow?0x10:0);
-    do{
-        if((status()&0x20)&&((inp(base+6)&mask)==mask)){outp(base,b);return 1;}
+static int transmit(const U8 *p,unsigned n){
+    unsigned start=ticks(),mask=peer|(flow?0x10:0),count,sent,capacity=fifo?16:1;
+    while(n){
+        /* THRE means FIFO empty, so at most 16 writes are safe. The assembly
+         * loop still checks CTS/required peer signals before each write. */
+        if(status()&0x20){
+            count=n<capacity?n:capacity;sent=uart_tx_fill(base,p,count,mask);
+            if(sent){p+=sent;n-=sent;start=ticks();continue;}
+        }
         keys();if(quitting)return 0;
-    }while((unsigned)(ticks()-start)<36);
-    counters[5]++;return 0;
+        if((unsigned)(ticks()-start)>=36){counters[5]++;return 0;}
+    }
+    return 1;
 }
 static int drain(void){
     unsigned start=ticks();
@@ -139,12 +151,12 @@ static int frame(void){
     if(crc(req,n+4,0xffff)!=check){counters[0]++;return 0;}return 1;
 }
 static int send(void){
-    unsigned i,n=word(reply+4)+6;pw(reply+n,crc(reply+2,n-2,0xffff));
-    for(i=0;i<n+2;i++)if(!transmit(reply[i]))return 0;return drain();
+    unsigned n=word(reply+4)+6;pw(reply+n,crc(reply+2,n-2,0xffff));
+    if(!transmit(reply,n+2))return 0;return drain();
 }
 static void error(const char *s){reply[2]=255;pw(reply+4,strlen(s));strcpy((char *)reply+6,s);}
 static void ioerror(unsigned e){char s[100];sprintf(s,"DOS error %u (path, disk full, protection or I/O failure)",e);error(s);}
-static void pause_file(void){if(handle>=0){_dos_close(handle);handle=-1;}active=0;list_active=0;readpos=readlen=0;}
+static void pause_file(void){if(handle>=0){_dos_close(handle);handle=-1;}active=0;list_active=0;readpos=readlen=0;upload_verified=0;}
 static int name_ok(const char *s){
     unsigned n=0,e=0,dot=0;char stem[9];U8 ch;
     while((ch=(U8)*s++)!=0){
@@ -237,6 +249,7 @@ static void scan_reply(int upload){
     if(n){e=_dos_read(handle,block,n,&got);if(e||got!=n){ioerror(e?e:5);pause_file();return;}
         file_crc=crc(block,n,file_crc);position+=n;}
     if(position==scan_to){
+        if(active==6)upload_verified=1;
         if(active==3){_dos_close(handle);handle=-1;active=0;}
         else active=upload?1:2;
     }
@@ -276,7 +289,8 @@ static void put_begin(unsigned n){
         e=save_record();if(e){remove_owned(part);ioerror(e);return;}
     }
     e=_dos_open(part,O_RDWR,&handle);if(e){ioerror(e);return;}
-    scan_to=(U32)lseek(handle,0,SEEK_END);lseek(handle,0,SEEK_SET);
+    scan_to=(U32)lseek(handle,0,SEEK_END);
+    if(lseek(handle,0,SEEK_SET)<0){error("Cannot seek upload staging file");pause_file();return;}
     if(scan_to>total){error("Retained partial is longer than source; discard partials before retrying");pause_file();return;}
     position=0;file_crc=0xffff;active=4;
     pd(reply+6,scan_to);pw(reply+4,4);
@@ -284,6 +298,7 @@ static void put_begin(unsigned n){
 static void put_end(unsigned n){
     unsigned e,a;U16 c;int had_old=0;
     if(active!=1||n!=2){error("No upload is ready");return;}
+    if(!upload_verified){error("Verify the staged upload before committing");return;}
     c=word(req+4);
     if(position!=total||c!=file_crc||c!=expected_crc){error("Upload size or whole-file CRC mismatch; partial retained");pause_file();return;}
     e=_dos_setftime(handle,word(meta+4),word(meta+6));if(_dos_close(handle)&&!e)e=5;handle=-1;active=0;
@@ -351,7 +366,7 @@ static void info_reply(void){
     union REGS r;unsigned i;U32 unit,freebytes=0,totalbytes=0;
     r.h.ah=0x36;r.h.dl=drive-'A'+1;intdos(&r,&r);
     if(r.x.ax!=0xffff){unit=(U32)r.x.ax*r.x.cx;freebytes=unit*r.x.bx;totalbytes=unit*r.x.dx;}
-    reply[6]=3;reply[7]=(U8)com;reply[8]=(U8)speed;reply[9]=(U8)flow;
+    reply[6]=6;reply[7]=(U8)com;reply[8]=(U8)speed;reply[9]=(U8)flow;
     reply[10]=(U8)peer;reply[11]=(U8)fifo;reply[12]=(U8)inp(base+6);reply[13]=(U8)inp(base+4);
     for(i=0;i<6;i++)pd(reply+14+i*4,counters[i]);
     pd(reply+38,freebytes);pd(reply+42,totalbytes);pw(reply+46,CAP);pw(reply+48,chunksize);
@@ -445,7 +460,8 @@ static void dispatch(void){
     case 0x40:if(n){error("Invalid diagnostics request");break;}info_reply();break;
     case 0x43:clock_command(n);break;
     case 0x41:
-        if(n!=9||p[0]>7||p[1]>1||(p[2]&~0xa0)||(word(p+3)!=128&&word(p+3)!=256&&word(p+3)!=512)){
+        if(n!=9||p[0]>7||p[1]>1||(p[2]&~0xa0)||word(p+3)>CAP||
+           (word(p+3)!=128&&word(p+3)!=256&&word(p+3)!=512&&word(p+3)!=2048&&word(p+3)!=4096)){
             error("Invalid connection settings");break;
         }
         if(active||pending){error("Settings can change only while idle");break;}
@@ -462,7 +478,7 @@ static void dispatch(void){
     case 0x50:delete_entry(n);break;
     case 0x51:rename_entry(n);break;
     case 1:
-        pause_file();sprintf((char *)reply+6,"NUXTLINK/3 %c:\\ file server",drive);pw(reply+4,strlen((char *)reply+6));break;
+        pause_file();sprintf((char *)reply+6,"NUXTLINK/6 %c:\\ file server",drive);pw(reply+4,strlen((char *)reply+6));break;
     case 0x30:pause_file();break;
     case 0x31:
     case 0x32:
@@ -512,10 +528,29 @@ list_result:
     case 0x13:
         if(n||active!=4){error("No upload resume scan is active");break;}scan_reply(1);break;
     case 0x10:put_begin(n);break;
+    case 0x15:
+        if(n||(active!=1&&active!=6)){error("No upload is ready for verification");break;}
+        if(active==1){
+            if(position!=total||file_crc!=expected_crc){error("Upload is incomplete or CRC differs");break;}
+            /* Close/reopen flushes DOS's handle buffers. Scan in bounded chunks,
+             * before the original destination is renamed or replaced. */
+            e=_dos_close(handle);handle=-1;
+            if(!e)e=_dos_open(part,O_RDWR,&handle);
+            if(e){ioerror(e);pause_file();break;}
+            scan_to=total;position=0;file_crc=0xffff;upload_verified=0;active=6;
+        }
+        scan_reply(1);break;
+    case 0x14:
+        if(active!=1||n<5||!word(p)||word(p)>chunksize||position+word(p)>total){error("Invalid compressed upload block");break;}
+        if(!hs_decode(p+4,n-4,block,word(p))||crc(block,word(p),0xffff)!=word(p+2)){
+            error("Compressed upload data failed verification");break;
+        }
+        n=word(p);p=block;
+        /* Fall through: same write, rolling CRC and resume accounting. */
     case 0x11:
         if(active!=1||!n||position+n>total){error("Invalid upload block or no upload active");break;}
         e=_dos_write(handle,p,n,&got);if(e||got!=n){ioerror(e?e:112);pause_file();break;}
-        file_crc=crc(p,n,file_crc);position+=n;break;
+        file_crc=crc(p,n,file_crc);position+=n;upload_verified=0;break;
     case 0x12:put_end(n);break;
     case 0x21:
         if(n||active!=2){error("No download is ready");break;}
@@ -558,7 +593,9 @@ int main(int argc,char **argv){
             else if(!stricmp(argv[i]+6,"DCD"))peer=128;else if(!stricmp(argv[i]+6,"BOTH"))peer=160;else goto usage;
         }else if(!strnicmp(argv[i],"/BLOCK:",7)){
             if(!strcmp(argv[i]+7,"128"))chunksize=128;else if(!strcmp(argv[i]+7,"256"))chunksize=256;
-            else if(!strcmp(argv[i]+7,"512"))chunksize=512;else goto usage;
+            else if(!strcmp(argv[i]+7,"512"))chunksize=512;
+            else if(!strcmp(argv[i]+7,"2048"))chunksize=2048;
+            else if(!strcmp(argv[i]+7,"4096"))chunksize=4096;else goto usage;
         }else {for(j=0;j<8;j++)if(!strcmp(argv[i],bauds[j]))break;if(j==8)goto usage;speed=j;}
     }
     r.h.ah=0x30;intdos(&r,&r);if(r.h.al<3||(r.h.al==3&&r.h.ah<31)){puts("DOS 3.31 or later required.");return 1;}
@@ -566,7 +603,7 @@ int main(int argc,char **argv){
     base=*(U16 __far *)MK_FP(0x40,(com-1)*2);if(!base){puts("COM port is not present in the BIOS table.");return 1;}
     old24=_dos_getvect(0x24);_dos_setvect(0x24, (void (__interrupt __far *)(void))MK_FP(code_segment(),(unsigned)critical));
     uart_open();reply[0]='N';reply[1]='X';
-    printf("\nNUXT LINK 3.2.1 - entire %c:\\ drive\n",drive);
+    printf("\nNUXT LINK 3.3.1 - entire %c:\\ drive\n",drive);
     show_settings();
     puts("Files, folders, hidden/system files and DOS metadata.\nEsc exits. Idle keys: B baud, F flow, D peer lines, C COM, S status.\nPartials survive disconnects. Defaults: COM1 9600 /FLOW:NONE.");
     last_tick=ticks();
@@ -593,6 +630,9 @@ int main(int argc,char **argv){
             dispatch();memcpy(prev,req,word(req+2)+4);cached=1;
         }
         if(send()){
+            /* At 1200 baud a 4 KiB reply exceeds the 30-second idle limit.
+             * Time spent transmitting is activity, not an idle peer. */
+            last_tick=ticks();
             if(pending==3){pending=1;switch_tick=ticks();}
             else if(pending==4)pending=0;
         }else if(pending==3){pending=0;cached=0;}else if(pending==4){pending=2;cached=0;}
@@ -601,6 +641,6 @@ int main(int argc,char **argv){
     pause_file();uart_close();_dos_setvect(0x24,old24);puts("\nStopped. UART restored; resumable partials retained.");return 0;
 usage:
     puts("NUXFER [COM1..COM4] [1200..115200] [/FLOW:NONE|RTSCTS]\n"
-         "       [/PEER:NONE|DSR|DCD|BOTH] [/BLOCK:128|256|512]\n"
+         "       [/PEER:NONE|DSR|DCD|BOTH] [/BLOCK:128|256|512|2048|4096]\n"
          "Defaults: COM1 9600 /FLOW:NONE /PEER:NONE /BLOCK:128");return 1;
 }

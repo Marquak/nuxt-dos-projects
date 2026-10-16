@@ -1,0 +1,70 @@
+3D CHECKERS 88 - MUSIC SOURCES AND LICENCES
+
+These four pieces were converted from the Mutopia Project's MIDI files.
+The original MIDI and LilyPond files are included beside this document.
+No recording or sampled instrument is included. The player uses an original
+OPL2 piano-style patch with up to eight music voices and a separate FX voice.
+
+1. THE BLUE DANUBE WALTZ, MAIN THEME - Johann Strauss Jr., Op. 314
+   Arrangement/typesetting: Nikos Kouremenos, 2005-2014.
+   Based on Christian Mondrup's four-hand piano reduction from the
+   Werner Icking Music Archive. The upstream arrangement transposes the
+   theme to C major and simplifies it. It is not the complete orchestral work.
+   Copyright (c) The Mutopia Project and Nikos Kouremenos, 2005-2014.
+   Mutopia-2014/03/24-519. Creative Commons Attribution-ShareAlike 4.0.
+   https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=519
+   https://www.mutopiaproject.org/ftp/StraussJJ/O314/blue_danube/
+   https://creativecommons.org/licenses/by-sa/4.0/
+   Files: blue_danube.ly, blue_danube.mid; MUSIC.H tune0.
+   The converted tune0 data and our musical adaptation retain CC BY-SA 4.0.
+
+2. FUR ELISE - Ludwig van Beethoven, WoO 59
+   Typesetting: Stelios Samelis. Source: Breitkopf & Haertel, 1888.
+   Mutopia-2015/08/18-931. Placed in the public domain by the typesetter.
+   https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=931
+   https://www.mutopiaproject.org/ftp/BeethovenLv/WoO59/fur_Elise_WoO59/
+   Files: fur_Elise_WoO59.ly, fur_Elise_WoO59.mid; MUSIC.H tune1.
+
+3. MOONLIGHT SONATA, FIRST MOVEMENT - Ludwig van Beethoven, Op. 27 No. 2
+   Typesetting: Stewart Holmes, copyright 2007.
+   Source: Berners, 1908, edited by A. Winterberger.
+   Mutopia-2007/02/11-276. Creative Commons Attribution-ShareAlike 2.5.
+   https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=276
+   https://www.mutopiaproject.org/ftp/BeethovenLv/O27/moonlight/
+   https://creativecommons.org/licenses/by-sa/2.5/
+   Files: moonlight1.ly (upstream moonlight1-a4.ly), moonlight1.mid;
+   MUSIC.H tune2. The complete first movement is used.
+   The converted tune2 data and our musical adaptation retain CC BY-SA 2.5.
+
+4. ODE TO JOY - Ludwig van Beethoven, four-part hymn arrangement
+   Typesetting: Peter Chubb. Mutopia-2009/08/05-528.
+   Placed in the public domain by the typesetter.
+   https://www.mutopiaproject.org/ftp/BeethovenLv/ode/
+   Files: ode.ly, ode.mid; MUSIC.H tune3.
+
+CHANGES FOR THE GAME
+Converted by ChatGPT (GPT-6 Astra / Codex) for this project, 2026-10-15.
+The MIDI note times are rounded to the 36.4 Hz PIT clock. All note attacks
+are retained, including both hands and harmony; maximum simultaneous voices
+in these sources is six. MIDI velocity becomes FM carrier attenuation.
+Sustain-pedal commands are replaced by the FM envelope's release, and the
+piano/hymn sound is replaced by the game's original FM piano instrument.
+A two-second breath is added after each piece before the next track.
+No musical endorsement by the composers, editors or Mutopia is implied.
+
+Approximate durations before the two-second gap:
+  Blue Danube theme 39 seconds; Fur Elise 2:10; Moonlight I 4:36;
+  Ode to Joy 38 seconds. The playlist loops, or advances in shuffled order.
+
+REBUILD
+  python3 MUSIC/CONVERT.PY
+This regenerates MUSIC.H with the Python standard library only. Checks in
+the converter reject an out-of-range note, voice stealing or excess events
+per tick. No MIDI player, external music file or tracker is needed in DOS.
+
+LICENSING SCOPE
+The programme, converter and original FM patches remain MIT-licensed.
+The named musical data above are separate assets under their stated terms,
+including their embedded forms in CHECK88.EXE. Keep these credits and the
+relevant licence links when redistributing the game or its musical data.
+The main LICENSE.TXT does not relicense the third-party music.

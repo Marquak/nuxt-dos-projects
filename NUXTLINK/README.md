@@ -1,43 +1,47 @@
-# NuXT Link 3.2.1
+# NuXT Link 3.3.3
 
 Move files between Linux and DOS over a serial cable. Browse folders, queue
 transfers and back up a DOS drive without swapping cards or floppies. Transfers
 are verified and preserve DOS timestamps and attributes. There's also a button
 to set the DOS clock from Linux.
 
-![Linux client with an example transfer queue and the Sync DOS Date/Time button.](SCREENSHOT.PNG)
-
-*Linux client with an example transfer queue and the Sync DOS Date/Time button.*
-
 The DOS server runs on an 8088/8086 or V20. The Linux client needs Python 3.10+
-and Tkinter, with no pip packages to install.
+and Tkinter, with no pip packages to install. The included native Linux helper
+handles upload compression; its source and build script are included.
 
 ## Upgrade and start
 
-Replace the complete Linux folder and restart the client. Saved profiles still
-work. Copy `NUX321.COM` to DOS using your current server, disconnect, then press Esc on DOS before starting the new
-server. The versioned filename lets you keep the old program as a fallback.
+3.3.3 fixes reconnecting when the previous DOS folder no longer exists, and
+includes the 3.3.2 disconnect/shutdown fixes. If you already have the 3.3.1 DOS
+server, just restart the Linux client. The included `NUXFER.COM` is unchanged.
+
+Stop the running DOS server before replacing `NUXFER.COM`. Copy the new file
+using FTP in binary mode. If transferring through NuXTLink itself, send it as
+`NUXNEW.COM` first, disconnect and exit the server, then replace `NUXFER.COM`
+with that file. Restart the Linux client and run the new DOS server. Saved
+profiles still work. When upgrading from before 3.3.1, update both programs.
 
 ```dos
-C:\NET\NUX321 COM1
+C:\NET\NUXFER COM1
 ```
 
 Use the actual directory where you copied it. The server starts at **9600 baud**
 for the initial handshake. In Linux, keep your preferred transfer settings,
-for example **115200, rtscts, peer both, block 512** with your full-handshake
+for example **115200, rtscts, peer both, block 2048** with your full-handshake
 cable. Connect negotiates those settings after finding the server.
 
 ```sh
 sh linux/launch.sh
 ```
 
-`NUXFER.COM`, `NUXFER32.COM`, `NUX321.COM` and `dos/NUXFER.COM` are identical.
-The folder and older aliases are retained so existing launchers keep working.
-Update both sides for date/time sync. The wire protocol remains v3; versions
-1 and 2 need both sides upgraded. No floppy image is included in this release.
+`NUXFER.COM` in this folder is the current DOS server. Versioned aliases and
+the duplicate binary under `dos/` have been removed. This repository uses `NUXTLINK`; the local release folder may still be named
+`NUXTLINK32` to preserve existing Linux launchers.
+This release uses wire protocol v6, introduced in 3.3.1, and does not connect to
+earlier protocol versions. No floppy image is included.
 
 The server shares the **whole drive containing its executable**. Launching
-`C:\NET\NUX321` from an `A:\` prompt shares `C:\`. Launching the floppy copy
+`C:\NET\NUXFER` from an `A:\` prompt shares `C:\`. Launching the floppy copy
 shares `A:\`. The Linux browser starts at that drive's root.
 
 Choose the serial device before Connect. A USB-to-RS-232 adapter and null-modem
@@ -53,6 +57,100 @@ Connection options reveals peer checks, packet size, FTDI latency and the DOS
 port reminder. Changes stay marked pending until Apply changes succeeds.
 Diagnostics shows individual UART/error counters and handshake lines.
 
+## Larger transfer blocks
+
+In Connection options, set **Block bytes** to **2048** and click **Apply changes**
+(or Connect if disconnected). Try **4096** afterward and compare a large file
+at the same baud rate. Save the profile to keep your choice. Existing profiles
+retain their selected size, so a saved 512-byte setting stays at 512 until edited.
+The connected status shows the actual block size confirmed by DOS.
+
+Larger blocks need fewer request/acknowledgement exchanges and fewer DOS file
+writes. They work for both upload and download. Frame CRC, whole-file checks,
+retry protection and verified resume still apply. Interrupted transfers can
+resume with a different block size. The 128/256/512 options remain useful on
+noisy links or at low baud rates.
+
+The baud rate and 8N1 framing are unchanged. At 115200 the raw ceiling is
+11.25 KiB/s before protocol overhead. Raw transfers remain below that
+ceiling. In the owner's earlier 3.2.2 floppy-image test, 2048-byte blocks sustained about
+7.8-8 KiB/s and 4096-byte blocks about 8.5 KiB/s. Results depend on the file
+and setup. The larger DOS buffers add 10.5 KiB of RAM while the server is running. Nothing stays resident
+when it exits. This update contains no FastLynx, Kermit or ZMODEM code.
+
+## Compression and faster serial handling
+
+**Compress uploads** is enabled by default and saved in connection profiles.
+It applies when the next queue starts, without renegotiating the connection.
+Linux compresses each block with heatshrink; DOS expands it before writing.
+A block is compressed only if its payload saves at least 25% and 32 bytes,
+including its four-byte length/checksum header. Everything else goes raw.
+Already-compressed games, archives and disk images may gain little. An image
+with unused zero-filled space can compress much better.
+
+Each block starts fresh, so retries and resumed files do not depend on an old
+compression dictionary. Packet CRC and decoded-block CRC remain enabled.
+Before committing an upload, DOS closes/reopens the staging file and reads it
+back in 4 KiB steps. Both ends check its whole-file CRC before the destination
+is replaced. This readback step was added in 3.3.1: earlier releases checked the
+received data's rolling CRC but did not actually reread the staged DOS file.
+Metadata verification remains enabled. Invalid compressed data is rejected
+before a DOS write. Resume can change both block size and compression setting.
+The decompressor is assembly and reuses the existing 4 KiB disk buffer as its
+history, adding no second window buffer. Compression is Linux-to-DOS only;
+DOS downloads remain raw to avoid compression work on the V20.
+
+The CRC routine now runs in assembly. DOS transmission fills up to 16 bytes
+when the UART FIFO is empty, checking the configured CTS/DSR/DCD signals before
+each byte. Non-FIFO UARTs still receive one byte at a time. ESC, timeouts and
+waiting for the final byte to leave the UART remain in place. FIFO batching
+mainly benefits downloads; uploads benefit from compression and faster CRCs.
+
+Displayed **file KiB/s** measures original file data, so a compressed upload can
+exceed the 11.25 KiB/s raw serial ceiling at 115200 baud. Double-click a completed
+upload to see compressed/raw block counts and payload bytes saved. Reports
+also retain those counts. Payload totals exclude frame headers, ACKs and retries;
+they are not a complete wire-traffic measurement. No NuXT speed claim is made
+until this version is measured on hardware.
+
+For a useful comparison, send the same large file with compression on and off,
+using 4096-byte blocks and the same baud/flow settings. Use Overwrite and turn
+off Verify & skip unchanged for this comparison, or the second run may just
+verify the existing file. A completed upload has no retained partial to resume.
+
+The supplied `_heatshrink.so` is built for x86-64 Linux. To rebuild it on another
+Linux system, install a C compiler and run from this release folder:
+
+```sh
+sh linux/build_codec.sh
+```
+
+If the helper cannot load, the client reports the problem. Uncheck Compress
+uploads to transfer raw while fixing it. Command-line overrides are
+`--compression` and `--no-compression`. See
+[third-party sources and licensing](third_party/heatshrink/README.md).
+No FastLynx code is included.
+
+## Completed transfer details
+
+The queue shows **Time** and **Compression** after each file completes. Both
+columns can be sorted numerically. Double-click an entry for the full details;
+the same results are saved in the transfer and queue reports.
+
+Time counts active work for that file, including preparation, resume checks,
+retries and final verification. It excludes waiting behind other files and
+pauses between queue runs. If you retry a failed or cancelled job in the same
+queue, its active time is accumulated. Clearing and rebuilding the queue starts
+new timings. Skipped entries and folders have no transfer time or ratio.
+
+Compression is original file bytes divided by acknowledged upload payload
+bytes. For example, `2.00:1 (50% saved)` means half as many payload bytes were
+sent. It includes compressed-block headers, but excludes framing, ACKs and
+retransmissions. For a resumed upload, the ratio covers only the final successful
+attempt's newly transferred portion, not the retained prefix or earlier attempts.
+Raw uploads show `1.00:1 (0% saved)`; downloads show `Raw`. Empty files and files
+already fully staged are labelled instead of showing an undefined ratio.
+
 ## Sync DOS date/time
 
 Click **Sync DOS Date/Time** beside Diagnostics while connected and idle.
@@ -67,10 +165,6 @@ attributes. The DOS date range is 1980-2099; invalid values are rejected before
 any change. Expect normal DOS clock resolution and serial latency, not exact
 subsecond synchronization.
 
-Both sides need this update. Older v3 servers can still transfer files, but the
-button explains that the DOS server needs updating. Upload `NUX321.COM` beside
-your old server, disconnect, exit the old server with Esc and run `NUX321 COM1`.
-Restart the Linux client to load the updated UI.
 
 The server uses DOS's date/time APIs, which also update the hardware clock on
 supported DOS/BIOS systems. RTC persistence depends on the BIOS and clock driver;
@@ -78,16 +172,23 @@ it has not been verified on the physical NuXT for this release.
 
 ## Connection settings and full-handshake cables
 
-Start DOS with `NUX321 COM1` for a 9600-baud handshake. The client tries
+Start DOS with `NUXFER COM1` for a 9600-baud handshake. The client tries
 9600 first, then the selected speed and other supported speeds if needed. This
-also finds an older server, a manually selected baud, or a server left at its
-transfer speed after a crash. Discovery can take longer in those cases.
+also finds a server at a manually selected baud, or one left at its
+transfer speed after disconnecting. Discovery can take longer in those cases.
 The DOS COM port must already be the one physically connected to the cable.
 
-Normal Disconnect returns the DOS server to 9600, no flow/peer requirements,
-and 128-byte blocks before closing. Your selected transfer settings remain in
-the GUI. If reset cannot be confirmed, the client reports it; subsequent
-connection discovery can find the retained speed.
+Disconnect stays available during an operation. It stops pending work, gives
+the DOS pause command one short attempt, then releases the Linux serial port.
+A missing DOS server or serial cleanup error no longer blocks disconnection
+or triggers repeated shutdown attempts. Queue entries and partials are retained.
+Window close uses the same cleanup. A running DOS server keeps its current
+settings; Connect finds that speed again. Restarting the DOS program still
+starts it at 9600 by default.
+
+If the previous DOS folder is no longer available when connecting, the browser
+opens the drive root and reports that change. Connection failures still report
+normally. Queued source and destination paths are never changed by this fallback.
 
 For the full-handshake cable, use **flow rtscts**, initially **peer none**. The
 optional peer choices `dsr`, `dcd`, `both` require those readiness inputs before
@@ -117,7 +218,8 @@ NUXFER COM1 38400 /FLOW:NONE /PEER:NONE
 ```
 
 `/PEER:` accepts `NONE`, `DSR`, `DCD`, `BOTH`. `/BLOCK:` accepts `128`, `256`,
-`512`. Defaults are COM1, 9600, no flow control, no required peer lines, 128.
+`512`, `2048` and `4096`. Defaults are COM1, 9600, no flow control, no required
+peer lines, 128.
 The 128-byte default is suitable for the original three-wire setup; larger
 blocks are optional. Packet CRC and whole-file verification always apply.
 
@@ -303,8 +405,10 @@ mouse conversion. Server COM addresses come from the BIOS data area. The UART
 is polled, with a FIFO enabled if detected. Packet headers/bodies are captured
 by a bounded 8086 assembly loop; interrupts stay enabled and no DOS/BIOS calls
 occur inside that loop. CRC calculation runs after reception with RTS low.
-Escape is checked between packets; at 1200 baud a 512-byte packet takes about
-4.3 seconds to finish, and a stalled packet has a one-second inter-byte timeout. On exit the saved baud, line-control,
+Escape is checked between packets. At 115200 baud a 4096-byte packet takes
+about 0.36 seconds on the wire; at 1200 it takes about 34 seconds. Use smaller
+blocks at very low baud rates for more responsive cancellation. A stalled
+packet has a one-second inter-byte timeout. On exit the saved baud, line-control,
 modem-control and interrupt-enable registers are restored; the FIFO is disabled.
 **Esc** exits; idle keys **B**, **F**, **D**, **C**, **S** change baud, toggle
 RTS/CTS, toggle required DSR+DCD, cycle present COM ports, or print status.
@@ -326,8 +430,7 @@ The disk and DOS environment must remain available during transfers.
 
 ## Build and test
 
-`dos/NUXFER.COM`, `NUXFER.COM`, `NUXFER32.COM` and `NUX321.COM` are the same
-compiled server.
+The build writes `NUXFER.COM` into the release folder, alongside this readme.
 Build from source with Open Watcom:
 
 ```sh

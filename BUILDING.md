@@ -5,6 +5,7 @@
 - Open Watcom C/C++ 2.0, Linux x86-64 host tools (`wcl`, `wcc`, `wasm`, `wlink`):
   https://github.com/open-watcom/open-watcom-v2/releases
 - GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS, NUXTDASH, TEXTMODE and the NUXMENU launcher.
+- A host C compiler (`cc`) for NuXTLink's native heatshrink helper.
 - Python 3.10+ for the host utilities, NUXMENU build and DUNE2FIX; Tkinter for NuXTLink.
 - Optional: Pillow to regenerate SUNSET procedural artwork; Furnace to edit
   the included OPL instrument audition. Neither is needed to compile/run DOS binaries.
@@ -18,8 +19,8 @@ export WATCOM=/path/to/watcom
 sh BUILD_ALL.SH
 ```
 
-This rebuilds all eleven compiled DOS projects, including both ORBIT executables,
-and refreshes NuXTLink's alternate-name binaries. DUNE2FIX is a Python script;
+This rebuilds all twelve compiled DOS projects, including both ORBIT executables,
+and NuXTLink's native Linux compression helper. DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
 
@@ -32,9 +33,9 @@ For a single project:
 (cd NUXTLINK && sh dos/BUILD.SH)
 ```
 
-After a NuXTLink-only build, `dos/NUXFER.COM` is authoritative; copy it to
-`NUXTLINK/NUX321.COM`, `NUXTLINK/NUXFER32.COM` and `NUXTLINK/NUXFER.COM`
-to refresh all distribution copies. `NUX321.COM` is the recommended name for 3.2.1.
+The NuXTLink DOS build writes `NUXTLINK/NUXFER.COM` directly. There are no
+alternate-name binaries. Build its Linux helper with
+`(cd NUXTLINK && sh linux/build_codec.sh)`.
 Build scripts select the required CPU target; do not replace them with generic
 compiler defaults. V20 does not support arbitrary 286/386 instructions, and
 8087 assembly must remain compatible with the original coprocessor.
@@ -72,3 +73,7 @@ included as source. See THIRD_PARTY.md for tool/runtime license information.
 NuXTroids and NuXTris support `sh BUILD.SH --test` with WATCOM set. Their
 CHECK.EXE programs and test files are for a disposable DOS test directory.
 See their TESTS.TXT files for the recorded validation.
+
+Build Checkers with `(cd CHECKERS88 && sh BUILD.SH)`. Its generated music header
+is included; `python3 CHECKERS88/MUSIC/CONVERT.PY` regenerates it from the bundled
+MIDI sources. See CHECKERS88/TESTING.TXT for its focused test procedures.

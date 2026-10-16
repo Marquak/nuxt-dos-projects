@@ -1,10 +1,11 @@
-# NuXT Link protocol 3
+# NuXT Link protocol 6
 
-V3 is not compatible with v2 or v1. Both clients and servers must be upgraded.
+NuXT Link 3.3.1 uses v6. Both client and server must be upgraded together.
+Older wire protocols are not supported; HELLO and INFO identify version 6.
 
 ## Frames and transport
 
-512-byte maximum payload; selected transfer blocks default to 128 bytes. Frame: `NX`, kind u8, sequence u8, payload length
+4096-byte maximum payload; selected transfer blocks default to 128 bytes. Frame: `NX`, kind u8, sequence u8, payload length
 u16 LE, payload, CRC16 u16 LE. CRC16/CCITT-FALSE uses polynomial 1021h and seed
 FFFFh over kind/sequence/length/payload. Binary data is never escaped or converted.
 ACK=80h, ERROR=FFh with an ASCII description. Stop-and-wait: retry the exact
@@ -12,14 +13,18 @@ request/sequence. The server compares the complete last request and caches its
 response, so duplicate writes, reads, final commits and directory advancement
 are replayed without being repeated. Sequence numbers wrap at 256.
 
-The client has five attempts per command, with bounded timeouts scaled for baud.
+The client has five attempts per command. The transfer timeout is
+max(3 seconds, (max(512, selected block)+16)*10/baud + 1 second), allowing
+8N1 wire time for the block and acknowledgement plus processing time.
+SETTINGS retains its separate confirmation/rollback state machine.
 The server uses a one-second inter-byte receive timeout and closes active file
-handles after about 30 seconds idle. Staging survives timeout, Escape, HELLO and
+handles after about 30 seconds idle. The idle timer is refreshed after a
+successful reply, so a long low-baud transmission does not expire its own transfer. Staging survives timeout, Escape, HELLO and
 CANCEL; uncommitted destinations are not exposed under the final filename.
 
 ## Version 3.2 connection discovery
 
-Wire protocol remains v3. The server now defaults to 9600/none/none/128.
+The server defaults to 9600/none/none/128.
 The Linux client probes 9600, the chosen baud, then remaining supported rates
 with bounded HELLO retries and quiet gaps for stale partial frames to expire.
 It opens without flow/peer gating, then negotiates requested settings.
@@ -48,7 +53,7 @@ is abandoned. Transfer framing, CRCs and commit verification are unchanged.
 
 | Hex | Name | Request | ACK payload |
 |---|---|---|---|
-| 01 | HELLO | empty | `NUXTLINK/3 C:\ file server` (drive varies); pauses active file |
+| 01 | HELLO | empty | `NUXTLINK/6 C:\ file server` (drive varies); pauses active file |
 | 02 | LIST_FIRST | path (root allowed) | meta + nameZ; empty means end |
 | 03 | LIST_NEXT | empty | same as LIST_FIRST |
 | 04 | STAT | path | meta |
@@ -58,11 +63,13 @@ is abandoned. Transfer framing, CRCs and commit verification are unchanged.
 | 08 | HASH_STEP | empty | scan; ready=1 closes the file |
 | 10 | PUT_BEGIN | meta + wholeCRC u16 + overwrite u8 (0/1) + path | retained prefix length u32 |
 | 13 | PUT_STATUS | empty | scan of retained prefix; ready=1 enables PUT_DATA |
-| 11 | PUT_DATA | 1..512 binary bytes | empty |
+| 11 | PUT_DATA | 1..4096 binary bytes | empty |
+| 14 | PUT_COMPRESSED | decoded size u16 + decoded CRC16 u16 + heatshrink bytes | empty |
+| 15 | PUT_VERIFY | empty | scan of closed/reopened upload staging; repeat until ready |
 | 12 | PUT_END | wholeCRC u16 | matching wholeCRC; committed only after length, CRC and metadata validation |
 | 20 | GET_BEGIN | resume offset u32 + path | meta; begins prefix scan |
 | 24 | GET_STATUS | empty | scan; ready=1 enables GET_DATA |
-| 21 | GET_DATA | empty | up to the selected block size (128/256/512 bytes) |
+| 21 | GET_DATA | empty | up to the selected block size (128/256/512/2048/4096 bytes) |
 | 22 | GET_END | empty | whole-file CRC after source metadata recheck |
 | 43 | CLOCK (3.2.1+) | empty to read; 8-byte clock to set | 8-byte DOS clock readback |
 | 30 | PAUSE/CANCEL | empty | empty; closes file handles, retains staging |
@@ -80,6 +87,45 @@ One file operation/scan is active at a time. HELLO and PAUSE close any active
 handle. The client verifies retained upload/download prefix CRC before continuing.
 A download final CRC covers the complete file, including the disk-scanned prefix.
 A completed Linux file also receives a locally recomputed SHA-256 for manifests.
+
+## Compressed uploads (v5)
+
+PUT_COMPRESSED has a decoded length (1..selected block size), a decoded
+CRC16/CCITT-FALSE (seed FFFFh) and one independent heatshrink stream. Window
+bits=12, lookahead bits=4; initial history is zero. Bits are MSB first: a 1 tag
+precedes an 8-bit literal, a 0 tag precedes a 12-bit (distance-1) and 4-bit
+(length-1). References may overlap. Last-byte padding must be zero; trailing
+bytes, truncated input and references exceeding decoded length are rejected.
+The entire payload, including the four-byte prefix, must fit 4096 bytes.
+
+Decoding uses the existing disk scratch buffer as history: a block cannot
+exceed the 4096-byte window, so no separate circular buffer is required.
+Leading references into initial zero history are supported. DOS verifies the
+decoded CRC before writing and updating the rolling file CRC and position.
+Rejected compressed blocks do not write or advance position. Frame CRC still
+covers the compressed payload; commit verifies the whole uncompressed file.
+
+Linux uses PUT_COMPRESSED only if its payload saves at least max(32,ceil(raw
+length/4)) bytes. Otherwise it uses PUT_DATA. Selection is per block; there is
+no connection compression state, dictionary carried across packets, or change
+to duplicate replay. Retained file lengths/resume offsets count decoded bytes.
+GET_DATA remains uncompressed. Host reports count acknowledged payload bytes
+once, excluding retries and framing; progress/rates count original file bytes.
+
+## Upload readback (v6)
+
+After the last data block, PUT_VERIFY first checks the received length and CRC,
+closes/reopens the staging file, resets the readback CRC and scans at most
+4096 bytes per request. Subsequent PUT_VERIFY requests continue the scan until
+ready=1. The client checks processed length and CRC against the local file,
+then issues PUT_END. No original destination is renamed during this scan.
+PAUSE/HELLO/idle timeout can cancel verification; the staged data remains.
+
+PUT_END requires a completed readback plus matching received size, readback
+CRC and expected file CRC. It cannot bypass the verification step. Replay of
+a lost scan reply or final commit ACK remains idempotent. A resumed upload,
+including one already fully staged, must be verified again before committing.
+Version 5 did not perform this reread; its earlier readback claims were wrong.
 
 ## Staging and commit
 
@@ -113,7 +159,7 @@ All metadata is checked via DOS again before success is acknowledged.
 
 All values are little-endian. Baud index follows the eight documented rates.
 Flow is 0=none or 1=RTS/CTS; peer mask is 00,20,80,A0 for none/DSR/DCD/both.
-Only block sizes 128,256,512 are accepted. SETTINGS is idle-only and rejects
+Only block sizes 128,256,512,2048,4096 are accepted. SETTINGS is idle-only and rejects
 required modem inputs that are already low. The server finishes transmitting
 the old-speed ACK, waits three BIOS ticks, applies the new settings, and awaits
 CONFIRM for 218 ticks. It rejects unrelated commands while pending. An
@@ -125,7 +171,7 @@ this avoids blindly restoring its old baud after the server already committed.
 INFO layout is Python struct `<8B6I2IHHB`, followed by the running executable's
 root-relative CP437 path and NUL (45 fixed bytes plus pathZ):
 
-- u8: version=3, COM number, baud index, flow, peer mask, FIFO available, MSR, MCR.
+- u8: version=6, COM number, baud index, flow, peer mask, FIFO available, MSR, MCR.
 - six u32 counters: failed frame CRCs, overruns, parity errors, framing errors,
   break indications, transmit/handshake timeouts. Counters reset on server start.
 - u32 free bytes, u32 total DOS-volume bytes.

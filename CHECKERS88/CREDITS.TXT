@@ -1,0 +1,64 @@
+3D CHECKERS 88 - CODE AND RESEARCH
+Reviewed 2026-10-15.
+
+Coding: ChatGPT (GPT-6 Astra / Codex), at the user's direction.
+Design and requested target hardware: the NuXT DOS projects' owner.
+This update was tested by Codex in DOSBox-X and with host-side
+rule checks. A physical NuXT test has not yet been performed.
+
+REUSED FROM OUR PROJECTS
+NuXTris: FONT.H and RENDER.ASM, plus the general VGA setup, sound effects,
+PIT timer and analog joystick measurement approach. These are our original
+MIT-licensed components. No Tetris game-rule code is used here.
+Orbit 87 / Starfield: the original-8087 presence/control-word routines.
+The projection kernel, checkers rules, AI and board geometry are new.
+Classical music data are converted from the credited Mutopia editions;
+see MUSIC/SOURCES.TXT for individual licences, changes and original files.
+
+CHECKERS REFERENCES
+World Checkers/Draughts Federation: Rules of Draughts, English version.
+https://wcdf.net/rules/rules_of_checkers_english.pdf
+Primary reference for legal moves, compulsory captures, choice of capture
+route, promotion ending the turn, victory, repetition and 40-move claims.
+We automate draw claims and do not implement tournament administration.
+
+Ponder (neo954/checkers), GPL-2.0:
+https://github.com/neo954/checkers
+Reviewed its README/rules and engine structure. Its C++ bitboard engine is
+not included or translated. No Ponder source code was copied.
+
+rapid-draughts (loks0n), MIT:
+https://github.com/loks0n/rapid-draughts
+Reviewed its English/WCDF rules scope, bitboard representation and bounded
+alpha-beta interface. Its TypeScript implementation is not included.
+
+Checkers Solver (Chillmerchant):
+https://github.com/Chillmerchant/checkers-solver
+https://raw.githubusercontent.com/Chillmerchant/checkers-solver/main/checkers_solver.py
+Reviewed the Python move-generation, capture backtracking, evaluation and
+alpha-beta source as an algorithm reference. No source was copied or
+translated. The new DOS engine uses a different 32-square representation,
+leg-by-leg forced continuation, iterative search and bounded static storage.
+
+DOS REFERENCES
+Little Game Engine for VGA/EGA (mills32):
+https://github.com/mills32/Little-Game-Engine-for-VGA-EGA
+Reviewed its documented changed-region rendering approach. Its 320x200
+engine, assets and code are not included in this 640x480 game. Version 1.2
+also checked lt_gfx.c while adding the cached, static board base. The solid
+span and edge routines are original code for this game, not LGE copies.
+The 1.2.1 review revisited its static-screen and selective-update approach;
+no additional third-party source was incorporated.
+
+FreeDOS CuteMouse:
+https://github.com/FDOS/mouse
+Related open-source DOS mouse driver/reference. Our game calls the standard
+INT 33h interface; it does not include a mouse driver or CuteMouse code.
+
+TOOLS
+Open Watcom 2 compiler, assembler and runtime; runtime terms in OWLIC.TXT.
+DOSBox-X for DOS execution, VGA, BIOS keyboard, timer and OPL checks.
+GCC/AddressSanitizer/UndefinedBehaviorSanitizer for host engine checks.
+Python/Pillow/NumPy to convert test VGA plane captures to preview PNGs.
+No commercial game assets, recordings, engines or game executables are included.
+The four classical arrangements use the licences in MUSIC/SOURCES.TXT.

@@ -9,7 +9,7 @@ on a stock 8088/8086. Others take advantage of the V20's extra instructions.
 This collection grew out of trying things on the real machine and fixing
 what didn't work. The test notes say what was checked for each version.
 
-These are the **current versions as of 2026-10-15**. Source, ready-to-run DOS
+These are the **current versions as of 2026-10-16**. Source, ready-to-run DOS
 programs, build scripts and instructions are included. Bring your own DOS.
 There are no commercial OS files, BIOS ROMs or complete games from other
 publishers in here.
@@ -23,7 +23,8 @@ publishers in here.
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Shoot the advancing aliens in an XT take on Space Invaders. |
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Fly a spaceship, dodge asteroids and blast them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | 1.2 | `NUXTRIS.EXE` | Clear rows of falling blocks in endless play or a 25-line challenge. |
-| [NUXTLINK](NUXTLINK/) | 3.2.1 | `NUX321.COM` | Move files between Linux and DOS, back up a DOS drive, and sync its clock over serial. |
+| [NUXTLINK](NUXTLINK/) | 3.3.3 | `NUXFER.COM` | Move files between Linux and DOS, back up a DOS drive, and sync its clock over serial. |
+| [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | A car cruising towards a neon sunset with an AdLib synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Fix the XMS startup error and skip the manual-word check in your US 1.07 copy of Dune II. |
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Check CPU speed, memory, video, ports, BIOS information and drives. |
@@ -41,8 +42,8 @@ command-line utility; its page has usage examples.
 Copy the listed files to a writable DOS folder and launch the program there.
 For NuXTLink, also run `sh NUXTLINK/linux/launch.sh` on Linux; it needs Python 3
 and Tkinter. Keep your existing NUXMENU.DAT when updating the menu, and NUXTRIS.DAT/BAK
-when updating NuXTris. For NuXTLink, 3.2.1 is the current release. Update both
-the DOS server and the complete Linux folder, then restart both.
+when updating NuXTris. NuXTLink 3.3.3 includes the 3.3.1 DOS server and uses wire protocol v6.
+Update both ends when upgrading from the previous GitHub version, then restart both.
 
 The higher resolutions are partly for fun and testing. Don't expect a V20 to
 fly at 1024x768, even with an 8087. Modes above standard VGA depend on the
@@ -61,8 +62,9 @@ historical emulator tests and owner-reported hardware results.
 Project-authored code, documentation, procedural art, fonts and composed FM
 music are offered under the [MIT license](LICENSE). Third-party code, including the adapted NuXTris rules and compiler runtimes,
 retains its own license: see [THIRD_PARTY.md](THIRD_PARTY.md) and each OWLIC.TXT.
-Research references are retained in the project documentation. External music
-and pictures used as inspiration are not bundled.
+Research references are retained in the project documentation. Checkers includes
+credited Mutopia music arrangements under their original licenses; see its
+[MUSIC/SOURCES.TXT](CHECKERS88/MUSIC/SOURCES.TXT).
 
 DUNE2FIX contains a patching script, tests, hashes, instructions and a setup
 screenshot. You must supply your own matching Dune II executables. The game

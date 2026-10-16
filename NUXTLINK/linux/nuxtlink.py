@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NuXT Link 3.2.1: full-drive browser and reviewable serial transfer queues."""
+"""NuXT Link 3.3.3: full-drive browser and reviewable serial transfer queues."""
 import os
 import stat
 import argparse
@@ -10,8 +10,8 @@ import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
-from link import BAUDS, PEERS, SerialPort, Client, Cancelled, LinkError, VersionError, ports, dos_path, join_path
-from transfers import plan_download, plan_upload, execute, verify_backup
+from link import BAUDS, PEERS, BLOCK_SIZES, SerialPort, Client, Cancelled, LinkError, RemoteError, VersionError, ports, dos_path, join_path
+from transfers import plan_download, plan_upload, execute, verify_backup, completion_columns, compression_stats
 from transfer_queue import TransferQueue, append_plan, execute_queue
 from operations import plan_delete, execute_delete
 from profiles import Profiles, DEFAULTS, validate
@@ -23,9 +23,11 @@ class App:
     def __init__(self, root, settings=None, profile_path=None):
         self.root, self.client, self.plan = root, None, None
         self.busy = self.closing = False
+        self.disconnect_pending = self.disconnecting = False
         self.can_cancel = True
         self.events = queue.Queue()
         self.cancel_event = threading.Event()
+        self.stop_event = threading.Event()
         self.entries, self.local_entries, self.rows = {}, {}, {}
         self.remote = '\\'
         self.started, self.progress_base, self.progress_file = 0, 0, None
@@ -89,6 +91,12 @@ class App:
         rows=list(tree.get_children())
         def key(row):
             value=tree.set(row,column)
+            if column in ('elapsed','compression'):
+                if not value or not row.startswith('job:'):return -1
+                job=self.plan.jobs[int(row.split(':')[1])]
+                if column=='elapsed':return job.elapsed_seconds
+                stats=compression_stats(job)
+                return stats[0] if stats else 1 if value=='Raw' else -1
             if column=='size':
                 try:return int(value.replace(',',''))
                 except ValueError:return -1
@@ -144,7 +152,8 @@ class App:
                   self.mkdir_button,self.rename_button,self.delete_button,self.apply_button,self.diag_button,self.clock_button):
             w.configure(state='normal' if connected and not self.busy else 'disabled')
         for w in (self.verify_button,self.save_button,self.remove_profile_button,self.ftdi_button):w.configure(state='disabled' if self.busy else 'normal')
-        self.connect_button.configure(text='Disconnect' if connected else 'Connect',state='disabled' if self.busy else 'normal')
+        self.connect_button.configure(text='Disconnect' if connected else 'Connect',
+            state='disabled' if self.disconnect_pending or self.disconnecting or self.closing or (self.busy and not connected) else 'normal')
         self.port_box.configure(state='disabled' if connected or self.busy else 'normal')
         self.profile_box.configure(state='disabled' if connected or self.busy else 'normal')
         self.load_button.configure(state='disabled' if connected or self.busy else 'normal')
@@ -159,6 +168,7 @@ class App:
         self.report_button.configure(state='normal' if self.report else 'disabled')
         self.policy_box.configure(state='disabled' if self.busy else 'readonly')
         self.incremental_check.configure(state='disabled' if self.busy else 'normal')
+        self.compression_check.configure(state='disabled' if self.busy else 'normal')
         ready=connected and not self.busy
         selected=[self.entries[i] for i in self.tree.selection() if i in self.entries]
         usable=bool(selected) and not any(e.internal for e in selected)
@@ -178,6 +188,7 @@ class App:
         self.file_percent.set('…');self.detail.set('Waiting for the operation to finish…')
         self.status.set(title);self.log_message(title)
         self.cancel_event.clear()
+        self.stop_event.clear()
         if self.client:self.client.cancelled.clear()
         self.update_controls()
         def worker():
@@ -190,14 +201,14 @@ class App:
         if self.events.qsize()<20:self.events.put(('note',message))
 
     def connect(self):
-        if self.busy:return
         if self.client:self.disconnect();return
+        if self.busy:return
         try:v=self.profile_values()
         except ValueError as exc:messagebox.showerror('Settings',str(exc));return
         if not v['device']:messagebox.showinfo('Serial device','Choose a serial device.');return
         remote=self.remote
         def action():
-            port=SerialPort(v['device'],9600);client=Client(port,9600);client.cancelled=self.cancel_event
+            port=SerialPort(v['device'],9600,interrupted=self.stop_event);client=Client(port,9600);client.cancelled=self.cancel_event
             try:
                 hello,info=client.establish(v['baud'],v['flow'],v['peer'],v['block'],self.notify)
                 latency=self.latency_session
@@ -208,8 +219,15 @@ class App:
                     try:
                         if latency.apply(v['latency']):self.notify(f"FTDI latency {v['latency']} ms")
                     except OSError:self.notify('Use Apply FTDI latency to authorize the adapter setting.')
-                entries=client.listing(remote)
-                return ('connected',client,hello,entries,info,remote)
+                path=remote
+                try:entries=client.listing(path)
+                except RemoteError:
+                    # A saved folder may have been renamed/deleted while offline.
+                    # A working link should still let the user browse the drive.
+                    if path=='\\':raise
+                    path='\\';entries=client.listing(path)
+                    hello+=' · Previous folder unavailable; opened '+client.drive
+                return ('connected',client,hello,entries,info,path)
             except BaseException:
                 port.close()
                 if self.latency_session:
@@ -274,6 +292,7 @@ class App:
         if not self.plan or not self.client or self.busy:return
         if self.plan.drive!=self.client.drive:
             messagebox.showerror('Different DOS drive','This queue was prepared for another drive. Build a new preview.');return
+        self.client.compress_uploads=self.compression.get()
         plan=self.plan;self.queue_started=time.monotonic()
         self.queue_base=sum(j.meta.size for j in plan.jobs if j.action in ('send','receive') and j.status in ('Complete','Verified'))
         if plan.direction=='delete':
@@ -289,7 +308,9 @@ class App:
         now=time.monotonic(); key=(index,job.status)
         if done==total or key!=getattr(self,'progress_key',None) or now-getattr(self,'progress_time',0)>=.08:
             if done==total or self.events.qsize()<20:
-                self.events.put(('progress',(index,job.status,done,total)))
+                # Timestamp in the worker: queued UI updates may be displayed
+                # together after a repaint or pause, but did not transfer together.
+                self.events.put(('progress',(index,job.status,done,total,now)))
                 self.progress_key,self.progress_time=key,now
     def cancel(self):
         self.cancel_event.set()
@@ -303,9 +324,21 @@ class App:
         row=selected[0]
         if row.startswith('job:') and self.plan:
             job=self.plan.jobs[int(row.split(':')[1])]
-            status,action,source,target,size=self.job_values(job)
+            status,action,source,target,size,elapsed,compression=self.job_values(job)
             text=f'{action} · {status}\n\nSource: {source}\nDestination: {target}\nBytes: {size}\n'
             text+=f'DOS modified: {job.meta.display_time}\nAttributes: {job.meta.attributes}'
+            if elapsed:
+                text+=f'\n\nTransfer time: {elapsed} (active work, including verification and retries)'
+                text+=f'\nCompression: {compression}'
+            if 'upload_payload_bytes' in job.result:
+                remaining=job.meta.size-job.result.get('resumed_bytes',0)
+                payload=job.result['upload_payload_bytes']
+                saved=max(0,remaining-payload)
+                text+=f'\n\nUpload: {remaining:,} file bytes, {payload:,} payload bytes ({saved:,} saved)'
+                text+=f"\nBlocks: {job.result['compressed_blocks']} compressed, {job.result['raw_blocks']} raw"
+                if job.result.get('resumed_bytes'):
+                    text+='\nCompression covers this completed attempt only; the retained prefix is excluded.'
+                text+='\nPayload counts exclude frame headers, acknowledgements and retries.'
             if job.reason:text+='\n\n'+job.reason
         else:text='\n'.join(str(v) for v in self.queue_tree.item(row,'values') if v)
         messagebox.showinfo('Queue entry',text,parent=self.root)
@@ -343,7 +376,7 @@ class App:
         if owner.direction=='delete':target='-'
         # Keep absolute paths visible: browsing elsewhere never retargets a job.
         return (status or job.status,actions.get(job.action,job.action),source,target,
-                '<DIR>' if job.meta.is_dir else f'{job.meta.size:,}')
+                '<DIR>' if job.meta.is_dir else f'{job.meta.size:,}', *completion_columns(job,status))
 
     def job_visible(self,status):
         mode=self.queue_filter.get();complete=status in ('Complete','Verified','Skipped')
@@ -359,7 +392,11 @@ class App:
         tag=('complete' if status in ('Complete','Verified') else 'error' if status=='Failed'
              else 'running' if status=='Running' else 'muted' if status in ('Skipped','Cancelled') else '')
         values=self.job_values(job,status,compact=True)
-        if index in self.rows:self.queue_tree.item(self.rows[index],values=values,tags=(tag,))
+        if index in self.rows:
+            row=self.rows[index]
+            # Most progress events change the meters, not this row's cells.
+            if tuple(map(str,self.queue_tree.item(row,'values'))) != tuple(map(str,values)):
+                self.queue_tree.item(row,values=values,tags=(tag,))
         else:self.rows[index]=self.queue_tree.insert('','end',iid=f'job:{index}',values=values,tags=(tag,))
         if previous!=status and hasattr(self.queue_tree,'_sort'):
             self.sort_table(self.queue_tree,*self.queue_tree._sort)
@@ -406,20 +443,20 @@ class App:
                 kind,value=self.events.get_nowait()
                 if kind=='note':self.status.set(value);self.log_message(value)
                 elif kind=='progress':
-                    index,status,done,total=value
+                    index,status,done,total,recorded=value
                     if not self.plan:continue
                     self.active_progress=(index,done)
                     job=self.plan.jobs[index]
                     self.update_job_row(index,status);self.queue_summary()
                     if self.progress_file!=index:
-                        self.progress_file=index;self.progress_base=done;self.started=time.monotonic()
-                    elapsed=max(.01,time.monotonic()-self.started)
+                        self.progress_file=index;self.progress_base=done;self.started=recorded
+                    elapsed=max(.01,recorded-self.started)
                     rate=max(0,done-self.progress_base)/elapsed
                     eta=(total-done)/rate if rate>0 else None
                     self.progress.stop();self.progress.configure(mode='determinate',value=100 if not total else 100*done/total)
                     self.file_percent.set(f"{min(100,int(self.progress['value']))}%")
                     self.status.set(f'{index+1}/{len(self.plan.jobs)} — {job.target} — {status}')
-                    self.detail.set(f'{done:,} / {total:,} bytes • {rate/1024:.1f} KiB/s • '
+                    self.detail.set(f'{done:,} / {total:,} bytes • {rate/1024:.1f} file KiB/s • '
                         f'ETA {int(eta)//60}m {int(eta)%60}s' if eta is not None else f'{done:,} / {total:,} bytes • preparing / verifying')
                     if job.action not in ('send','receive'):
                         self.detail.set(f'{self.job_values(job,status)[1]} · {status}')
@@ -450,6 +487,7 @@ class App:
                     elif value[0]=='clock':self.status.set('DOS date/time synced: '+value[1].strftime('%Y-%m-%d %H:%M:%S')+' (Linux local time).')
                     elif value[0]=='latency':self.status.set(f'FTDI latency set to {value[1]} ms; previous setting retained for restoration.')
                     elif value[0]=='disconnected':
+                        self.disconnect_pending=self.disconnecting=False
                         self.client=None;self.latency_session=None;self.info={};self.disk_space.set('')
                         self.remote_items=[];self.render_remote();self.remote_frame.configure(text='DOS files')
                         self.status.set('Disconnected.'+value[1])
@@ -465,7 +503,7 @@ class App:
                     self.log_message(self.status.get());self.update_controls()
                     if value[0] not in ('executed','queue_listing'):
                         self.detail.set('CRC and whole-file verification are always enabled. DOS metadata is preserved.')
-                    if value[0]=='executed' and not self.closing:self.refresh_after_queue()
+                    if value[0]=='executed' and not self.closing and not self.disconnect_pending:self.refresh_after_queue()
                 elif kind=='error':
                     self.busy=False;self.finish_progress();self.status.set(str(value));self.log_message(str(value))
                     self.detail.set('Completed work and resumable files are retained. Review the queue or activity log.')
@@ -473,18 +511,18 @@ class App:
                         self.fill_plan()
                         folder=Path(self.plan.local_root)/'.nuxtlink'
                         if (folder/'last-report.txt').exists():self.report=str(folder/'last-report.txt')
-                    if not isinstance(value,Cancelled) and not self.closing:messagebox.showerror('NuXT Link',str(value))
+                    if not isinstance(value,Cancelled) and not self.closing and not self.disconnect_pending:messagebox.showerror('NuXT Link',str(value))
                     self.update_controls()
         except queue.Empty:pass
-        if self.closing and not self.busy:
+        if (self.closing or self.disconnect_pending) and not self.busy:
             if self.client or self.latency_session:self.disconnect()
-            else:self.root.destroy();return
+            elif self.closing:self.root.destroy();return
+            else:self.disconnect_pending=False;self.update_controls()
         self.root.after(60,self.poll)
 
     def close_window(self):
         self.closing=True
-        if self.busy:self.cancel()
-        elif self.client or self.latency_session:self.disconnect()
+        if self.busy or self.client or self.latency_session:self.disconnect()
         else:self.root.destroy()
 
     def log_message(self, text):
@@ -498,7 +536,7 @@ class App:
         self.arrange_panes()
 
     def profile_values(self):
-        return validate(dict(device=self.device.get().strip(),baud=int(self.speed.get()),flow=self.flow.get(),peer=self.peer.get(),block=int(self.block_size.get()),latency=int(self.latency.get()),com=self.doscom.get(),local=str(self.local),remote=self.remote))
+        return validate(dict(device=self.device.get().strip(),baud=int(self.speed.get()),flow=self.flow.get(),peer=self.peer.get(),block=int(self.block_size.get()),compression=self.compression.get(),latency=int(self.latency.get()),com=self.doscom.get(),local=str(self.local),remote=self.remote))
 
     def save_profile(self):
         try:self.profiles.save(self.profile_name.get(),self.profile_values())
@@ -509,6 +547,7 @@ class App:
         if self.busy or self.client:return
         values=self.profiles.items.get(self.profile_name.get())
         if not values:return
+        self.compression.set(values['compression'])
         for key,var in [('device',self.device),('baud',self.speed),('flow',self.flow),('peer',self.peer),('block',self.block_size),('latency',self.latency),('com',self.doscom)]:var.set(str(values[key]))
         self.remote=values['remote'];self.location.set(self.remote);self.local_navigate(values['local'])
 
@@ -664,21 +703,37 @@ class App:
         self.work('Applying FTDI latency; Linux may request administrator authentication…',action,cancellable=False)
 
     def disconnect(self):
+        if self.disconnecting:return
+        self.disconnect_pending=True
+        if self.busy:
+            # The worker owns the descriptor until it has saved resumable state.
+            # Interrupt waits, never close/reuse its fd from the Tk thread.
+            self.cancel_event.set();self.stop_event.set()
+            if self.client:
+                self.client.cancelled.set()
+                self.client.stopping.set()
+            self.status.set('Stopping the operation and disconnecting…')
+            self.update_controls()
+            return
         client=self.client;latency=self.latency_session
+        self.disconnecting=True
+        # Detach once. A cleanup failure must never trigger a close/retry loop.
+        self.client=None;self.latency_session=None
         def action():
-            warning=''
+            warnings=[]
             if client:
                 try:
-                    client.abort()
-                    client.apply_settings(9600,'none','none',128)
-                except (OSError,LinkError) as exc:
-                    warning=' DOS speed reset could not be confirmed: '+str(exc)
-                finally:client.transport.close()
+                    client.stopping.clear()
+                    if not client.abort():warnings.append('DOS did not confirm the pause; reconnect to resume.')
+                except Exception as exc:warnings.append('DOS pause: '+str(exc))
+                finally:
+                    try:client.transport.close()
+                    except Exception as exc:warnings.append('Serial cleanup: '+str(exc))
             if latency:
                 try:latency.restore(authorize=True)
-                except (OSError,ValueError) as exc:warning=' Latency restoration: '+str(exc)
-            return ('disconnected',warning)
-        self.work('Disconnecting and restoring adapter settings…',action,cancellable=False)
+                except Exception as exc:warnings.append('Latency restoration: '+str(exc))
+            return ('disconnected',(' '+' '.join(warnings)) if warnings else '')
+        self.work('Disconnecting…',action,cancellable=False)
 
     def queue_totals(self,index=None,done=0):
         if not self.plan:return
@@ -704,8 +759,10 @@ def main():
     parser=argparse.ArgumentParser(description='NuXT Link 3 serial file manager. Connection settings are negotiated with the DOS server.')
     parser.add_argument('--profile');parser.add_argument('--device')
     parser.add_argument('--baud',type=int,choices=BAUDS);parser.add_argument('--flow',choices=('none','rtscts'))
-    parser.add_argument('--peer',choices=tuple(PEERS));parser.add_argument('--block',type=int,choices=(128,256,512))
+    parser.add_argument('--peer',choices=tuple(PEERS));parser.add_argument('--block',type=int,choices=BLOCK_SIZES)
     parser.add_argument('--latency',type=int,help='FTDI milliseconds; 0 leaves the adapter unchanged')
+    parser.add_argument('--compression',action=argparse.BooleanOptionalAction,default=None,
+                        help='compress uploads when worthwhile (default: enabled)')
     parser.add_argument('--com',choices=('COM1','COM2','COM3','COM4'),help='DOS port reminder/profile; changes locally with DOS C key or command line')
     parser.add_argument('--local');parser.add_argument('--remote');parser.add_argument('--connect',action='store_true')
     args=parser.parse_args();values={}

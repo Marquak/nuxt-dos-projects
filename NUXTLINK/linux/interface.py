@@ -1,7 +1,7 @@
 """Tk layout for the Linux client; no serial or filesystem operations."""
 import tkinter as tk
 from tkinter import ttk
-from link import BAUDS, PEERS
+from link import BAUDS, PEERS, BLOCK_SIZES
 
 
 class Tip:
@@ -40,7 +40,7 @@ class Tip:
 
 def build_interface(app, settings):
     a, root = app, app.root
-    root.title('NuXT Link 3.2.1 - serial file manager')
+    root.title('NuXT Link 3.3.3 - serial file manager')
     root.geometry(f'{min(1180, root.winfo_screenwidth()-40)}x{min(820, root.winfo_screenheight()-80)}')
     root.minsize(960, 700)
     root.protocol('WM_DELETE_WINDOW', a.close_window)
@@ -65,7 +65,7 @@ def build_interface(app, settings):
     header = ttk.Frame(outer)
     header.pack(fill='x', pady=(0, 4))
     ttk.Label(header, text='NuXT Link', style='Title.TLabel').pack(side='left')
-    ttk.Label(header, text='3.2.1  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
+    ttk.Label(header, text='3.3.3  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
     profiles = ttk.Frame(header)
     profiles.pack(side='right')
     ttk.Label(profiles, text='Profile').pack(side='left', padx=5)
@@ -120,7 +120,7 @@ def build_interface(app, settings):
     for text, attr, var, values, width in [
             ('DOS port','com_box',a.doscom,('COM1','COM2','COM3','COM4'),6),
             ('Require peer','peer_box',a.peer,tuple(PEERS),6),
-            ('Block bytes','block_box',a.block_size,(128,256,512),5),
+            ('Block bytes','block_box',a.block_size,BLOCK_SIZES,5),
             ('FTDI ms','latency_box',a.latency,(0,2,4,8,16),4)]:
         ttk.Label(a.advanced, text=text).pack(side='left', padx=(0,4))
         box = ttk.Combobox(a.advanced, textvariable=var, values=values, width=width,
@@ -145,6 +145,10 @@ def build_interface(app, settings):
     a.incremental_check = ttk.Checkbutton(options, text='Verify & skip unchanged', variable=a.incremental)
     a.incremental_check.pack(side='left')
     Tip(a.incremental_check, 'Skip identical contents after verification. Turning this off does not disable packet CRC or verification of transferred files.')
+    a.compression = tk.BooleanVar(value=settings.get('compression', True))
+    a.compression_check = ttk.Checkbutton(options, text='Compress uploads', variable=a.compression)
+    a.compression_check.pack(side='left', padx=10)
+    Tip(a.compression_check, 'Compress uploads when a block saves at least 25% and 32 bytes. Poorly compressible blocks stay raw. Applies to the next queue run; saved with profiles.')
     a.backup_button = ttk.Menubutton(options, text='Backups')
     a.backup_button.pack(side='right')
     menu = tk.Menu(a.backup_button, tearoff=False)
@@ -284,8 +288,10 @@ def build_interface(app, settings):
     queue_title = ttk.Label(queued, textvariable=a.summary)
     queued.configure(labelwidget=queue_title)
     Tip(queue_title, 'Preview the queue before Start / resume. Double-click a job to see full paths, DOS metadata and any error or skip reason.')
-    a.queue_tree = a.table(queued, ('status','action','source','path','size'),
-                           ('Status','Action','Source','Destination / issue','Bytes'), (100,85,330,330,90))
+    a.queue_tree = a.table(queued, ('status','action','source','path','size','elapsed','compression'),
+                           ('Status','Action','Source','Destination / issue','Bytes','Time','Compression'),
+                           (90,85,225,225,85,100,165))
+    Tip(a.queue_tree, 'Time includes active transfer, retries and verification, excluding queue waits and pauses.\nCompression is original bytes : upload payload bytes, with % saved.\nFor resumed uploads, compression describes the final resumed portion. Double-click for details.')
     a.queue_tree.bind('<Double-1>', a.show_job)
     a.queue_tree.bind('<Return>', a.show_job)
     for tag, color in [('complete','#236146'), ('error','#a32833'), ('running','#155a89'), ('muted','#64717b')]:

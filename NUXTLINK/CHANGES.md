@@ -1,3 +1,90 @@
+# NuXT Link 3.3.3 - 16 October 2026
+
+- Fix reconnecting after the last DOS folder was renamed, removed or became
+  unavailable. Open the drive root and report the fallback instead of closing
+  an otherwise working connection. Serial failures still report normally.
+  Existing queued paths stay unchanged.
+- Final focused review: 86 host/Tk tests passed. DOS remains 3.3.1, wire v6.
+
+---
+
+# NuXT Link 3.3.2 - 16 October 2026
+
+- Fix Disconnect and window close after the DOS server exits. Stop trying to
+  renegotiate DOS settings during cleanup. Leave a running server at its current
+  speed; Connect already searches for it. A pause request gets one short attempt.
+- Allow Disconnect during a busy operation. Interrupt serial waits, including
+  low DSR/DCD, blocked writes and settings recovery, before closing the port in
+  the worker. Queue entries and resumable files are retained.
+- Always release the serial descriptor even when restoring its settings raises
+  `termios.error`. Detach the connection once so cleanup errors cannot cause a
+  repeated disconnect loop on window close. FTDI restoration is still attempted.
+- Linux-only update. DOS 3.3.1 and wire protocol v6 are unchanged.
+
+---
+
+# NuXT Link 3.3.1 - 16 October 2026
+
+- Show completed-file Time and Compression columns in the Linux queue, with
+  numeric sorting and full details on double-click. Save results in reports.
+  Time includes active attempts, retries and verification, excluding pauses.
+  Resumed-upload ratios describe the final newly transferred portion only.
+- Fix missing DOS upload readback: close/reopen and hash the staged file in
+  bounded, cancellable steps before replacing the original destination. Both
+  ends check the readback length/CRC. Earlier releases verified received data
+  but did not actually reread the staged file, despite the documentation.
+- Require the readback before commit, including after resume. Use protocol v6
+  so an older client cannot silently omit the new check. Update both ends.
+- Check the initial staging-file seek result. Clear old failure messages when
+  retrying a job, retain completion metrics in the combined queue report, and
+  avoid redrawing queue rows whose cells have not changed.
+
+---
+
+# NuXT Link 3.3 - 16 October 2026
+
+- Add heatshrink compression for uploads, with a saved on/off toggle and raw
+  fallback when a block saves less than 25% or 32 bytes. Show payload savings
+  in completed queue entries and reports; label speed as file KiB/s.
+- Decode independent blocks in bounded assembly using the existing DOS disk
+  buffer. Check decoded length/CRC before writing. Retain file readback,
+  metadata verification, duplicate replay and resume across setting changes.
+- Replace the C CRC byte loop with table-driven assembly, keeping the same
+  polynomial and checksum values for frames, files and resume records.
+- Fill the empty transmit FIFO in bursts of up to 16 bytes. Check configured
+  peer signals per byte, retain timeout/ESC handling and final UART drain,
+  and use single-byte writes without a FIFO.
+- Use wire protocol v5. Update DOS and Linux together. Keep the NUXTLINK32
+  folder and NUXFER.COM filename so existing launchers still work.
+- Include the upstream heatshrink encoder, its ISC license, a Linux helper
+  and build script. No proprietary FastLynx code was copied.
+
+---
+
+# NuXT Link 3.2.2 - 16 October 2026
+
+- Correct the Linux speed display to use worker timestamps, so delayed UI
+  updates cannot create a false burst when processed together. DOS is unchanged
+  by this display fix; restart the Linux client after the current transfer.
+- Add selectable 2048- and 4096-byte transfer blocks to DOS, Linux, saved
+  profiles and command-line options. Existing profiles keep their chosen size.
+- Negotiate the selected size with the existing confirmed-settings exchange.
+  Uploads and downloads use it; resume can switch sizes at any byte offset.
+- Keep all CRC, duplicate-request, whole-file and metadata verification.
+- Scale transfer timeouts to the selected block and baud rate. Count time
+  transmitting a reply as activity, including 4 KiB replies at 1200 baud.
+- Use wire protocol v4. Update DOS and Linux together; no older-version
+  compatibility or fallback. Smaller block options remain available.
+- Use NUXFER.COM as the single DOS binary; remove versioned aliases and
+  duplicate release builds. Retain the NUXTLINK32 folder for Linux launchers.
+  DOS frame buffers grow by 10.5 KiB; COM grows by 116 bytes.
+
+Based on the local throughput investigation, especially the cost of repeated
+stop-and-wait exchanges. No third-party protocol or proprietary code added.
+Hardware speed measurements remain for the NuXT test.
+
+---
+
 # NuXT Link 3.2.1 - 13 October 2026
 
 - Add Sync DOS Date/Time beside Diagnostics. Sends Linux local date/time while

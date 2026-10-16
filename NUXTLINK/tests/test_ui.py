@@ -9,15 +9,16 @@ import sys
 import tempfile
 import threading
 import time
+import termios
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import tkinter as tk
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'linux'))
 from nuxtlink import App
-from link import Entry, Metadata, Cancelled
+from link import Entry, Metadata, Cancelled, Client, RemoteError, LinkError, INFO
 from transfers import Job, Plan
 
 
@@ -105,6 +106,39 @@ class UITests(unittest.TestCase):
         self.assertIn('2026-10-13 21:45:12',a.status.get())
         self.assertFalse(a.clock_button.instate(['disabled']))
 
+    def test_compression_profile_and_busy_state(self):
+        a=self.app
+        self.assertTrue(a.compression.get())
+        a.compression.set(False)
+        values=a.profile_values()
+        self.assertFalse(values['compression'])
+        a.profiles.save('Raw',values)
+        self.assertFalse(a.profiles.items['Raw']['compression'])
+        a.busy=True;a.update_controls()
+        self.assertTrue(a.compression_check.instate(['disabled']))
+        a.busy=False;a.update_controls()
+        self.assertFalse(a.compression_check.instate(['disabled']))
+
+    def test_completed_queue_shows_time_ratio_and_sorts_numerically(self):
+        self.connect_fixture();a=self.app;plan=self.make_plan()
+        for job,seconds,payload in zip(plan.jobs,(120,9),(100,10)):
+            job.status='Complete';job.elapsed_seconds=seconds
+            job.result={'resumed_bytes':0,'upload_payload_bytes':payload,'compressed_blocks':1,'raw_blocks':0}
+        a.fill_plan()
+        self.assertEqual(a.queue_tree.set('job:0','elapsed'),'2m 00s')
+        self.assertEqual(a.queue_tree.set('job:0','compression'),'10.00:1 (90% saved)')
+        a.sort_table(a.queue_tree,'elapsed',False)
+        self.assertEqual(a.queue_tree.get_children()[0],'job:1')
+        a.sort_table(a.queue_tree,'compression',False)
+        self.assertEqual(a.queue_tree.get_children()[0],'job:1')
+        a.queue_tree.selection_set('job:0')
+        with patch('nuxtlink.messagebox.showinfo') as show:
+            a.show_job()
+            self.assertIn('Transfer time: 2m 00s',show.call_args.args[1])
+            self.assertIn('10.00:1 (90% saved)',show.call_args.args[1])
+        a.queue_filter.set('Completed');a.fill_plan()
+        self.assertEqual(a.queue_tree.set('job:0','elapsed'),'2m 00s')
+
     def test_each_pane_keeps_its_sort_across_directories_and_refresh(self):
         self.connect_fixture()
         a = self.app
@@ -168,18 +202,18 @@ class UITests(unittest.TestCase):
         self.connect_fixture()
         a = self.app;plan=self.make_plan();plan.status='Running'
         plan.jobs[0].status='Running';a.busy=True
-        a.events.put(('progress',(0,'Running',500,1000)))
+        a.events.put(('progress',(0,'Running',500,1000,time.monotonic())))
         a.poll()
         self.assertEqual(float(a.progress['value']),50)
         self.assertAlmostEqual(float(a.queue_progress['value']),100*500/1020)
         a.queue_filter.set('Pending');a.fill_plan()
         self.assertAlmostEqual(float(a.queue_progress['value']),100*500/1020)
         plan.jobs[0].status='Complete'
-        a.events.put(('progress',(0,'Complete',1000,1000)));a.poll()
+        a.events.put(('progress',(0,'Complete',1000,1000,time.monotonic())));a.poll()
         self.assertNotIn(0,a.rows)
         a.queue_filter.set('Failed');a.fill_plan()
         plan.jobs[1].status='Failed';plan.jobs[1].reason='CRC verification failed'
-        a.events.put(('progress',(1,'Failed',0,20)));a.poll()
+        a.events.put(('progress',(1,'Failed',0,20,time.monotonic())));a.poll()
         self.assertIn(1,a.rows)
         a.queue_tree.selection_set(a.rows[1])
         with patch('nuxtlink.messagebox.showinfo') as show:
@@ -189,6 +223,20 @@ class UITests(unittest.TestCase):
         a.events.put(('error',Cancelled('Stopped')));a.poll()
         self.assertFalse(a.busy)
         self.assertLess(float(a.queue_progress['value']),100)
+
+    def test_speed_uses_worker_time_when_progress_updates_arrive_together(self):
+        self.connect_fixture()
+        a=self.app;plan=self.make_plan()
+        job=plan.jobs[0];job.meta=meta(32768);job.status='Running'
+        # The worker records 8 KiB over one second. The GUI is stalled until
+        # all three events are queued, then processes them in a single poll.
+        with patch('nuxtlink.time.monotonic',side_effect=[100.,100.5,101.]):
+            for done in (0,4096,8192):a.progress_event(0,job,done,32768)
+        with patch('nuxtlink.time.monotonic',return_value=110.):a.poll()
+        self.assertIn('8.0 file KiB/s',a.detail.get())
+        self.assertIn('ETA 0m 3s',a.detail.get())
+        self.assertEqual(a.started,100.)
+        self.assertEqual(a.active_progress,(0,8192))
 
     def test_clear_queue_and_disconnect_do_not_remove_files(self):
         self.connect_fixture()
@@ -203,12 +251,96 @@ class UITests(unittest.TestCase):
         self.assertIn('Disconnected',a.connection_hint.get())
         self.assertTrue(a.get_button.instate(['disabled']))
 
+    def test_exit_after_cleanup_errors_releases_connection_once(self):
+        self.connect_fixture();a=self.app
+        client=a.client
+        client.stopping=a.stop_event
+        client.abort=Mock(return_value=False)
+        client.transport=SimpleNamespace(close=Mock(side_effect=termios.error(5,'Input/output error')))
+        latency=SimpleNamespace(restore=Mock(side_effect=OSError('Adapter gone')))
+        a.latency_session=latency
+        with patch.object(self.root,'destroy') as destroy,patch('nuxtlink.messagebox.showerror') as error:
+            a.disconnect();a.close_window();self.settle()
+            destroy.assert_called_once();error.assert_not_called()
+        self.assertIsNone(a.client);self.assertIsNone(a.latency_session)
+        self.assertFalse(a.disconnecting)
+        self.assertEqual(str(a.progress['mode']), 'determinate')
+        client.abort.assert_called_once();client.transport.close.assert_called_once()
+        latency.restore.assert_called_once()
+
+    def test_disconnect_while_waiting_for_dead_peer_retains_queue(self):
+        self.connect_fixture();a=self.app;plan=self.make_plan()
+        class Port:
+            interrupted=a.stop_event
+            close=Mock()
+            def write(self,data,timeout):pass
+            def read(self,timeout):time.sleep(min(timeout,.01));return b''
+        client=Client(Port(),timeout=40);client.drive='C:\\';client.cancelled=a.cancel_event
+        a.client=client
+        a.work('Reading DOS folder',lambda:client.request(INFO))
+        self.assertFalse(a.connect_button.instate(['disabled']))
+        started=time.monotonic()
+        with patch('nuxtlink.messagebox.showerror') as error:
+            a.connect_button.invoke();self.settle()
+            self.assertLess(time.monotonic()-started,1.5)
+            error.assert_not_called()
+        self.assertIs(a.plan,plan);self.assertIsNone(a.client)
+        client.transport.close.assert_called_once()
+        self.assertIn('Disconnected',a.connection_hint.get())
+        self.assertFalse(a.connect_button.instate(['disabled']))
+        self.assertTrue((self.folder/'BIG.BIN').exists())
+
+    def test_close_during_discovery_interrupts_private_connection(self):
+        a=self.app;a.device.set('/dev/fake')
+        class Port:
+            close=Mock()
+            def __init__(self,path,baud,*,interrupted):self.interrupted=interrupted
+            def configure(self,*args):pass
+            def discard(self):pass
+            def write(self,data,timeout):pass
+            def read(self,timeout):time.sleep(min(timeout,.01));return b''
+        with patch('nuxtlink.SerialPort',Port),patch.object(self.root,'destroy') as destroy:
+            a.connect();a.close_window();self.settle()
+            destroy.assert_called_once()
+        Port.close.assert_called_once()
+        self.assertIsNone(a.client)
+
+    def test_reconnect_when_previous_dos_folder_was_removed(self):
+        self.connect_fixture();a=self.app;a.client=None
+        a.remote='\\REMOVED';a.device.set('/dev/fake');a.latency.set('0')
+        port=Mock()
+        client=Mock(drive='C:\\')
+        client.establish.return_value=('NUXTLINK/6 C:\\ file server',self.info)
+        client.listing.side_effect=[RemoteError('DOS error 3 (path missing)'),self.listing]
+        with patch('nuxtlink.SerialPort',return_value=port),patch('nuxtlink.Client',return_value=client), \
+             patch('nuxtlink.LatencySession'),patch('nuxtlink.messagebox.showerror') as error:
+            a.connect();self.settle()
+            error.assert_not_called()
+        self.assertEqual([call.args[0] for call in client.listing.call_args_list],['\\REMOVED','\\'])
+        self.assertIs(a.client,client);self.assertEqual(a.remote,'\\')
+        self.assertEqual(a.location.get(),'C:\\')
+        self.assertIn('previous folder',a.status.get().lower())
+        port.close.assert_not_called()
+
+    def test_reconnect_does_not_hide_a_serial_failure_with_folder_fallback(self):
+        self.connect_fixture();a=self.app;a.client=None
+        a.remote='\\REMOVED';a.device.set('/dev/fake');a.latency.set('0')
+        port=Mock();client=Mock(drive='C:\\')
+        client.establish.return_value=('NUXTLINK/6 C:\\ file server',self.info)
+        client.listing.side_effect=LinkError('No valid reply')
+        with patch('nuxtlink.SerialPort',return_value=port),patch('nuxtlink.Client',return_value=client), \
+             patch('nuxtlink.LatencySession'),patch('nuxtlink.messagebox.showerror') as error:
+            a.connect();self.settle()
+            error.assert_called_once()
+        client.listing.assert_called_once_with('\\REMOVED')
+        self.assertIsNone(a.client);port.close.assert_called_once()
+
     def test_finished_report_and_progress_survive_automatic_refresh(self):
         self.connect_fixture()
         a=self.app;plan=self.make_plan()
         for job in plan.jobs:job.status='Complete'
         plan.status='Complete';a.busy=True
-        a.events.put(('progress',(1,'Complete',20,20)))
+        a.events.put(('progress',(1,'Complete',20,20,time.monotonic())))
         a.events.put(('done',('executed',str(self.folder/'last-report.txt'))))
         a.poll();self.settle()
         self.assertIn('Complete',a.status.get())

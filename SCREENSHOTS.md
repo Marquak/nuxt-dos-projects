@@ -14,3 +14,7 @@ These are saved program captures from development checks. NuXTLink shows sample 
 | **[NUXTDASH](NUXTDASH/)**<br>[<img src="NUXTDASH/SCREENSHOT.PNG" width="360" alt="The Drives page in an emulator. Hardware details will differ on your NuXT.">](NUXTDASH/SCREENSHOT.PNG)<br>The Drives page in an emulator. Hardware details will differ on your NuXT. |  |
 
 The Dune II setup screenshot shows Westwood's commercial game and is not covered by this repository's MIT license. See [third-party notes](THIRD_PARTY.md).
+
+## [3D Checkers 88](CHECKERS88/)
+
+[![The rotating 3D checkers board](CHECKERS88/DEPTH.PNG)](CHECKERS88/DEPTH.PNG)

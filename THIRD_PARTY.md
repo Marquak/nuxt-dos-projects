@@ -45,7 +45,7 @@ all possible third-party claims.
 
 ## Open Watcom runtime
 
-NUXMENU/NUI.EXE, ORBIT87, STARFIELD, MATRIX, NUXTLINK, SUNSET, NUXTROIDS and NUXTRIS binaries are linked
+NUXMENU/NUI.EXE, ORBIT87, STARFIELD, MATRIX, NUXTLINK, SUNSET, NUXTROIDS NUXTRIS and CHECKERS88 binaries are linked
 using Open Watcom 2.0. Their compiler/runtime portions are not relicensed by
 the repository's MIT license. The Sybase Open Watcom Public License 1.0 is
 retained as OWLIC.TXT in those projects and licenses/OPEN-WATCOM.txt here.
@@ -93,3 +93,32 @@ Original assembly, no third-party code incorporated. The BIOS interface and
 [Vidsync source](https://github.com/jhhoward/Vidsync/blob/main/vidsync.s) were
 consulted for mode switching and hook behaviour. GNU binutils is a build tool
 and is not bundled. TEXTMODE does not include Vidsync or mTCP.
+
+## NuXTLink compression
+
+NuXTLink 3.3.3 includes the heatshrink encoder at upstream revision
+`7d419e1fa4830d0b919b9b6a91fe2fb786cf3280`, copyright 2013-2015 Scott Vokes,
+under the ISC license. Source and the full notice are in
+[NUXTLINK/third_party/heatshrink](NUXTLINK/third_party/heatshrink/).
+The Linux native helper incorporates this encoder. The DOS assembly decoder,
+CRC and UART burst routines are project code. No FastLynx, Kermit or ZMODEM
+code is included.
+
+## 3D Checkers 88
+
+The game, renderer, AI and FM player are project code under MIT. Checkers AI
+projects and Little Game Engine were design references, not copied code;
+[CREDITS.TXT](CHECKERS88/CREDITS.TXT) records those references.
+
+The bundled Mutopia MIDI/LilyPond files and their converted music data retain
+their own licenses, including when embedded in CHECK88.EXE:
+
+- The Blue Danube theme: Nikos Kouremenos, based on Christian Mondrup's reduction,
+  CC BY-SA 4.0.
+- Moonlight Sonata, first movement: Stewart Holmes, CC BY-SA 2.5.
+- Fur Elise: Stelios Samelis, public domain.
+- Ode to Joy: Peter Chubb, public domain.
+
+Full attribution, source and license links, and changes made for FM playback
+are in [MUSIC/SOURCES.TXT](CHECKERS88/MUSIC/SOURCES.TXT). These musical assets
+are not relicensed under MIT. Original sources and the converter are included.

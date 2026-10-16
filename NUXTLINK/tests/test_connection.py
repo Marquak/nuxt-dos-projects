@@ -25,15 +25,15 @@ class BaudPort:
         if self.pending and self.clock.now()>=self.deadline:self.server=self.old;self.pending=0
     def info(self):
         baud,flow,peer,block=self.server
-        return struct.pack('<8B6I2IHHB',3,1,BAUDS.index(baud),FLOWS.index(flow),PEERS[peer],1,0xb0,3,
-                           0,0,0,0,0,0,1000000,2000000,512,block,self.pending)+b'\\NUXFER.COM\0'
+        return struct.pack('<8B6I2IHHB',6,1,BAUDS.index(baud),FLOWS.index(flow),PEERS[peer],1,0xb0,3,
+                           0,0,0,0,0,0,1000000,2000000,4096,block,self.pending)+b'\\NUXFER.COM\0'
     def write(self,data,timeout):
         self.poll();kind,seq=data[2:4];payload=data[6:-2];self.writes.append((self.baud,kind))
         if self.baud!=self.server[0]:return
         rate=self.baud;response=ACK
         if kind==HELLO:
             if self.hello_loss:self.hello_loss-=1;return
-            payload=b'NUXTLINK/3 C:\\ file server'
+            payload=b'NUXTLINK/6 C:\\ file server'
         elif kind==INFO:payload=self.info()
         elif kind==SETTINGS:
             if self.reject:response=ERROR;payload=b'Required CTS line is low'
@@ -63,7 +63,7 @@ class Connections(unittest.TestCase):
     def tearDown(self):
         for p in reversed(self.patches):p.stop()
     def make(self,baud=9600):
-        p=BaudPort(self.clock,baud);c=Client(p,9600);c.cancelled=Event(self.clock);return p,c
+        p=BaudPort(self.clock,baud);c=Client(p,9600);c.cancelled=Event(self.clock);c.stopping=Event(self.clock);return p,c
     def test_first_hello_lost_then_successful_9600_bootstrap(self):
         p,c=self.make();p.hello_loss=1
         hello,info=c.establish(115200,'rtscts','both',512)
@@ -81,8 +81,10 @@ class Connections(unittest.TestCase):
         self.assertEqual(info['baud'],115200);self.assertEqual(p.pending,0)
     def test_lost_confirm_ack_retries_same_command(self):
         p,c=self.make();p.drop[CONFIRM]=1
+        c.compress_uploads=False
         self.assertEqual(c.apply_settings(57600)['baud'],57600)
         self.assertEqual(p.confirm_replies,2);self.assertEqual(c.attempts,5)
+        self.assertFalse(c.compress_uploads)
     def test_lost_both_confirm_replies_uses_committed_diagnostics(self):
         p,c=self.make();p.drop[CONFIRM]=2
         self.assertEqual(c.apply_settings(57600)['baud'],57600);self.assertEqual(p.pending,0)
@@ -103,6 +105,23 @@ class Connections(unittest.TestCase):
         p,c=self.make(1200);p.configure(1200)
         c.apply_settings(1200)
         self.assertGreater(c.timeout,5)
+    def test_large_blocks_negotiate_with_lost_ack_and_slow_baud(self):
+        for size in (2048,4096):
+            with self.subTest(size=size):
+                p,c=self.make();p.drop[CONFIRM]=1
+                c.connect()
+                info=c.apply_settings(1200,'none','none',size)
+                self.assertEqual(info['block_size'],size)
+                self.assertEqual(p.server,(1200,'none','none',size))
+                self.assertGreater(c.timeout,(size+16)*10/1200)
+                self.assertEqual(c.diagnostics()['max_payload'],4096)
+    def test_large_block_switch_rolls_back_block_size_too(self):
+        p,c=self.make();c.connect();c.apply_settings(115200,'none','none',2048)
+        p.drop['all_confirm']=True
+        with self.assertRaisesRegex(LinkError,'recovered their previous settings'):
+            c.apply_settings(57600,'none','none',4096)
+        self.assertEqual(c.block_size,2048)
+        self.assertEqual(p.server,(115200,'none','none',2048))
     def test_failed_lock_does_not_restore_or_unlock_other_serial_owner(self):
         with patch('link.os.open',return_value=7),patch('link.os.close') as close, \
              patch('link.fcntl.flock',side_effect=BlockingIOError()), \

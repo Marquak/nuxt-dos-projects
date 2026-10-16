@@ -5,7 +5,7 @@ original Python code; it does not embed FileZilla's C++ code or dependencies.
 """
 from pathlib import Path
 from link import Cancelled, LinkError, dos_key, metadata_dir, atomic_json, preserve_metadata
-from transfers import execute, save_report, report_paths, safe_local
+from transfers import execute, save_report, report_paths, safe_local, completion_report
 
 FINISHED = ('Complete', 'Verified', 'Skipped')
 
@@ -100,6 +100,7 @@ def queue_report(queue):
         for job in plan.jobs:
             lines.append(f'{job.status}: {job.source} -> {job.target}')
             if job.reason: lines.append('  '+job.reason)
+            if completion_report(job): lines.append('  '+completion_report(job))
         lines.extend(f'ERROR: {e["path"]}: {e["error"]}' for e in plan.errors)
         lines.extend(f'EXCLUDED: {e["path"]}: {e["reason"]}' for e in plan.excluded)
         lines.extend(f'MISSING: {name}' for name in plan.missing)

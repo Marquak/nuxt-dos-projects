@@ -1,8 +1,23 @@
-# Snapshot checks, 2026-10-15
+# Snapshot checks, 2026-10-16
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
+
+## NuXTLink 3.3.3 and 3D Checkers 88 1.2.1
+
+Published the tested local releases with source, build scripts and credits.
+NuXTLink now has one DOS binary, NUXFER.COM (server version 3.3.1), alongside
+the 3.3.3 Linux client. Older binary aliases have been removed. Both ends use
+wire protocol v6; update both when upgrading from the previous public version.
+
+The final local NuXTLink review passed 86 host/Tk tests; all 86 also passed
+again from the publication copy on an isolated virtual display. Its TESTING.md records
+prior DOS integration and assembly checks. Checkers' TESTING.TXT records its
+host and DOSBox-X checks, including 1.2.1 input and redraw regression checks.
+These emulator suites were not repeated for publication. This packaging pass
+checks source/binary parity and the repository's complete checksum inventory.
+Checkers screenshots and music attribution accompany the source and executable.
 
 ## TEXTMODE, NuXT Menu 1.5 and Orbit87 2.1
 

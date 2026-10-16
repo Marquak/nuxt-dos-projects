@@ -19,10 +19,13 @@ import time
 import secrets
 
 BAUDS = (1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200)
-MAX_PAYLOAD = 512
+MAX_PAYLOAD = 4096
+BLOCK_SIZES = (128, 256, 512, 2048, 4096)
 MAGIC = b"NX"
 HELLO, FIRST, NEXT = 1, 2, 3
 PUT_BEGIN, PUT_DATA, PUT_END = 0x10, 0x11, 0x12
+PUT_COMPRESSED = 0x14
+PUT_VERIFY = 0x15
 GET_BEGIN, GET_DATA, GET_END = 0x20, 0x21, 0x22
 CANCEL, ACK, ERROR = 0x30, 0x80, 0xFF
 STAT, MKDIR, META, HASH, HASH_STEP = 4, 5, 6, 7, 8
@@ -307,12 +310,13 @@ class Parser:
 
 
 class SerialPort:
-    def __init__(self, path: str, baud: int, flow="none", peer="none"):
+    def __init__(self, path: str, baud: int, flow="none", peer="none", *, interrupted=None):
         if baud not in BAUDS or flow not in FLOWS or peer not in PEERS:
             raise ValueError('Unsupported baud rate')
         self.fd = os.open(path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         self.old = None
         self.exclusive = False
+        self.interrupted = interrupted if interrupted is not None else threading.Event()
         self.path, self.baud, self.flow, self.peer = path, baud, flow, peer
         try:
             fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -340,7 +344,9 @@ class SerialPort:
             raise
 
     def read(self, timeout: float) -> bytes:
-        ready, _, _ = select.select([self.fd], [], [], max(0, timeout))
+        self.check_interrupted()
+        ready, _, _ = select.select([self.fd], [], [], max(0, min(.1, timeout)))
+        self.check_interrupted()
         if not ready:
             return b''
         try:
@@ -352,9 +358,11 @@ class SerialPort:
         return data
 
     def write(self, data: bytes, timeout: float):
+        self.check_interrupted()
         end = time.monotonic()+timeout
         mask = (termios.TIOCM_DSR if self.peer in ('dsr', 'both') else 0) | (termios.TIOCM_CAR if self.peer in ('dcd', 'both') else 0)
         while mask:
+            self.check_interrupted()
             state = self.modem_status()
             if state is None:
                 raise LinkError('This serial device cannot report the required DSR/DCD signals.')
@@ -362,19 +370,25 @@ class SerialPort:
                 break
             if time.monotonic() >= end:
                 raise TimeoutError('Required DSR/DCD signal is low. Check cable and DOS readiness.')
-            time.sleep(.005)
+            self.interrupted.wait(.005)
         view = memoryview(data)
         while view:
+            self.check_interrupted()
             remaining = end-time.monotonic()
             if remaining <= 0:
                 raise TimeoutError('Serial write timed out')
-            _, ready, _ = select.select([], [self.fd], [], remaining)
+            _, ready, _ = select.select([], [self.fd], [], min(.1, remaining))
+            self.check_interrupted()
             if ready:
                 try:
                     n = os.write(self.fd, view)
                 except BlockingIOError:
                     continue
                 view = view[n:]
+
+    def check_interrupted(self):
+        if self.interrupted.is_set():
+            raise Cancelled('Disconnect requested; resumable files retained.')
 
     def configure(self, baud, flow='none', peer='none'):
         if baud not in BAUDS or flow not in FLOWS or peer not in PEERS:
@@ -396,43 +410,54 @@ class SerialPort:
             return None
 
     def close(self):
-        if self.fd is not None:
+        fd, self.fd = self.fd, None
+        if fd is not None:
             try:
                 if self.old is not None:
-                    termios.tcsetattr(self.fd, termios.TCSANOW, self.old)
-            except OSError:
-                pass
-            try:
+                    # Do not leave flow-stalled bytes queued at the old baud.
+                    try:termios.tcflush(fd, termios.TCOFLUSH)
+                    except (OSError, termios.error):pass
+                    try:termios.tcsetattr(fd, termios.TCSANOW, self.old)
+                    except (OSError, termios.error):pass
                 if self.exclusive and hasattr(termios, 'TIOCNXCL'):
-                    fcntl.ioctl(self.fd, termios.TIOCNXCL)
-            except OSError:
-                pass
-            os.close(self.fd)
-            self.fd = None
+                    try:fcntl.ioctl(fd, termios.TIOCNXCL)
+                    except OSError:pass
+            finally:
+                # termios.error is NOT an OSError. Always release the descriptor,
+                # even when an unplugged adapter rejects settings restoration.
+                os.close(fd)
 
 
 class Client:
     """Single-worker, stop-and-wait client; retries use the identical sequence."""
     def __init__(self, transport, baud=38400, timeout=None, attempts=5):
         self.transport = transport
-        self.timeout = timeout or max(3.0, (MAX_PAYLOAD+16)*10/baud + 1.0)
+        self.timeout = timeout or max(3.0, (512+16)*10/baud + 1.0)
         self.baud, self.flow, self.peer, self.block_size = baud, "none", "none", 128
+        self.compress_uploads = True
         self.attempts = attempts
         self.sequence = 0
         self.parser = Parser()
         self.retries = 0
         self.cancelled = threading.Event()
+        self.stopping = getattr(transport, 'interrupted', threading.Event())
+
+    def check_stopping(self):
+        if self.stopping.is_set():
+            raise Cancelled('Disconnect requested; resumable files retained.')
 
     def request(self, kind: int, payload=b'', *, cancellable=True) -> bytes:
         seq = self.sequence
         self.sequence = (seq+1) & 255
         packet = encode(kind, seq, payload)
         for attempt in range(self.attempts):
+            self.check_stopping()
             if cancellable and self.cancelled.is_set():
                 raise Cancelled('Transfer cancelled')
             self.transport.write(packet, self.timeout)
             until = time.monotonic()+self.timeout
             while time.monotonic() < until:
+                self.check_stopping()
                 # Finish the in-flight CRC-checked reply before honoring cancellation.
                 frame = self.parser.pop()
                 if frame is None:
@@ -455,9 +480,9 @@ class Client:
 
     def connect(self) -> str:
         hello = self.request(HELLO).decode('ascii', errors='replace')
-        if not hello.startswith('NUXTLINK/3 '):
-            raise VersionError('Install the matching NuXT Link 3 DOS server and Linux client.')
-        match = re.fullmatch(r'NUXTLINK/3 ([A-Z]:\\) .+', hello)
+        if not hello.startswith('NUXTLINK/6 '):
+            raise VersionError('Install both the NuXT Link 3.3.1 DOS server and Linux client.')
+        match = re.fullmatch(r'NUXTLINK/6 ([A-Z]:\\) .+', hello)
         if not match:
             raise LinkError('Invalid server greeting or drive')
         self.drive = match.group(1)
@@ -467,10 +492,10 @@ class Client:
                   notify=lambda text: None):
         """Discover an idle server, then confirm the requested settings.
 
-        New servers start at 9600. A still-running/older server may be at its
+        Servers start at 9600. A still-running server may be at its
         previous speed. Never send break or reset modem lines to force it.
         """
-        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in (128,256,512):
+        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in BLOCK_SIZES:
             raise ValueError('Unsupported connection settings')
         attempts, timeout = self.attempts, self.timeout
         rates = list(dict.fromkeys((9600, baud, 38400, 115200, 57600, 19200, 4800, 2400, 1200)))
@@ -555,9 +580,9 @@ class Client:
                   'crc_errors', 'overruns', 'parity_errors', 'framing_errors', 'breaks', 'flow_timeouts',
                   'free_bytes', 'total_bytes', 'max_payload', 'block_size', 'pending')
         info = dict(zip(fields, struct.unpack(fmt, data[:size])))
-        if (info['version'] != 3 or info['baud_index'] >= len(BAUDS) or info['flow_id'] > 1 or
+        if (info['version'] != 6 or info['baud_index'] >= len(BAUDS) or info['flow_id'] > 1 or
             info['peer_mask'] not in PEERS.values() or info['com'] not in (1,2,3,4) or
-            info['block_size'] not in (128,256,512) or not info['block_size'] <= info['max_payload'] <= MAX_PAYLOAD):
+            info['block_size'] not in BLOCK_SIZES or info['max_payload'] != MAX_PAYLOAD):
             raise LinkError('Unsupported diagnostics version or settings')
         info['baud'] = BAUDS[info['baud_index']]
         info['flow'] = FLOWS[info['flow_id']]
@@ -567,13 +592,13 @@ class Client:
         return info
 
     def apply_settings(self, baud, flow='none', peer='none', block_size=128):
-        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in (128,256,512):
+        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in BLOCK_SIZES:
             raise ValueError('Unsupported connection settings')
         old = self.diagnostics()
         desired = (baud, flow, peer, block_size)
         if desired == (old['baud'], old['flow'], old['peer'], old['block_size']):
             self.transport.configure(baud, flow, peer)
-            self.timeout = max(3.0, (MAX_PAYLOAD+16)*10/baud + 1.0)
+            self.timeout = max(3.0, (max(512,block_size)+16)*10/baud + 1.0)
             return old
         token = secrets.randbits(32)
         packet = struct.pack('<BBBHI', BAUDS.index(baud), FLOWS.index(flow), PEERS[peer], block_size, token)
@@ -587,16 +612,19 @@ class Client:
                 answer = self.request(SETTINGS, packet, cancellable=False)
             except RemoteError:
                 raise
+            except Cancelled:
+                raise
             except (LinkError, TimeoutError):
                 answer = None  # Server may already have switched after a lost ACK.
             if answer is not None and answer != packet:
                 raise LinkError('Connection-settings acknowledgement mismatch')
             prepared = True
-            time.sleep(.28)
+            self.stopping.wait(.28)
+            self.check_stopping()
             self.transport.configure(baud, flow, peer)
             if hasattr(self.transport, 'discard'): self.transport.discard()
             self.parser.buffer.clear()
-            self.timeout = max(3.0, (MAX_PAYLOAD+16)*10/baud + 1.0)
+            self.timeout = max(3.0, (max(512,block_size)+16)*10/baud + 1.0)
             self.attempts = 2
             answer = self.request(CONFIRM, struct.pack('<I',token), cancellable=False)
             info = self._diagnostics(answer)
@@ -604,6 +632,8 @@ class Client:
                 raise LinkError('Server confirmed different settings')
             info['pending'] = 0
             return info
+        except Cancelled:
+            raise
         except RemoteError:
             if not prepared:
                 raise
@@ -623,12 +653,15 @@ class Client:
                             info = self._diagnostics(self.request(CONFIRM,struct.pack('<I',token),cancellable=False))
                         info['pending'] = 0
                         return info
+                except Cancelled:
+                    raise
                 except (OSError, LinkError):
                     pass
             # Unconfirmed changes expire after 218 BIOS ticks (about 12 seconds).
             remaining = 13.5 - (time.monotonic()-started)
             if remaining > 0:
-                time.sleep(remaining)
+                self.stopping.wait(remaining)
+                self.check_stopping()
             self.transport.configure(old['baud'],old['flow'],old['peer'])
             self.parser.buffer.clear()
             self.timeout = timeout
@@ -653,14 +686,19 @@ class Client:
 
     def abort(self):
         # Pause closes DOS handles but retains upload staging for reconnection.
-        old = self.attempts
+        if self.stopping.is_set():return False
+        old, timeout = self.attempts, self.timeout
         try:
             self.attempts = 1
+            # A missing peer must not turn cleanup into another long transfer.
+            # At most 0.5s writing and 0.5s waiting for this tiny ACK.
+            self.timeout = min(timeout, .5)
             self.request(CANCEL, cancellable=False)
-        except (OSError, LinkError, TimeoutError):
-            pass
+            return True
+        except (OSError, termios.error, LinkError):
+            return False
         finally:
-            self.attempts = old
+            self.attempts, self.timeout = old, timeout
 
     def listing(self, path='\\'):
         result, kind, payload = [], FIRST, wire_path(path)
@@ -724,6 +762,9 @@ class Client:
         if meta.is_dir or size != meta.size or size > MAX_FILE:
             raise ValueError('Invalid file size or source changed during preparation')
         before = source.stat()
+        compressed_blocks = raw_blocks = wire_bytes = 0
+        if self.compress_uploads:
+            from heatshrink_codec import packet as compress_packet
         try:
             reply = self.request(PUT_BEGIN, meta.pack()+struct.pack('<HB', checksum, overwrite)+wire_path(path))
             if len(reply) != 4:
@@ -740,17 +781,30 @@ class Client:
                     data = stream.read(min(self.block_size, size-done))
                     if not data:
                         raise LinkError('Local file became shorter during transfer')
-                    self.request(PUT_DATA, data)
+                    packed = compress_packet(data) if self.compress_uploads else None
+                    if packed is not None:
+                        self.request(PUT_COMPRESSED, packed)
+                        compressed_blocks += 1
+                        wire_bytes += len(packed)
+                    else:
+                        self.request(PUT_DATA, data)
+                        raw_blocks += 1
+                        wire_bytes += len(data)
                     done += len(data)
                     progress(done, size)
             after = source.stat()
             if (before.st_size, before.st_mtime_ns, before.st_ino) != (after.st_size, after.st_mtime_ns, after.st_ino):
                 raise LinkError('Local file changed during transfer; upload retained without committing')
+            verified_size, verified_crc = self.scan(PUT_VERIFY)
+            if verified_size != size or verified_crc != checksum:
+                raise LinkError('DOS staging-file readback failed; original destination and partial retained')
             reply = self.request(PUT_END, struct.pack('<H', checksum))
             if reply != struct.pack('<H', checksum) or self.stat(path) != meta:
                 raise LinkError('Upload data or DOS metadata verification failed')
             progress(size, size)
-            return {'crc16': checksum, 'sha256': digest, 'resumed_bytes': offset, 'metadata': asdict(meta)}
+            return {'crc16': checksum, 'sha256': digest, 'resumed_bytes': offset, 'metadata': asdict(meta),
+                    'compressed_blocks': compressed_blocks, 'raw_blocks': raw_blocks,
+                    'upload_payload_bytes': wire_bytes}
         except BaseException:
             self.abort()
             raise

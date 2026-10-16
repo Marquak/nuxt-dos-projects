@@ -13,16 +13,16 @@ class V3Tests(unittest.TestCase):
         class Port:
             def write(self,data,timeout):self.data=encode(ACK,data[3],b'NUXTLINK/2 C:\\ file server')
             def read(self,timeout):data=self.data;self.data=b'';return data
-        with self.assertRaisesRegex(VersionError,'matching NuXT Link 3'):
+        with self.assertRaisesRegex(VersionError,'both the NuXT Link 3.3.1'):
             Client(Port()).connect()
 
     def test_frame_limit_and_split_large_crc(self):
-        for size in (0,127,128,129,255,256,511,512):
+        for size in (0,127,128,129,255,256,511,512,513,2047,2048,2049,4095,4096):
             payload=bytes(i%256 for i in range(size));wire=encode(PUT_DATA,9,payload)
             parser=Parser()
             for pos in range(0,len(wire),13):parser.feed(wire[pos:pos+13])
             self.assertEqual(parser.pop(),(PUT_DATA,9,payload))
-        with self.assertRaises(ValueError):encode(PUT_DATA,9,b'x'*513)
+        with self.assertRaises(ValueError):encode(PUT_DATA,9,b'x'*4097)
 
     def test_cancellation_finishes_current_reply(self):
         event=threading.Event()
@@ -51,6 +51,10 @@ class V3Tests(unittest.TestCase):
             path=Path(folder)/'settings.json';store=Profiles(path)
             store.save('NuXT',dict(baud=115200,flow='rtscts',peer='both',block=512))
             self.assertEqual(Profiles(path).items['NuXT']['peer'],'both')
+            for size in (2048,4096):
+                store.save('Large',dict(block=size))
+                self.assertEqual(Profiles(path).items['Large']['block'],size)
+            store.delete('Large')
             with self.assertRaises(ValueError):store.save('Bad',dict(baud=123))
             store.delete('NuXT');self.assertEqual(Profiles(path).items,{})
 

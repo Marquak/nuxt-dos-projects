@@ -1,5 +1,5 @@
 {
-  "snapshot_date": "2026-10-15",
+  "snapshot_date": "2026-10-16",
   "collection": "NuXT DOS projects",
   "projects": {
     "NUXMENU": "1.5",
@@ -7,15 +7,17 @@
     "STARFIELD": "1.0",
     "MATRIX": "2.0",
     "INVADERS": "2.0",
-    "NUXTLINK": "3.2.1",
+    "NUXTLINK": "3.3.3 (DOS server 3.3.1, wire v6)",
     "SUNSET": "3.2",
     "DUNE2FIX": "1.1 combined XMS/manual-check patcher only",
     "NUXTDASH": "1.3",
     "NUXTROIDS": "1.3",
     "NUXTRIS": "1.2",
-    "TEXTMODE": "1.0"
+    "TEXTMODE": "1.0",
+    "CHECKERS88": "1.2.1"
   },
   "binaries": {
+    "CHECKERS88/CHECK88.EXE": "cc4600f475d7bdbb48849c1514e81cea4a6263243c8a38a979f1679ce14cad07",
     "INVADERS/INVADERS.COM": "cffd87bc977102ac229bf4f8b144e4b24ee9696f10b173bd46d7fc1d2701de13",
     "MATRIX/BENCH.EXE": "91ca8c76fd137ee3b146395c7cace24b1020e6be2e0e27093b577fd947fe6fa6",
     "MATRIX/CHECK.EXE": "785208019ae71e1c0564fd41ac9658d620fe6149acb4188630d40ec6a4c71f8a",
@@ -24,16 +26,13 @@
     "NUXMENU/MENU.EXE": "1a1c222a1e31a07e206fb2a4da9146a73aa60d0a09713693795dd33778a2853b",
     "NUXMENU/NUI.EXE": "65c77ed0b5c4b3f017a01bdd6bedf8614c5c09eb7720bbf4bde98545e060f075",
     "NUXTDASH/DASH.COM": "4605d3619252737db8c85fcfad2e4c398048d7b1ea21ade8cd25866e9a27c75c",
-    "NUXTLINK/NUXFER.COM": "ac78be5b5ceac7d9e39ed82ad87ab2a36cc0c52efcab3225ccb51dad63bd0830",
-    "NUXTLINK/NUXFER32.COM": "ac78be5b5ceac7d9e39ed82ad87ab2a36cc0c52efcab3225ccb51dad63bd0830",
-    "NUXTLINK/dos/NUXFER.COM": "ac78be5b5ceac7d9e39ed82ad87ab2a36cc0c52efcab3225ccb51dad63bd0830",
+    "NUXTLINK/NUXFER.COM": "0b0a1c98d861d928e594000768bba74b06bbad844f4831ae9961bac9ea799a8c",
     "NUXTRIS/NUXTRIS.EXE": "aeb9d888ce61d643d4c8700bcc87511bf6170143d39da8d80b484e366d96d0e2",
     "NUXTROIDS/NUXTROID.EXE": "5d7c3f23ace21dd3e560420a685db4b2aef23944a4c32542a1432111b3de895a",
     "ORBIT87/ORBIT87.EXE": "129c4e932fd7c862dcfa080ea265e3ae88e129a17bffaa00a3765d9faa43c08b",
     "ORBIT87/ORBITV20.EXE": "adbdcc9d009cd623b0f0f907cb235b96dc766452eddaa2fc203c0f69a8b2e90e",
     "STARFIELD/STAR.EXE": "b8fd1fd38ae86d15b31e67b74438aa278e716b5128fd80f8025de843d7c384cb",
     "SUNSET/SUNSET.EXE": "1891a5b5c5191ba144d63998ef73698e9a2b40b3701b07cd892a38ed712e372f",
-    "NUXTLINK/NUX321.COM": "ac78be5b5ceac7d9e39ed82ad87ab2a36cc0c52efcab3225ccb51dad63bd0830",
     "TEXTMODE/TEXTMODE.COM": "43d02da28de0a35e1e53e4597d13d6089f746cfaa98c251a5be1f930b6881bac"
   },
   "toolchain": "Open Watcom 2.0 beta Oct 5 2026; GNU binutils 2.47",

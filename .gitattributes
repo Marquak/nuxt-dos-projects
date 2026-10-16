@@ -19,3 +19,7 @@
 
 # Keep the ready-to-copy DOS wrapper CRLF even in GitHub ZIP downloads.
 TEXTMODE/*.BAT -text
+
+# Preserve the original upstream music sources byte-for-byte.
+CHECKERS88/MUSIC/*.ly -text
+CHECKERS88/MUSIC/*.mid binary

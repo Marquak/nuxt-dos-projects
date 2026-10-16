@@ -1,3 +1,185 @@
+# NuXT Link 3.3.3 final review, 16 October 2026
+
+86 host/Tk tests passed on a private Xvfb display. The missing-folder reconnect
+test first reproduced the failure against 3.3.2, then passed with root fallback.
+A second test confirms a serial failure is not hidden by that fallback and the
+failed connection's descriptor is closed.
+
+The focused source review covered Linux reconnect/shutdown, queue paths and
+retry state, compression framing, and DOS staged-file verification/commit and
+cached replies. No other actionable bug was identified in those reviewed paths.
+This is not a guarantee that every hardware or failure case has been exercised.
+DOS source/binary is unchanged; previous DOS integration results below still
+apply. No physical serial device or emulator was used for this final pass.
+
+---
+
+# NuXT Link 3.3.2 validation, 16 October 2026
+
+84 host/Tk tests passed on a private Xvfb display. Eleven new tests cover silent
+peers, low handshake signals, blocked writes, settings negotiation/recovery
+interruption, discovery cancellation, cleanup EIO errors, descriptor release,
+one-time window shutdown and keeping the queue after a busy disconnect.
+
+The silent-peer test checks one CANCEL attempt with at most 0.5 seconds for
+writing and 0.5 seconds for its reply, even with a 40-second transfer timeout.
+Private PTY checks verify that a shutdown signal interrupts a waiting request
+without retries. Tk tests reproduce cleanup errors and confirm the window
+closes once, the spinner stops and the connection is cleared. These tests use
+fake peers and private PTYs, not the user's serial adapter. Linux authorization
+for FTDI restoration, if required, can still need user interaction.
+
+Reviewed the [pySerial POSIX implementation](https://github.com/pyserial/pyserial/blob/master/serial/serialposix.py)
+for I/O cancellation and descriptor cleanup. No code was copied and no new
+dependency was added. DOS source/binary and wire protocol are unchanged from
+3.3.1; no emulator or physical NuXT run was needed for this Linux-only fix.
+
+---
+
+# NuXT Link 3.3.1 validation, 16 October 2026
+
+73 host/Tk tests passed. New checks cover active time accumulated across a retry
+while excluding the pause, result persistence in combined queue reports,
+resume-aware ratio arithmetic, raw/empty/already-staged files, completion-only
+columns, numeric sorting and entry details. A bad staging-readback CRC is
+rejected by the Linux client without sending PUT_END. The 1024x720 completed
+queue layout was visually checked. The DOS server builds with Open Watcom,
+8086 target and warnings as errors, to 26,740 bytes.
+
+The updated server passed the existing raw/compressed integration suites on a
+private MS-DOS 6.22/QEMU disk: 2048/4096-byte transfers, sequence wrap, metadata,
+resume, raw fallback, malformed compressed blocks and deliberate packet faults.
+New checks confirm commit is rejected without readback, lost readback/commit
+ACKs replay safely, cancelling readback leaves the old destination intact,
+fully staged uploads resume without sending payload again, and empty files
+complete verification. There were nine injected frame faults across the raw
+and compressed suites. No physical serial device, CF card or 86Box was used.
+
+The review covered DOS UART/FIFO/CRC/decode boundaries, command/transfer state,
+resume/commit paths and Linux framing, queue execution and reporting. This is
+a focused bug review, not a claim that every possible fault was tested. Assembly
+routines are unchanged from 3.3; their 422-case checks were not repeated.
+
+Correction to historical notes below: releases through 3.3 checked the upload's
+received rolling CRC, not an actual reread of DOS staging. That gap is fixed in
+3.3.1. Downloads already had local readback verification.
+
+---
+
+# NuXT Link 3.3 validation, 16 October 2026
+
+The 26,398-byte NUXFER.COM builds with Open Watcom targeting 8086, warnings as
+errors. An independent link-map build matches the shipped binary exactly.
+Code/data/BSS is 45,566 bytes; BSS remains unchanged at 18,912 bytes. The program
+fits the tiny-model segment with its configured 4096-byte stack and PSP. Both
+the file and linked group grew by 584 bytes compared with 3.2.2. Decompression
+reuses the existing disk buffer instead of adding another 4 KiB history buffer.
+
+69 host/Tk tests passed on a private Xvfb display, including native heatshrink
+encoder round trips against an independent format reader, raw fallback,
+compression profile settings and UI busy state. Existing connection retries,
+rollback, CRC, queue, metadata, clock and speed-display tests passed. The
+1024x720 layout was visually checked with connection options expanded.
+
+422 Unicorn assembly cases passed against separately assembled copies of the
+same release routines:
+
+- CRC over 0..4100 bytes with four seeds, checking against Python's CRC-HQX.
+- Heatshrink output from the upstream encoder, random/repetitive/all-byte
+  patterns, overlapping references and initial zero history, including maximum
+  distance 4096. Truncation, excess decoded length, trailing bytes and nonzero
+  padding are rejected. Output canaries and saved registers/IF/DF are checked.
+- FIFO fills from zero to 16 bytes on two COM bases; required CTS/DSR/DCD lines
+  can stop a burst before its first byte or partway through. No bytes are sent
+  while the required lines are low. Single-byte non-FIFO calls are covered.
+
+On a private MS-DOS 6.22/FAT16 QEMU disk, the delivered server passed:
+
+- Existing raw 65,573-byte upload/download tests at 2048 and 4096 bytes,
+  sequence wrap, lost write ACKs, corrupt download replies, metadata checks,
+  resume at byte 2048 with a changed block size and oversized-header rejection.
+- Mixed compressed/raw 73,733-byte uploads at 2048 and 4096 bytes, lost compressed
+  write ACKs, sequence wrap and exact readback with read-only/hidden/system
+  attributes and timestamps. Synthetic data used 31,265 / 31,187 payload bytes
+  respectively; these figures are compression ratios, not performance results.
+- Raw/compressed/raw resume at offsets 2048 and 6144, changing block size.
+- Invalid decoded sizes, truncated streams, extra bytes, nonzero padding and
+  decoded CRC mismatches rejected without writing or advancing position. A
+  valid block and commit afterward produce exact expected bytes.
+- Compressed-frame CRC corruption recovered through retransmission. Seven
+  deliberate packet faults across the raw/compressed suites recovered.
+- Compressed 128/256/512-byte blocks with raw one-byte tails, and transmission
+  with and without configured RTS/CTS flow control.
+
+These checks validate behavior, not V20 performance, actual FTDI latency or
+physical CTS propagation. NuXT throughput remains to be measured by the owner.
+No real serial port, CF card, system clock or 86Box instance was used.
+
+Reproduce host tests (build the helper first if needed):
+
+```sh
+sh linux/build_codec.sh
+xvfb-run -a python3 -m unittest discover -s tests -v
+```
+
+For the assembly checks, assemble/link CRC.ASM, HSDEC.ASM and UARTTX.ASM into
+standalone COM files named CRC.com, HSDEC.com and UARTTX.com with respective
+entry symbols crc_fast_, hs_decode_ and uart_tx_fill_. Pass their directory to
+`python3 tests/fast_emulation.py DIR` (Unicorn is a test-only dependency).
+
+Boot the server on a disposable DOS disk for `tests/integration_blocks.py` and
+`tests/integration_compression.py`, each with a serial PTY path argument.
+They create/overwrite NXBTEST and NXCTEST and change serial settings. Never
+point them at valuable DOS files. Earlier validation below is historical.
+
+---
+
+# Linux speed display follow-up, 16 October 2026
+
+64 host/Tk tests passed. The new regression queues three worker updates over
+one second, then processes them together after a simulated UI delay. The
+meter correctly reports 8.0 KiB/s and a three-second ETA, independent of the
+UI's processing time. This is a display correction only; the 3.2.2 DOS binary
+is byte-identical, and DOS integration was not repeated.
+
+The owner reports about 7.8-8 KiB/s with 2048-byte blocks and about 8.5 KiB/s
+with 4096 on the same floppy image. The one-time startup reading near 40 KiB/s
+is not a sustainable UART rate. This report motivated the timing fix; the
+specific physical transfer was not independently instrumented.
+
+---
+
+# Larger transfer blocks: 3.2.2 validation, 16 October 2026
+
+63 host/Tk tests passed on a private Xvfb display. Added checks cover split
+frames through 4096 bytes, oversized-frame rejection, profile persistence,
+large-block settings with lost confirmation ACKs, low-baud timeout scaling,
+and rollback from 4096 to 2048. Previous transfer/queue/clock/UI checks passed.
+
+The 25,814-byte DOS COM builds with Open Watcom targeting 8086, warnings as
+errors. An independent map build matched the delivered binary exactly.
+The linked code/data/BSS group is 44,982 bytes, leaving room for the configured
+4096-byte stack and PSP within the tiny-model segment. Three expanded frame
+buffers add 10,752 bytes compared with 3.2.1.
+
+Focused checks on a disposable MS-DOS 6.22/QEMU disk passed:
+
+- 65,573-byte binary upload/download at both 2048 and 4096, crossing 64 KiB,
+  with exact data, CRC and DOS metadata verification.
+- Sequence wrap, dropped write ACKs and corrupt read replies. Four deliberately
+  injected packet faults recovered without duplicate writes or skipped data.
+- Upload and download resume at byte 2048 after switching to 4096-byte blocks.
+- Oversized declared payload rejection followed by a successful request.
+- Settings changes through all five block sizes, then return to 9600/128.
+
+Reproduce with tests/integration_blocks.py on a disposable DOS server only.
+QEMU was chosen for actual DOS file I/O and protocol checks. Its serial backend
+is not a physical FTDI adapter or a V20 timing model. No real UART, user CF card
+or 86Box was accessed. Throughput, error counts and responsiveness on the NuXT
+still need hardware testing. Historical reports below apply to older releases.
+
+---
+
 # Date/time sync update, 2026-10-13
 
 NuXT Link 3.2.1 built with the existing Open Watcom 8086/tiny-model build,

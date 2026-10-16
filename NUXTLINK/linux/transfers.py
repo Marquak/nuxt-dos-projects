@@ -23,6 +23,52 @@ class Job:
     status: str = 'Queued'
     result: dict = field(default_factory=dict)
     overwrite: bool = False
+    elapsed_seconds: float = 0.0
+
+
+def elapsed_label(seconds):
+    seconds = max(0, seconds)
+    if seconds < 60:
+        return f'{seconds:.1f}s'
+    whole = int(seconds)
+    if whole < 3600:
+        return f'{whole//60}m {whole%60:02d}s'
+    return f'{whole//3600}h {whole//60%60:02d}m {whole%60:02d}s'
+
+
+def compression_stats(job):
+    """Original bytes / acknowledged payload, for the successful attempt only."""
+    if job.action != 'send' or 'upload_payload_bytes' not in job.result:
+        return None
+    original = job.meta.size - job.result.get('resumed_bytes', 0)
+    payload = job.result['upload_payload_bytes']
+    if original <= 0 or payload <= 0:
+        return None
+    return original / payload, 100 * (1 - payload / original)
+
+
+def completion_columns(job, status=None):
+    if (status or job.status) != 'Complete' or job.action not in ('send', 'receive'):
+        return '', ''
+    stats = compression_stats(job)
+    if stats is not None:
+        ratio, saved = stats
+        compression = f'{ratio:.2f}:1 ({saved:.0f}% saved)'
+    elif not job.meta.size:
+        compression = 'Empty file'
+    elif job.result.get('resumed_bytes') == job.meta.size:
+        compression = 'Already staged'
+    else:
+        compression = 'Raw' if job.action == 'receive' else ''
+    return elapsed_label(job.elapsed_seconds), compression
+
+
+def completion_report(job):
+    elapsed, compression = completion_columns(job)
+    if not elapsed:
+        return ''
+    scope = ' (last resumed portion)' if job.action == 'send' and job.result.get('resumed_bytes') else ''
+    return f'Time: {elapsed} active; compression: {compression}{scope}'
 
 
 @dataclass
@@ -330,6 +376,8 @@ def save_report(plan, paths):
             lines.append('  '+j.reason)
         if j.result:
             lines.append('  '+json.dumps(j.result, sort_keys=True))
+        if completion_report(j):
+            lines.append('  '+completion_report(j))
     for e in plan.errors:
         lines.append(f'ERROR: {e["path"]}: {e["error"]}')
     for e in plan.excluded:
@@ -355,7 +403,10 @@ def execute(client, plan, progress=lambda index,job,done,total: None):
                     directories.append((index, job))
                 continue
             current = job
+            if job.status in ('Failed', 'Cancelled'):
+                job.reason = ''
             job.status = 'Running'
+            started = time.monotonic() if job.action in ('send', 'receive') else None
             progress(index, job, 0, job.meta.size)
             try:
                 if plan.direction == 'upload' and job.action in ('send', 'verified') and local_metadata(job.source) != job.meta:
@@ -404,6 +455,9 @@ def execute(client, plan, progress=lambda index,job,done,total: None):
                 # continuing could cause a stream of misleading follow-on errors.
                 job.status, job.reason = 'Failed', str(exc)
                 raise
+            finally:
+                if started is not None:
+                    job.elapsed_seconds += max(0, time.monotonic() - started)
             progress(index, job, job.meta.size, job.meta.size)
             save_report(plan, paths)
         # Apply directory timestamps last, deepest first. Creating child files
