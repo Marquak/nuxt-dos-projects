@@ -111,8 +111,9 @@ These are diagnostics, not a measured average frame rate.
 
 DOSBox tests looked playable at 640x480 and 800x600, but the NuXT's ISA VGA
 bus is the real test. The Trident path reuses the mode setup from our other
-NuXT demos. The user has confirmed the game runs on the NuXT. The user also confirmed the 1.1 score-update hitch is fixed. The owner reported lag in later waves in 1.2; version 1.3 needs a new
-physical NuXT playtest.
+NuXT demos. I confirmed the game runs on the NuXT and the 1.1 score hitch is
+fixed. I still noticed lag in later waves with 1.2, so version 1.3 needs a
+new playtest on the NuXT.
 No 86Box testing was used.
 
 The program expects normal BIOS timer timing on entry and restores that

@@ -158,10 +158,10 @@ Masked assembly spans fill the base a byte at a time; VGA write mode 3
 paints its rim edges without disturbing neighbouring pixels. Piece shapes
 and colours are unchanged. Existing CHECK88.CFG settings still work.
 
-The title's '88' is the name, not an 8088 compatibility claim. The target
-is the user's NuXT V20 with VGA and optional 8087/AdLib. DOSBox-X was used
-for development checks. Real NuXT joystick timing, audio balance and AI
-thinking times still need a physical test. No 86Box tests were run.
+The title's '88' is the name, not an 8088 compatibility claim. It targets
+my NuXT V20 with VGA and supports its 8087 and AdLib. DOSBox-X was used for
+development checks. Joystick timing, audio balance and AI thinking times still
+need a physical NuXT test. No 86Box tests were run.
 
 1.2.1 REVIEW UPDATE
 Keyboard and mouse input from the same poll now perform only one action,

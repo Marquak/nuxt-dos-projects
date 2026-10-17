@@ -73,13 +73,13 @@ and two in SETUP.EXE; executable sizes and all other bytes stay unchanged. Outpu
 The exact original setup reproduced error 80h in QEMU/MS-DOS 6.22 with a
 controlled XMS stub advertising a manager but rejecting functions. Patched
 setup reached its menu and patched game reached the main menu under that same
-stub. The owner then confirmed the fix works on a real NuXT with USE!UMBS and
+stub. I then confirmed the fix works on my NuXT with USE!UMBS and
 DOSMAX. This is startup compatibility validation, not a complete playthrough.
 
 The combined build was also checked with the same XMS stub in QEMU. Targeted
 instruction tests verified that the old build entered the manual check after
 missions 1/7 and the new build skipped it, while retaining both XMS fixes. The
-owner confirmed the combined build works on the NuXT. This wasn't a complete
+I confirmed the combined build works on the NuXT. This wasn't a complete
 campaign playthrough.
 
 The included tests use synthetic fixtures, not commercial game bytes:

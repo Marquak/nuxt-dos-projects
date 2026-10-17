@@ -97,7 +97,7 @@ Watcom 2 can rebuild the game with WATCOM=/path/to/watcom sh BUILD.SH.
 
 TEST STATUS
 
-The user confirmed a playable NuXT-to-DOSBox-X LAN match with 0.6.1.
+I confirmed a playable NuXT-to-DOSBox-X LAN match with 0.6.1.
 A two-client DOSBox-X serial test also completed with matching scores
 on both sides and no frame or UART errors. For 0.6.2, a routed DOSBox-X
 LAN test reached live play after an unrelated large packet; zero game

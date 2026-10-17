@@ -47,7 +47,7 @@ DOSBox-X, VGA and 8086 CPU setting, without ANSI.SYS:
 80x50/8x8 font, 80x25/8x16 font, invalid/missing arguments, surrounding
 spaces, and unchanged geometry after an invalid argument. The BIOS data
 area was read independently to check results. No 86Box tests.
-The owner subsequently confirmed the IRCjr wrapper works on the NuXT.
+I also confirmed the IRCjr wrapper works on my NuXT.
 The automated checks did not emulate the physical LCD/Vidsync combination.
 
 REFERENCES
@@ -61,7 +61,7 @@ Local mTCP IRCjr SCREEN.CPP was reviewed for BIOS row-count detection.
 No source code was copied from these projects.
 
 Coding: ChatGPT / Codex. Emulator checks: Codex.
-Physical NuXT testing: owner confirmed IRC50 works on 2026-10-15.
+Physical NuXT testing: I confirmed IRC50 works on 2026-10-15.
 Serial transfer preserved the batch; FTP text conversion introduced extra
 carriage returns. Use Binary transfer mode for BAT/CFG/TXT as well as COM.
 

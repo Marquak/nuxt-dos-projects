@@ -72,10 +72,10 @@ noisy links or at low baud rates.
 
 The baud rate and 8N1 framing are unchanged. At 115200 the raw ceiling is
 11.25 KiB/s before protocol overhead. Raw transfers remain below that
-ceiling. In the owner's earlier 3.2.2 floppy-image test, 2048-byte blocks sustained about
-7.8-8 KiB/s and 4096-byte blocks about 8.5 KiB/s. Results depend on the file
-and setup. The larger DOS buffers use another 10.5 KiB while the server runs; the memory
-is released on exit.
+ceiling. In an earlier 3.2.2 floppy-image test on my NuXT, 2048-byte blocks
+sustained about 7.8-8 KiB/s and 4096-byte blocks about 8.5 KiB/s. Results
+depend on the file and setup. The larger DOS buffers use another 10.5 KiB
+while the server runs; the memory is released on exit.
 
 ## Compression and faster serial handling
 

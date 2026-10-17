@@ -77,8 +77,8 @@ disable interrupts, change turbo settings or install an interrupt handler.
 Treat the MHz number as approximate. Interrupt handlers, bus waits, memory
 refresh and instruction fetching can lower the estimate. Modified timer
 software and emulator timing can make it inaccurate. Timeouts and implausible
-results display N/A. The user confirmed turbo-speed changes on the NuXT; the display
-is not forced to one of the expected 4.77/7.16/9.55 MHz settings.
+results display N/A. I confirmed that the speed reading changes with turbo
+on my NuXT; it is not forced to 4.77, 7.16 or 9.55 MHz.
 
 8087 / x87 PROBE
 ---------------
@@ -186,4 +186,4 @@ https://fd.lod.bz/rbil/interrup/bios/1308.html
 https://fd.lod.bz/rbil/interrup/io_disk/1348.html
 
 No third-party source code is bundled. Implementation uses the documented
-interfaces/instructions. The owner confirmed the final 1.3 build on the NuXT.
+interfaces/instructions. I confirmed the final 1.3 build on my NuXT.

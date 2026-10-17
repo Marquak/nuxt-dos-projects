@@ -130,9 +130,9 @@ Two 1024x768/16 pages do not fit 512 KB, so the NuXT uses a single page
 at that resolution. Other cards may use VBE page flipping if the BIOS
 and memory checks allow it. Otherwise single-page drawing is retained.
 /SINGLE forces that original path. ORBIT.LOG (/REPORT) records which
-path was selected. The owner confirmed double buffering without flicker
-on the NuXT with 2.0. Version 2.1 retains that display-start code; its new
-renderer work has been checked in DOSBox-X and awaits a NuXT test.
+path was selected. I confirmed double buffering without flicker on the NuXT
+with 2.0. Version 2.1 retains that display-start code; its new renderer work
+has been checked in DOSBox-X and awaits a NuXT test.
 
 Both executables are about 40 KB. Their linked memory images are about
 84 KB, including an 8 KB stack, plus DOS/runtime allocation overhead.

@@ -144,7 +144,7 @@ UNDER THE HOOD
 
 TESTED
   See TESTS.TXT. Version 1.2: focused DOSBox-X regression checks. Earlier
-  builds were tested in DOSBox/QEMU and by the user on the physical NuXT.
+  builds were tested in DOSBox/QEMU and on my physical NuXT.
   These new changes still need a physical check; emulator cycles are not
   a V20 performance measurement.
 
