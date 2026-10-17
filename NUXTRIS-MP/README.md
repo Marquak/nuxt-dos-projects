@@ -47,7 +47,7 @@ and 640 KB RAM. AdLib and a standard analog gameport are supported. Your
 settings and match history stay in `NXTMULT.CFG` and `NXTMATCH.TXT`; keep those
 files when updating.
 
-This is a multiplayer preview. The user played a smooth NuXT-to-DOSBox-X LAN
+This is a multiplayer preview. I played a smooth NuXT-to-DOSBox-X LAN
 match with version 0.6.1. Version 0.6.2 corrects a packet-drop counter; its
 match protocol and gameplay are unchanged. See [TESTS.TXT](TESTS.TXT) for the
 checks and remaining hardware-test limits.

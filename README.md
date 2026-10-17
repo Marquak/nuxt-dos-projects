@@ -18,7 +18,7 @@ publishers in here.
 | --- | --- | --- | --- |
 | [NUXMENU](NUXMENU/) | 1.5 | `MENU.EXE` and `NUI.EXE` together | Organise DOS games and programs into menus and launch them. |
 | [ORBIT87](ORBIT87/) | 2.1 | `ORBITV20.EXE` for V20; `ORBIT87.EXE` for 8088 | An animated space demo with an AdLib techno soundtrack. |
-| [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Fly through an endless field of stars. No sound or text. |
+| [STARFIELD](STARFIELD/) | 1.0 | `STAR.EXE` | Fly through an endless field of stars with adjustable speed and density. |
 | [MATRIX](MATRIX/) | 2.0 | `MATRIX.EXE` | Falling green characters inspired by The Matrix. |
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Shoot the advancing aliens in an XT take on Space Invaders. |
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Fly a spaceship, dodge asteroids and blast them into smaller pieces. |
@@ -26,7 +26,7 @@ publishers in here.
 | [NUXTRIS-MP](NUXTRIS-MP/) | 0.6.2 preview | `NXTNET.EXE` on both PCs | Play a two-board Tetris score race over serial or LAN. |
 | [NUXTLINK](NUXTLINK/) | 3.3.3 | `NUXFER.COM` | Move files between Linux and DOS, back up a DOS drive, and sync its clock over serial. |
 | [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
-| [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | A car cruising towards a neon sunset with an AdLib synthwave soundtrack. |
+| [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset to an AdLib synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Fix the XMS startup error and skip the manual-word check in your US 1.07 copy of Dune II. |
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Check CPU speed, memory, video, ports, BIOS information and drives. |
 | [TEXTMODE](TEXTMODE/) | 1.0 | `TEXTMODE.COM`; optional `IRC50.BAT` | Switch DOS between 25 and 50 text rows without ANSI.SYS. |
