@@ -1,13 +1,13 @@
 # NuXT Link 3.3.3
 
-Move files between Linux and DOS over a serial cable. Browse folders, queue
-transfers and back up a DOS drive without swapping cards or floppies. Transfers
-are verified and preserve DOS timestamps and attributes. There's also a button
-to set the DOS clock from Linux.
+Move files between Linux and DOS over a serial cable. Browse both machines,
+queue files from different folders, and back up the DOS drive without swapping
+cards or floppies. Transfers are checked and keep their DOS timestamps and
+attributes. You can also set the DOS clock from Linux with one button.
 
-The DOS server runs on an 8088/8086 or V20. The Linux client needs Python 3.10+
-and Tkinter, with no pip packages to install. The included native Linux helper
-handles upload compression; its source and build script are included.
+The DOS server runs on an 8088/8086 or V20. The Linux client uses Python 3.10+
+and Tkinter. Its small native helper compresses uploads; source and build scripts
+are included.
 
 ## Upgrade and start
 
@@ -34,11 +34,10 @@ cable. Connect negotiates those settings after finding the server.
 sh linux/launch.sh
 ```
 
-`NUXFER.COM` in this folder is the current DOS server. Versioned aliases and
-the duplicate binary under `dos/` have been removed. This repository uses `NUXTLINK`; the local release folder may still be named
-`NUXTLINK32` to preserve existing Linux launchers.
-This release uses wire protocol v6, introduced in 3.3.1, and does not connect to
-earlier protocol versions. No floppy image is included.
+`NUXFER.COM` in this folder is the current DOS server. The local release folder
+may still be named `NUXTLINK32` so existing Linux launchers keep working. This
+release uses wire protocol v6, introduced in 3.3.1; both ends need that version
+of the protocol.
 
 The server shares the **whole drive containing its executable**. Launching
 `C:\NET\NUXFER` from an `A:\` prompt shares `C:\`. Launching the floppy copy
@@ -75,8 +74,8 @@ The baud rate and 8N1 framing are unchanged. At 115200 the raw ceiling is
 11.25 KiB/s before protocol overhead. Raw transfers remain below that
 ceiling. In the owner's earlier 3.2.2 floppy-image test, 2048-byte blocks sustained about
 7.8-8 KiB/s and 4096-byte blocks about 8.5 KiB/s. Results depend on the file
-and setup. The larger DOS buffers add 10.5 KiB of RAM while the server is running. Nothing stays resident
-when it exits. This update contains no FastLynx, Kermit or ZMODEM code.
+and setup. The larger DOS buffers use another 10.5 KiB while the server runs; the memory
+is released on exit.
 
 ## Compression and faster serial handling
 
@@ -129,8 +128,6 @@ If the helper cannot load, the client reports the problem. Uncheck Compress
 uploads to transfer raw while fixing it. Command-line overrides are
 `--compression` and `--no-compression`. See
 [third-party sources and licensing](third_party/heatshrink/README.md).
-No FastLynx code is included.
-
 ## Completed transfer details
 
 The queue shows **Time** and **Compression** after each file completes. Both

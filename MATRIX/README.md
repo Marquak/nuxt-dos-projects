@@ -1,19 +1,19 @@
 # Matrix 2.0
 
-Falling green characters, inspired by The Matrix. Pick a resolution and
-colour depth, then let it run. No sound or extra text on screen.
-640x480 in 16 colours is the main target; higher modes are there to try out.
+Fill the screen with falling green characters inspired by The Matrix. Choose
+a resolution and colour depth, then let it run. The main mode is 640x480 in
+16 colours; higher modes are there to try on faster video cards.
 
 ![Falling green characters with glow enabled.](SCREENSHOT.PNG)
 
 *Falling green characters with glow enabled.*
 
 - **Run:** copy `MATRIX.EXE` to DOS; start with `MATRIX`.
-- **Hardware:** 8088/8086 or later, VGA/SVGA; optional 8087. BENCH/CHECK/FPUTEST are optional diagnostics.
+- **Hardware:** 8088/8086 or later with VGA/SVGA. An 8087 can calculate the
+  glow curve; `BENCH`, `CHECK` and `FPUTEST` are included for diagnostics.
 - **Full instructions:** [README.TXT](README.TXT).
 - **Build:** `WATCOM=/path/to/watcom sh BUILD.SH` from this folder.
 
-Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
-and this project's test notes for validation and build dependencies.
-Project-authored material is MIT licensed; see [../LICENSE](../LICENSE) and
-[../THIRD_PARTY.md](../THIRD_PARTY.md) for runtime/dependency terms.
+The source and DOS programs are here too. See [BUILDING.md](../BUILDING.md)
+for tools and [THIRD_PARTY.md](../THIRD_PARTY.md) for license details. The
+original project material is [MIT licensed](../LICENSE).

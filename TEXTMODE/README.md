@@ -1,8 +1,8 @@
 # TEXTMODE 1.0
 
-Switch between 80x25 and 80x50 DOS text without loading ANSI.SYS. Made for
-using IRCjr in 50 lines while keeping the NuXT's existing Vidsync setup.
-The assembly utility is 287 bytes and leaves nothing resident.
+Switch between 80x25 and 80x50 DOS text without loading ANSI.SYS. I made
+this for IRCjr, so I can use 50 lines without disturbing the NuXT's Vidsync
+setup. The utility is 287 bytes and leaves nothing resident.
 
 Copy `TEXTMODE.COM` and `IRC50.BAT` to `C:\NET\MTCP`, beside `IRCJR.EXE`.
 Keep your existing mTCP configuration and packet driver setup.
@@ -25,12 +25,12 @@ TEXTMODE 25
 Requires a VGA-compatible BIOS. Each switch clears the screen. Remove the
 ANSI.SYS entry if you added it only for row switching, then reboot; keep
 Vidsync installed. Use **Binary** FTP transfers so BAT file line endings
-arrive unchanged. Serial transfer also worked on the owner's NuXT.
+arrive unchanged. Serial transfer also worked on my NuXT.
 
 Both modes use 400 scanlines. BIOS calls pass through Vidsync's existing hook;
 this utility does not force Vidsync to recalibrate the LCD.
 
-The owner confirmed the IRCjr wrapper works on the NuXT. Focused DOSBox-X
+I confirmed the IRCjr wrapper works on the NuXT. Focused DOSBox-X
 checks covered both row counts, font heights and invalid arguments.
 See [README.TXT](README.TXT) for details and exit codes.
 

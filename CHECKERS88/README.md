@@ -1,9 +1,9 @@
 # 3D Checkers 88
 
-Play checkers against the computer or a friend on the same PC. Rotate the board
-to a view you like, pick a colour theme and play with some classical AdLib music
-in the background. Forced captures, kings, undo and selectable AI difficulty
-are included.
+Play checkers against the computer or a friend on the same PC. Turn the board
+to a view you like, choose a colour theme and put on some classical AdLib music.
+It follows the usual forced-capture and king rules, with undo and a choice of
+AI difficulty.
 
 ![The checkers board](DEPTH.PNG)
 
@@ -12,9 +12,9 @@ are included.
 Copy `CHECK88.EXE` to a writable DOS folder and run `CHECK88`. It saves your
 settings in `CHECK88.CFG`. The music is built in; no separate player is needed.
 
-Requires DOS 3.3+, a V20/V30 or 80186-compatible CPU, and VGA 640x480 in
-16 colours. An 8087 is optional. Keyboard, DOS mouse and gameport joystick
-controls are supported. AdLib is optional, with separate music and effects
+Runs on DOS 3.3+ with a V20/V30 or 80186-compatible CPU and VGA 640x480 in
+16 colours. Use a keyboard, DOS mouse or gameport joystick. The game also
+supports an 8087 for board projection and AdLib music and effects, with separate
 volume controls.
 
 Use WASD to rotate and tilt the board, R to restore the default view, and F1

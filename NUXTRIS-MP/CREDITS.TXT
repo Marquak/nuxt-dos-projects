@@ -1,0 +1,73 @@
+NUXTRIS 1.1 - source and reference credits
+
+Game rules adapted from olzhasar/sdl-tetris (MIT):
+  https://github.com/olzhasar/sdl-tetris
+  Commit: 428d99d52a1de2448c7442d2655fae56aa6e9e96
+  Source: src/game.c and src/game.h
+  Licence: UPSTREAM.TXT, preserved verbatim, including the upstream
+  copyright placeholders as published. Attribution: olzhasar and the
+  sdl-tetris contributors.
+
+The adaptation uses the upstream coordinate-pair tetromino representation,
+Fisher-Yates bag, collision/movement/rotation routines and row-shifting
+approach. It adds a preview, byte-sized board, 32-bit score and line mask,
+separate lock/clear/spawn phases, fixed tick timing, Type B and save files.
+Spawn orientations, scoring and input behaviour differ from upstream.
+SDL code and assets are not included. The DOS version has no SDL dependency.
+
+Historical reference:
+  https://tetris.wiki/Tetris_(Electronika_60)
+  Used to check the original well size, simple presentation and next-piece
+  preview. No page text or art is included in the game.
+
+Local reusable code:
+  NuXTroids/Invaders planar VGA renderer, font, XT keyboard/timer handling,
+  and bounded PIT-timed PC gameport calibration, adapted for this game.
+  These are earlier MIT-licensed NuXT DOS project components.
+  Version 1.1 also reuses NuXTroids 1.1's original glyph-delta HUD blitter.
+  New graphics, title glyphs and four-line-clear fanfare are original.
+
+Additional DOS source reference:
+  https://www.freedos.org/about/devel/
+  FreeDOS's archived INFOPlus gameport routine was reviewed for context.
+  No INFOPlus source was incorporated. Archive inclusion does not imply a
+  common licence.
+
+Built with Open Watcom 2. See OWLIC.TXT for runtime terms.
+Developed with Codex, with design direction and hardware testing by Marquak.
+
+Multiplayer serial preview 0.5
+  New protocol, UART adaptation, paired journal and two-board display are
+  original project code. No new external source code was copied.
+  Design references: naclander/netris (opponent updates), jelliehermsen/tetrinet
+  (board snapshots), mbbrutman/mTCP (planned LAN), our NuXTLink UART handling.
+  https://github.com/naclander/netris
+  https://github.com/jelliehermsen/tetrinet
+  https://github.com/mbbrutman/mTCP
+  https://www.dosbox.com/wiki/Configuration:SerialPort
+  DOSBox-X serialport.cpp reviewed for stale receive-timeout acknowledgement.
+  libserial.cpp reviewed for Linux raw FF/error-marker handling.
+  directserial.cpp/nullmodem.cpp and Linux ftdi_sio.c reviewed for USB
+  modem-status polling and the local transparent socket serial launcher.
+  https://github.com/joncampbell123/dosbox-x
+  Doom serial framing and Chocolate Doom serial notes were reviewed; no code
+  copied. Full snapshots were retained for recovery on a small two-board game.
+  https://github.com/id-Software/DOOM/blob/master/sersrc/PORT.C
+  https://www.chocolate-doom.org/wiki/index.php/Serial_protocol_support
+  Little Game Engine remains a graphics design reference, not copied code.
+  No mTCP/Netris/TetriNET code was linked in the 0.5 serial preview. Original
+  MIT licence and existing upstream/runtime notices continue to apply.
+
+Multiplayer LAN preview 0.6
+  LAN.H adapts the packet-driver callback and registration sequence from
+  Michael B. Brutman's mTCP src/TCPLIB/PACKET.CPP, Copyright (C) 2005-2026
+  Michael B. Brutman, under GPL-3.0-or-later. Source revision reviewed:
+  7632b7fd176aace0e6a88d2ce3be449f966764ba.
+  https://github.com/mbbrutman/mTCP
+  GPL3.TXT contains the full GPL version 3. The combined NXTNET.EXE is
+  distributed under GPL-3.0-or-later; the original game and serial files
+  retain their MIT notices. No mTCP TCP stack or DOS utility is bundled.
+  New Ethernet, ARP, IPv4 and UDP framing in LAN.H is project code. The
+  packet-driver ABI and frame layouts were checked against mTCP's source.
+  DOSBox-X's official networking guide was used for the local NE2000 test:
+  https://dosbox-x.com/wiki/Guide:Setting-up-networking-in-DOSBox-X

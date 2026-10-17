@@ -23,14 +23,14 @@ the other way. P or Esc pauses. F1 changes the theme and F2 changes the sound.
 The score display updates when a piece lands, avoiding extra redraws during
 a soft drop.
 
-Version 1.2 fixes Backspace after an eight-character score name. Menus and
-name entry now redraw only changed text and cursor pixels. Gameplay, sound
-and the save format are unchanged. All 129 checks passed in DOSBox-X; this
-update still needs its physical NuXT check.
+Version 1.2 fixes Backspace after an eight-character score name and makes
+menu redraws lighter. All 129 checks passed in DOSBox-X. I still need to
+check this specific update on the NuXT; earlier builds played well there.
 
 V20/V30 or an 80186-compatible CPU, DOS 3.3+, and VGA 640x480 in 16 colours.
-The 8087 isn't needed. This is the completed single-player version; serial and
-LAN multiplayer aren't implemented. Earlier builds have been played on the NuXT.
+This is the single-player game. For two boards on one screen, see
+[ИuXTяis Multiplayer](../NUXTRIS-MP/). Earlier single-player builds have
+been played on my NuXT.
 
 [README.TXT](README.TXT) has the rules, controls, saves and technical details.
 [TESTS.TXT](TESTS.TXT) separates current checks from earlier test runs.

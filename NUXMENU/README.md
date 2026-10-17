@@ -1,8 +1,8 @@
 # NuXT Menu 1.5
 
-A menu for keeping your DOS games and programs in one place. Browse the drive
-to add them, organise them into submenus, and star the ones you use most to put
-them in Favourites. Navigate with a keyboard, mouse or joystick.
+Keep your DOS games and programs in one menu. Browse the drive to add them,
+arrange them in submenus, and mark the ones you use most as Favourites. Use a
+keyboard, mouse or joystick to get around.
 
 Choose your colours, add a clock or screensaver, and pick up where you left off
 when a program closes. The main screen stays simple, with the extra controls
@@ -23,8 +23,8 @@ an EXE and about 5.8 KiB for a batch file, down from about 30.5 KiB with the old
 launcher. DOS version, environment size and drivers affect these figures.
 
 Version 1.5 adds scrollbars, mouse-wheel support where the driver provides it,
-browsing from the edit form, Tab navigation and per-menu sorting. The small
-launcher is unchanged. Test results and their limits are in [TESTING.TXT](TESTING.TXT).
+a file browser in the edit form, Tab navigation and sorting for each menu.
+[TESTING.TXT](TESTING.TXT) has the test results.
 
 Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
 for build dependencies. Project-authored material is MIT licensed; see

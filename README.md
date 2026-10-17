@@ -1,15 +1,15 @@
 # NuXT DOS projects
 
-Games, demos and utilities for my NuXT. A bit of gaming, some AdLib tunes,
-and seeing what we can get out of a V20 and an 8087.
+Games, demos and utilities I've been making for my NuXT. There are a few games
+to play, some AdLib music, and plenty of experiments with old PC hardware.
 
 My setup is a NuXT 2.0 with a V20 at about 10 MHz, an Intel 8087, Trident VGA
 with 512 KB VRAM, a reproduction AdLib and DOS 6.22. Some of these also run
 on a stock 8088/8086. Others take advantage of the V20's extra instructions.
-This collection grew out of trying things on the real machine and fixing
-what didn't work. The test notes say what was checked for each version.
+I try these on the real machine and keep working on the parts that don't feel
+right. Each project's test notes say what has been checked.
 
-These are the **current versions as of 2026-10-16**. Source, ready-to-run DOS
+These are the **current versions as of 2026-10-17**. Source, ready-to-run DOS
 programs, build scripts and instructions are included. Bring your own DOS.
 There are no commercial OS files, BIOS ROMs or complete games from other
 publishers in here.
@@ -23,6 +23,7 @@ publishers in here.
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Shoot the advancing aliens in an XT take on Space Invaders. |
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Fly a spaceship, dodge asteroids and blast them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | 1.2 | `NUXTRIS.EXE` | Clear rows of falling blocks in endless play or a 25-line challenge. |
+| [NUXTRIS-MP](NUXTRIS-MP/) | 0.6.2 preview | `NXTNET.EXE` on both PCs | Play a two-board Tetris score race over serial or LAN. |
 | [NUXTLINK](NUXTLINK/) | 3.3.3 | `NUXFER.COM` | Move files between Linux and DOS, back up a DOS drive, and sync its clock over serial. |
 | [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | A car cruising towards a neon sunset with an AdLib synthwave soundtrack. |
@@ -30,9 +31,9 @@ publishers in here.
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Check CPU speed, memory, video, ports, BIOS information and drives. |
 | [TEXTMODE](TEXTMODE/) | 1.0 | `TEXTMODE.COM`; optional `IRC50.BAT` | Switch DOS between 25 and 50 text rows without ANSI.SYS. |
 
-ORBIT87 and ORBITV20 share one source tree and are both built by its build
-script. Each program's README.TXT contains
-its controls, switches, supported video modes and hardware caveats.
+ORBIT87 and ORBITV20 are built from the same source. The two NuXTris versions
+are separate programs; multiplayer does not replace the single-player game.
+Each project's README.TXT has its controls, video modes and hardware details.
 
 [Browse the screenshot gallery](SCREENSHOTS.md). TEXTMODE is a small
 command-line utility; its page has usage examples.
@@ -40,6 +41,10 @@ command-line utility; its page has usage examples.
 ## Run
 
 Copy the listed files to a writable DOS folder and launch the program there.
+For NuXTris Multiplayer, copy `NXTNET.EXE` to both computers. LAN play needs
+a packet driver and `MTCPCFG` set to the full DOS path of your mTCP config
+file, for example `SET MTCPCFG=C:\NET\MTCP.CFG`. See its
+[connection guide](NUXTRIS-MP/README.md) before starting a LAN game.
 For NuXTLink, also run `sh NUXTLINK/linux/launch.sh` on Linux; it needs Python 3
 and Tkinter. Keep your existing NUXMENU.DAT when updating the menu, and NUXTRIS.DAT/BAK
 when updating NuXTris. NuXTLink 3.3.3 includes the 3.3.1 DOS server and uses wire protocol v6.
@@ -59,9 +64,11 @@ historical emulator tests and owner-reported hardware results.
 
 ## License and provenance
 
-Project-authored code, documentation, procedural art, fonts and composed FM
-music are offered under the [MIT license](LICENSE). Third-party code, including the adapted NuXTris rules and compiler runtimes,
-retains its own license: see [THIRD_PARTY.md](THIRD_PARTY.md) and each OWLIC.TXT.
+Most original code, documentation, art, fonts and music are offered under the
+[MIT license](LICENSE). NuXTris Multiplayer includes a packet-driver adapter
+derived from mTCP and is distributed under GPL-3.0-or-later. Other third-party
+code and compiler runtimes keep their own licenses. Details are in
+[THIRD_PARTY.md](THIRD_PARTY.md) and the notices in each project folder.
 Research references are retained in the project documentation. Checkers includes
 credited Mutopia music arrangements under their original licenses; see its
 [MUSIC/SOURCES.TXT](CHECKERS88/MUSIC/SOURCES.TXT).
@@ -69,8 +76,8 @@ credited Mutopia music arrangements under their original licenses; see its
 DUNE2FIX contains a patching script, tests, hashes, instructions and a setup
 screenshot. You must supply your own matching Dune II executables. The game
 and its screenshot are not covered by this repository's MIT license. Names
-of hardware and other games are used descriptively; this is an independent hobby project, not an official
-Monotech, Microsoft, Westwood, Taito or other vendor release.
+of hardware and other games are used descriptively. This is an independent
+hobby project, not an official release from Monotech or any other vendor.
 
 ---
 

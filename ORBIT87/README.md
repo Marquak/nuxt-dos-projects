@@ -1,8 +1,8 @@
 # ORBIT 87 2.1
 
-An animated space demo with an AdLib techno soundtrack. It moves through a
-series of scenes, using the 8087 when one is installed. Includes a V20 build
-and a separate build for a stock 8088/8086.
+A five-scene space demo with an AdLib techno soundtrack. The 8087 handles
+its live geometry when present. There are separate builds for the V20 and
+stock 8088/8086 machines.
 
 ![Neon Ocean scene. ORBIT87 and ORBITV20 share the same visuals.](SCREENSHOT.PNG)
 
@@ -13,11 +13,10 @@ and a separate build for a stock 8088/8086.
 - **Full instructions:** [README.TXT](README.TXT).
 - **Build:** `WATCOM=/path/to/watcom sh BUILD.SH` from this folder.
 
-Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
-and this project's test notes for validation and build dependencies.
-Project-authored material is MIT licensed; see [../LICENSE](../LICENSE) and
-[../THIRD_PARTY.md](../THIRD_PARTY.md) for runtime/dependency terms.
+Source and DOS builds are included. See [BUILDING.md](../BUILDING.md) for the
+toolchain and [THIRD_PARTY.md](../THIRD_PARTY.md) for license details. The
+original project material is [MIT licensed](../LICENSE).
 
-Version 2.1 fixes the statistics toggle while paused and cuts repeated drawing
-and calculation work. The owner reported visibly faster animation on the NuXT.
+Version 2.1 fixes the statistics toggle while paused and runs visibly faster
+on my NuXT after reducing repeated drawing and calculations.
 Emulator measurements and their limits are in [TESTING.md](TESTING.md).

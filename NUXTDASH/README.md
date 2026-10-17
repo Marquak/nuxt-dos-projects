@@ -1,15 +1,15 @@
 # NuXT Dash 1.3
 
-Check what's in your NuXT and what DOS can see. Dash shows CPU speed, memory,
-video, ports, BIOS information and drives. It's handy for checking the turbo
-speed or seeing how much upper memory is free.
+See what your NuXT reports to DOS: CPU speed, memory, video, ports, BIOS
+information and drives. I use it to check turbo speed and available upper
+memory after changing the startup configuration.
 
 ![The Drives page in an emulator. Hardware details will differ on your NuXT.](SCREENSHOT.PNG)
 
 *The Drives page in an emulator. Hardware details will differ on your NuXT.*
 
-Copy **DASH.COM** to your DOS machine and run `DASH`. No installation or
-configuration file needed. This version is working well on my NuXT.
+Copy **DASH.COM** to your DOS machine and run `DASH`. It has no installer or
+configuration file. Version 1.3 is working well on my NuXT.
 
 ## What's in it
 
@@ -53,4 +53,4 @@ sh BUILD.SH
 No Open Watcom or C runtime required. [README.TXT](README.TXT) has the detailed
 probe behaviour and technical references. [TESTS.TXT](TESTS.TXT) records the
 QEMU and instruction-level checks. No 86Box testing was used for this update.
-The owner also confirmed the final 1.3 build works on the NuXT.
+I also confirmed the final 1.3 build on my NuXT.

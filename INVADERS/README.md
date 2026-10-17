@@ -1,8 +1,8 @@
 # XT Invaders 2.0
 
-Shoot the aliens before they reach the bottom of the screen. An XT take on
-Space Invaders, with the familiar marching thump, AdLib effects and a different
-background each wave. Play with the keyboard or a gameport joystick/gamepad.
+Shoot the aliens before they reach the bottom of the screen. This XT-style
+Invaders game has the marching thump, AdLib effects and a new backdrop each
+wave. Play with a keyboard or a gameport joystick/gamepad.
 
 ![An alien wave over the city backdrop.](SCREENSHOT.PNG)
 
@@ -17,9 +17,10 @@ background each wave. Play with the keyboard or a gameport joystick/gamepad.
 - **Full instructions:** [README.TXT](README.TXT).
 - **Build:** `sh BUILD.SH` with GNU binutils.
 
-Version 2.0 improves fire-tap handling, doubles the player/laser update rate,
-reduces redraw work and adds six original wireframe backgrounds. VGA uses
-crisp doubled sprites in a centred 640x400 playfield within 640x480.
+Version 2.0 makes quick taps of the fire button more reliable and movement
+smoother. It also adds six backdrops. In VGA mode, the doubled sprites fill a
+centred 640x400 playfield on a 640x480 screen. Rendering details are in
+[TESTS.TXT](TESTS.TXT).
 
 Tested in QEMU and DOSBox, including an emulated gameport controller. See
 [TESTS.TXT](TESTS.TXT) for coverage and hardware-validation limits.

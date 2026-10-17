@@ -34,8 +34,8 @@ NEEDED
   Target system: NuXT V20 around 10 MHz, DOS 6.22, Trident VGA.
 
 This build uses 80186 instructions. It is not an 8088/8086 executable.
-The 8087 is not needed and is left alone: integer cell coordinates are a
-better fit here. This is standard VGA; there is no VESA driver requirement.
+Board movement and scoring use integer cell coordinates. Video uses standard
+VGA mode 12h.
 
 TWO GAME TYPES
   A: Endless. Clear lines and keep going until the stack reaches the top.

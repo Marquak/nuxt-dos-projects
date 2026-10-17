@@ -1,8 +1,24 @@
-# Snapshot checks, 2026-10-16
+# Snapshot checks, 2026-10-17
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass.
+
+## NuXTris Multiplayer 0.6.2 and README review
+
+Published the tested multiplayer preview as a separate folder from the
+single-player game. The source, executable, build scripts, DOS guide, license
+notices and development test notes match the local 0.6.2 release. Player
+settings, match logs and USB-adapter settings were left out. The README gives
+the full `MTCPCFG` path example and explains how its `PACKETINT` value relates
+to the loaded packet driver. The program itself was not changed for this
+publication pass.
+
+The owner reported smooth NuXT-to-DOSBox-X LAN play with 0.6.1. Version 0.6.2
+was checked in DOSBox-X after a diagnostic counter fix, as recorded in
+`NUXTRIS-MP/TESTS.TXT`. This upload does not claim a fresh NuXT hardware run.
+The repository's project introductions were edited for clearer, more natural
+wording without changing their binaries or technical requirements.
 
 ## NuXTLink 3.3.3 and 3D Checkers 88 1.2.1
 

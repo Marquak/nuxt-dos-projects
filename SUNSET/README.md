@@ -1,22 +1,22 @@
-# Sunset 3.2  -  Neon Coast
+# Sunset 3.2: Neon Coast
 
-A car cruising towards a neon sunset, with palm trees passing by and an AdLib
-synthwave soundtrack. No text on screen and no ending. Just let it play.
-Start at 320x200 on the NuXT, or try the higher resolutions for fun.
+Cruise toward a neon sunset while palm trees pass by and an AdLib synthwave
+track plays. Start at 320x200 on the NuXT. Higher resolutions are there to try
+on faster machines.
 
 ![The demo running at 320x200 in 256 colours.](SCREENSHOT.PNG)
 
 *The demo running at 320x200 in 256 colours.*
 
 - **Run:** copy `SUNSET.EXE` to DOS; start with `SUNSET`.
-- **Hardware:** V20/80186 or later, VGA/SVGA; optional 8087 and AdLib. Start at 320x200 for speed.
+- **Hardware:** V20/80186 or later with VGA/SVGA. The 8087 prepares the
+  perspective table at startup; AdLib plays the soundtrack.
 - **Full instructions:** [README.TXT](README.TXT).
 - **Build:** `WATCOM=/path/to/watcom sh BUILD.SH` from this folder.
 
-Source and current binaries are included. See [../BUILDING.md](../BUILDING.md)
-and this project's test notes for validation and build dependencies.
-Project-authored material is MIT licensed; see [../LICENSE](../LICENSE) and
-[../THIRD_PARTY.md](../THIRD_PARTY.md) for runtime/dependency terms.
+Source and DOS builds are included. See [BUILDING.md](../BUILDING.md) for the
+toolchain and [THIRD_PARTY.md](../THIRD_PARTY.md) for license details. The
+original project material is [MIT licensed](../LICENSE).
 
 The FURNACE folder contains editable instrument auditions; MUSIC.C contains
 the full score. No external music recordings are included.

@@ -1,8 +1,8 @@
 # Dune II fixes for NuXT
 
-A patch for the US 1.07 version of Dune II. It fixes the XMS startup error
-with UMB-only memory managers and skips the manual-word copy protection.
-Both fixes have been tested on my NuXT.
+If the US 1.07 release of Dune II gives the XMS startup error with a UMB-only
+memory manager, this patch lets the game start. It also skips the manual-word
+check. Both changes have been tested on my NuXT.
 
 ![Dune II setup running after the XMS fix. Original game files are required.](SCREENSHOT.PNG)
 
@@ -30,11 +30,10 @@ python3 patch.py /path/to/your/DUNE2 --check
 python3 patch.py /path/to/your/DUNE2 --output /path/to/new/dune2-patched
 ```
 
-The output directory must not exist. Both inputs are validated before anything
-is created. Unknown versions, modified files and duplicate case variants are
-rejected rather than patched by guessing. The originals are never overwritten.
-If disk writing fails partway, remove the incomplete new output directory and
-retry with adequate space.
+Choose a new output directory. The script checks both inputs first and refuses
+unknown or modified versions, so it never guesses where to patch. It leaves
+your originals alone. If a write fails partway through, remove the incomplete
+output directory and try again after freeing some space.
 
 Copy SETUPNX.EXE and DUNE2FX.EXE from that new directory to your DOS DUNE2 folder,
 keeping all your existing game data and original executables. Boot normally:
