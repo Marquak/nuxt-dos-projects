@@ -1,4 +1,4 @@
-NUXTRIS MULTIPLAYER 0.6.3 - SERIAL AND LAN PREVIEW
+NUXTRIS MULTIPLAYER 0.6.4 - SERIAL AND LAN PREVIEW
 
 Two live boards and the same piece sequence. Play a timed score race or
 unlimited sudden death. The first top-out ends sudden death, and the higher
@@ -13,7 +13,7 @@ calibrate, or K to use the keyboard.
 
 LAN CONNECTION
 
-Use NXTNET.EXE on both DOS computers. Version 0.6.3 uses the same match
+Use NXTNET.EXE on both DOS computers. Version 0.6.4 uses the same match
 protocol as 0.6.1. Load a working Ethernet packet driver first. Set the
 MTCPCFG environment variable to the full DOS path of your mTCP config file,
 in AUTOEXEC.BAT or at the DOS prompt before starting the game, for example:
@@ -25,7 +25,7 @@ subnet. NuXTris uses UDP port 47587 and does not need an mTCP program to
 stay resident.
 
 In CONNECTION, set LINK to LAN. HOST GAME shows the host IP from MTCPCFG.
-If its settings are missing or invalid, the menu shows a red IP error.
+If its settings are missing or invalid, the menu shows IP ERROR with a red marker.
 On the other DOS computer, choose JOIN GAME and set PEER IP to the address
 shown on the host. The host learns the joiner's address. Either side can start
 first; both wait until the other connects. Esc then Y cancels the wait.
@@ -104,5 +104,6 @@ on both sides and no frame or UART errors. For 0.6.2, a routed DOSBox-X
 LAN test reached live play after an unrelated large packet; zero game
 frames were rejected or dropped. This diagnostic fix has not been tested
 on the NuXT; it does not change match packets, timing or rendering.
-Version 0.6.3 adds the host IP display; its match protocol is unchanged.
+Version 0.6.4 fixes a blank HOST GAME row in 0.6.3. The match protocol
+and gameplay are unchanged.
 No 86Box test was run.

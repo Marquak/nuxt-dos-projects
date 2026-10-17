@@ -17,13 +17,15 @@ static void mp_hostip_refresh(void) {
     if(!lan_config()) { hostiperror=1; return; }
     sprintf(hostip,"%u.%u.%u.%u",lan_local[0],lan_local[1],lan_local[2],lan_local[3]);
 }
-/* These two LAN rows change rarely. Clear only their text area when the
-   address or colour changes; leave the menu frame and other rows intact. */
+/* Keep the normal glyph-delta path for menu text. A small colour marker
+   identifies the address state without clearing the text underneath it. */
 static void mp_menu_colorline(int i,int y,const char *s,int color) {
-    if(!strcmp(menucache[i],s) && menucolor[i]==color) return;
-    clearbox(88,y,480,14); raster(0x18);
-    textxy(88,y,s,color,2);
-    strcpy(menucache[i],s); menucolor[i]=color;
+    mp_text(menucache[i],88,y,s);
+    if(menucolor[i]==color) return;
+    raster(0x18);
+    if(menucolor[i] && menucolor[i]!=15) { ink(menucolor[i]); rect(80,y,3,14); }
+    if(color!=15) { ink(color); rect(80,y,3,14); }
+    menucolor[i]=color;
 }
 static void mp_paths(const char *exe) {
     unsigned i,n=0;

@@ -1,8 +1,10 @@
-NUXTRIS MULTIPLAYER 0.6.3 - host address display, 2026-10-17
+NUXTRIS MULTIPLAYER 0.6.4 - host address display fix, 2026-10-17
 
-- Host LAN menu shows the IP read from MTCPCFG, or a red error and config
-  message if it cannot be read. The address also appears on the game screen.
-- Open Watcom release build passed. Physical NuXT display check remains.
+- HOST GAME row now uses the established text renderer and a small cyan or
+  red status marker. This fixes the blank row reported on the NuXT in 0.6.3.
+- Open Watcom release build passed. Focused DOSBox-X VGA captures showed
+  both the valid host IP and the missing-config error text on the main menu.
+  Physical NuXT confirmation remains.
 
 Previous 0.6.2 review:
 

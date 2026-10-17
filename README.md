@@ -27,7 +27,7 @@ publishers in here.
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Shoot the advancing aliens in an XT take on Space Invaders. |
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Fly a spaceship, dodge asteroids and blast them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | 1.2 | `NUXTRIS.EXE` | Clear rows of falling blocks in endless play or a 25-line challenge. |
-| [NUXTRIS-MP](NUXTRIS-MP/) | 0.6.3 preview | `NXTNET.EXE` on both PCs | Play a two-board Tetris score race over serial or LAN. |
+| [NUXTRIS-MP](NUXTRIS-MP/) | 0.6.4 preview | `NXTNET.EXE` on both PCs | Play a two-board Tetris score race over serial or LAN. |
 | [NUXTLINK](NUXTLINK/) | 3.3.3 | `NUXFER.COM` | Move files between Linux and DOS, back up a DOS drive, and sync its clock over serial. |
 | [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset to an AdLib synthwave soundtrack. |

@@ -15,7 +15,7 @@
     "NUXTRIS": "1.2",
     "TEXTMODE": "1.0",
     "CHECKERS88": "1.2.1",
-    "NUXTRIS-MP": "0.6.3 preview (serial and LAN)"
+    "NUXTRIS-MP": "0.6.4 preview (serial and LAN)"
   },
   "binaries": {
     "CHECKERS88/CHECK88.EXE": "cc4600f475d7bdbb48849c1514e81cea4a6263243c8a38a979f1679ce14cad07",
@@ -35,7 +35,7 @@
     "STARFIELD/STAR.EXE": "b8fd1fd38ae86d15b31e67b74438aa278e716b5128fd80f8025de843d7c384cb",
     "SUNSET/SUNSET.EXE": "1891a5b5c5191ba144d63998ef73698e9a2b40b3701b07cd892a38ed712e372f",
     "TEXTMODE/TEXTMODE.COM": "43d02da28de0a35e1e53e4597d13d6089f746cfaa98c251a5be1f930b6881bac",
-    "NUXTRIS-MP/NXTNET.EXE": "c86325fda06e4ed5ce4436e11a81853e3e8837e33bd1f1618876e021fe9704c2"
+    "NUXTRIS-MP/NXTNET.EXE": "e7c2d707da801a5c085fdb311d685a3823e7390ce01a6979b0aa20806fed7250"
   },
   "toolchain": "Open Watcom 2.0 beta Oct 5 2026; GNU binutils 2.47",
   "commercial_game_executables_included": false
