@@ -516,6 +516,7 @@ static void mp_render(void) {
     }
 }
 static void mp_scene(void) {
+    char s[24];
     memset(picturecache,0,sizeof(picturecache)); memset(mphud,0,sizeof(mphud));
     boarddirty[0]=boarddirty[1]=1;
     nextcache[0]=nextcache[1]=-1; scorecache[0]=scorecache[1]=0xffffffffUL;
@@ -526,6 +527,10 @@ static void mp_scene(void) {
     textxy(286,42,"TIME",15,1);
     textxy(274,108,"LEFT NEXT",15,1); textxy(274,282,"RIGHT NEXT",15,1);
     textxy(258,174,"LINES / LEVEL",15,1); textxy(258,348,"LINES / LEVEL",15,1);
+    if(transport && role) {
+        sprintf(s,"HOST %u.%u.%u.%u",lan_local[0],lan_local[1],lan_local[2],lan_local[3]);
+        textxy(250,94,s,11,1);
+    }
     textxy(14,458,"ARROWS MOVE  DOWN DROP  X/Z ROTATE",15,1);
     textxy(14,470,"P PAUSE  ESC MENU  F1 THEME  F2 SOUND  F3 LINK",15,1);
     raster(0x18);

@@ -6,9 +6,25 @@ static char cfgpath[160],cfgback[160],cfgtmp[160];
 static unsigned char cfgcached[MCFSIZE];
 static int cfgloaded,cfgerror,menupage,mpselect=1,editing,editpos,editfresh;
 static char editname[9],editip[16],menucache[10][40],markcache[10][2],menunote[48];
+static char hostip[16];
+static int hostiperror,menucolor[10];
 static int ippos,ipfresh;
 static char namecursor[24];
 static char uinotice[48];
+static void mp_hostip_refresh(void) {
+    hostip[0]=0; hostiperror=0;
+    if(!transport || !role) return;
+    if(!lan_config()) { hostiperror=1; return; }
+    sprintf(hostip,"%u.%u.%u.%u",lan_local[0],lan_local[1],lan_local[2],lan_local[3]);
+}
+/* These two LAN rows change rarely. Clear only their text area when the
+   address or colour changes; leave the menu frame and other rows intact. */
+static void mp_menu_colorline(int i,int y,const char *s,int color) {
+    if(!strcmp(menucache[i],s) && menucolor[i]==color) return;
+    clearbox(88,y,480,14); raster(0x18);
+    textxy(88,y,s,color,2);
+    strcpy(menucache[i],s); menucolor[i]=color;
+}
 static void mp_paths(const char *exe) {
     unsigned i,n=0;
     for(i=0;exe[i] && i<140;i++) if(exe[i]=='\\' || exe[i]=='/' || exe[i]==':') n=i+1;
@@ -63,6 +79,7 @@ static void mp_cfgsave(void) {
 }
 static void mp_menu_scene(void) {
     memset(menucache,0,sizeof(menucache)); memset(markcache,0,sizeof(markcache));
+    memset(menucolor,0,sizeof(menucolor)); mp_hostip_refresh();
     menunote[0]=namecursor[0]=0; wipe(); raster(0x10); logo(22); ink(15);
     centered(60,menupage?"CONNECTION":"MULTIPLAYER",15);
     rect(44,92,552,284);
@@ -81,13 +98,14 @@ static void mp_menu_draw(void) {
             else sprintf(s,"BAUD       %lu",baudrate); break;
         case 4: sprintf(s,"FLOW       %s",transport?"SERIAL ONLY":optflow?"RTS/CTS":"3-WIRE"); break;
         case 5: if(editing==2) sprintf(s,"PEER IP    %s",editip);
-            else if(transport && role) strcpy(s,"PEER IP    AUTO");
+            else if(transport && role) sprintf(s,"HOST IP    %s",hostiperror?"IP ERROR":hostip);
             else if(transport) sprintf(s,"PEER IP    %u.%u.%u.%u",joinip[0],joinip[1],joinip[2],joinip[3]);
             else strcpy(s,"PEER IP    LAN ONLY"); break;
         default: strcpy(s,"BACK"); break;
         } else switch(i) {
         case 0: sprintf(s,"NAME       %s",editing?editname:pname); break;
-        case 1: strcpy(s,role?"HOST GAME":"JOIN GAME"); break;
+        case 1: if(role && transport) sprintf(s,"HOST GAME > %s",hostiperror?"IP ERROR":hostip);
+            else strcpy(s,role?"HOST GAME":"JOIN GAME"); break;
         case 2: if(transport) sprintf(s,"CONNECTION %s LAN",role?"HOST":"JOIN");
             else sprintf(s,"CONNECTION %s COM%u",role?"HOST":"JOIN",comnum); break;
         case 3: if(!role) strcpy(s,"MODE       CHOSEN BY HOST");
@@ -102,7 +120,9 @@ static void mp_menu_draw(void) {
         default: strcpy(s,"EXIT TO DOS"); break;
         }
         mp_text(markcache[i],62,108+i*26,i==mpselect?">":"");
-        mp_text(menucache[i],88,108+i*26,s);
+        if((menupage && i==5) || (!menupage && i==1))
+            mp_menu_colorline(i,108+i*26,s,transport && role?(hostiperror?12:11):15);
+        else mp_text(menucache[i],88,108+i*26,s);
     }
     if(editing==1) {
         strcpy(s,"           "); memset(s+11,' ',8); s[19]=0; s[11+editpos]='_';
@@ -111,9 +131,10 @@ static void mp_menu_draw(void) {
     } else if(editing==2) {
         mp_text(menunote,56,446,uinotice[0]?uinotice:"TYPE IP ADDRESS - ENTER OK - ESC CANCEL");
     } else {
-        const char *note=uinotice[0]?uinotice:(cfgerror?"SETTINGS NOT SAVED - CHECK DISK":
+        const char *note=uinotice[0]?uinotice:(transport && role && hostiperror?lan_reason:
+            (cfgerror?"SETTINGS NOT SAVED - CHECK DISK":
             (menupage && bridge?"PORT/SPEED/FLOW: USE DOSBOXX.SH":
-            (!audiofound && (soundmode&1)?"NO ADLIB - PC SPEAKER AVAILABLE":"")));
+            (!audiofound && (soundmode&1)?"NO ADLIB - PC SPEAKER AVAILABLE":""))));
         mp_text(menunote,56,446,note);
     }
 }
@@ -237,8 +258,8 @@ static int mp_menu(void) {
         if(enter || lr) {
             int d=lr?lr:1;
             if(menupage) {
-                if(mpselect==0) role=!role;
-                else if(mpselect==1) transport=!transport;
+                if(mpselect==0) { role=!role; mp_hostip_refresh(); }
+                else if(mpselect==1) { transport=!transport; mp_hostip_refresh(); }
                 else if(mpselect==6) { menupage=0; mpselect=2; inputs_flush(); mp_menu_scene(); }
                 else if(mpselect==5 && transport && !role && enter) mp_ip_begin();
                 else if(transport) strcpy(uinotice,"LAN USES MTCPCFG AND PACKET DRIVER");

@@ -1,4 +1,4 @@
-# ИuXTяis Multiplayer 0.6.2
+# ИuXTяis Multiplayer 0.6.3
 
 Play Tetris together with both boards on screen. You get the same pieces, so
 it's a straight score race. Choose a time limit, or play sudden death: the
@@ -29,9 +29,11 @@ interrupt used to load the packet driver, such as `0x60`. The game reads these
 settings itself; an mTCP program does not have to stay open. It uses UDP port
 47587.
 
-In CONNECTION, set LINK to LAN. The joining player enters the host's IP
-address. [LANBOX.SH](LANBOX.SH) starts a DOSBox-X LAN client on the Linux
-machine used for development. Its driver path and setup are explained in
+In CONNECTION, set LINK to LAN. HOST GAME shows the address read from
+`MTCPCFG` in cyan, or a red IP error if the settings cannot be read. The
+joining player enters the address shown on the host.
+[LANBOX.SH](LANBOX.SH) starts a DOSBox-X LAN client on the Linux machine used
+for development. Its driver path and setup are explained in
 [README.TXT](README.TXT). A working packet driver is required on real DOS
 hardware and is not included here.
 
@@ -47,10 +49,10 @@ and 640 KB RAM. AdLib and a standard analog gameport are supported. Your
 settings and match history stay in `NXTMULT.CFG` and `NXTMATCH.TXT`; keep those
 files when updating.
 
-This is a multiplayer preview. I played a smooth NuXT-to-DOSBox-X LAN
-match with version 0.6.1. Version 0.6.2 corrects a packet-drop counter; its
-match protocol and gameplay are unchanged. See [TESTS.TXT](TESTS.TXT) for the
-checks and remaining hardware-test limits.
+This is a multiplayer preview. I played a smooth NuXT-to-DOSBox-X LAN match
+with version 0.6.1. Version 0.6.3 adds the host IP display to the menu and
+game screen. The match protocol and gameplay are unchanged. See
+[TESTS.TXT](TESTS.TXT) for the checks and remaining hardware-test limits.
 
 Source and an Open Watcom build script are included. The original game and
 serial code are MIT licensed. The LAN packet-driver adapter uses code adapted
