@@ -3,6 +3,10 @@
 Games, demos and utilities I've been making for my NuXT. There are a few games
 to play, some AdLib music, and plenty of experiments with old PC hardware.
 
+All the coding for these projects was done with GPT-6 Codex. I came up with
+the ideas, steered the design and tested the programs on my NuXT. Third-party
+code is credited in the relevant project folders.
+
 My setup is a NuXT 2.0 with a V20 at about 10 MHz, an Intel 8087, Trident VGA
 with 512 KB VRAM, a reproduction AdLib and DOS 6.22. Some of these also run
 on a stock 8088/8086. Others take advantage of the V20's extra instructions.
@@ -85,6 +89,5 @@ I'm not affiliated with the NuXT project or Monotech in any way. I'm just a big
 fan and a hobbyist who enjoys tinkering with this machine. Check out
 [Monotech's website](https://monotech.fwscart.com/) for the NuXT and their other projects.
 
-All coding for these projects was done with ChatGPT (GPT-6 Astra / Codex).
-Third-party code is credited separately where used. Testing was a joint effort:
-I tested on my NuXT, while Codex ran automated checks and emulator tests.
+GPT-6 Codex also ran automated checks and emulator tests. Hardware testing
+was done on my NuXT.
