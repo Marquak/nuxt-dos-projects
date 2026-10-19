@@ -99,7 +99,7 @@ def run(port, baud=9600):
         assert client.scan(PUT_STATUS)==(0,0xffff)
         for i in range(0,len(data),4096):client.request(PUT_DATA,data[i:i+4096])
         status=struct.unpack('<IIHB',client.request(PUT_VERIFY))
-        assert status[0]==4096 and status[1]==len(data) and not status[3]
+        assert status[0]==8192 and status[1]==len(data) and not status[3]
         client.abort()
         assert client.hash(path)==(old_meta,old_crc)
         result=client.upload(src,path,meta=meta,overwrite=True)

@@ -48,7 +48,7 @@ class ClockTests(unittest.TestCase):
                 with self.assertRaises(LinkError):self.client(side_effect=responses).sync_clock()
 
     def test_old_server_explains_upgrade(self):
-        with self.assertRaisesRegex(VersionError,'3.2.1'):
+        with self.assertRaisesRegex(VersionError,'NUXFER.COM'):
             self.client(side_effect=RemoteError('Unknown command')).read_clock()
         with self.assertRaisesRegex(RemoteError,'active operation'):
             self.client(side_effect=RemoteError('Finish active operation')).read_clock()

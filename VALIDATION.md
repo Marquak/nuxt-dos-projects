@@ -1,8 +1,27 @@
-# Snapshot checks, 2026-10-17
+# Snapshot checks, 2026-10-19
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
-tests were not all repeated for this packaging pass.
+tests were not all repeated for this packaging pass. Sections below the current
+release notes document earlier publication passes.
+
+## NuXT Link 4.0 serial promotion
+
+The 0.3.2 Fast preview became the main serial release, `NUXTLINK/NUXFER.COM`,
+with its matching Linux client and wire version 8. The earlier 3.5.2 UDP LAN
+package remains in `NUXTLINK32`; its `NUXNET.EXE` still needs its own wire-v6
+Linux client. Personal profiles and transfer reports are not in either package.
+The new serial client imports serial profiles from the Fast preview and the
+older combined client into a separate store without editing those sources.
+
+The owner completed four-file queues in both directions on the NuXT using
+the 0.3.2 preview. Codex then interrupted a 128 KiB upload after 16 KiB on
+the physical NuXT, reconnected, resumed at the exact offset, downloaded the
+file, and compared it byte for byte. The 4.0 DOS rebuild targets 8086; 74 of
+95 host tests passed, with 21 Tk tests skipped for lack of a display. A
+disposable MS-DOS 6.22/QEMU run passed zero, mixed, random and floppy-image
+roundtrips plus LZ4 and malformed-frame checks. The rebuilt 4.0 banner has
+not yet had a separate physical startup check.
 
 ## NuXTris Multiplayer 0.6.2 and README review
 

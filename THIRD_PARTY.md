@@ -20,9 +20,14 @@ all possible third-party claims.
   AdLib programming reference, not a bundled dependency. Version 2.0 also
   consulted ID_IN.C, the FreeDOS INFOPlus archive and the documented arcade
   fleet-sound sequence. Its gameport code and wireframe scenery are original.
-- NUXTLINK: original DOS server, protocol, Linux client and tests; UART/FTDI
+- NUXTLINK: DOS server, protocol, Linux client and tests; UART/FTDI
   datasheets and serial standards were references. No pyserial is needed. FileZilla queue paths were a design reference in 3.2;
-  no FileZilla code was copied.
+  no FileZilla code was copied. The FastLynx protocol was studied through
+  synthetic captures for throughput ideas; no FastLynx binary or source is included.
+  The 4.0 DOS source inherits GPL-3.0-or-later terms from the earlier combined
+  serial/LAN NuXT Link source, which adapted mTCP packet-driver registration.
+  The Linux client remains MIT licensed. The separate NUXTLINK32 package keeps
+  the prior combined serial/LAN source and its GPL notices.
 - NUXTROIDS: original game, geometry, scenery and sound, reusing earlier NuXT
   project code. Asteroids projects, RBIL, FreeDOS INFOPlus and id Software
   drawing code were references; no Atari assets or external game code copied.
@@ -103,13 +108,14 @@ and is not bundled. TEXTMODE does not include Vidsync or mTCP.
 
 ## NuXTLink compression
 
-NuXTLink 3.3.3 includes the heatshrink encoder at upstream revision
+NuXT Link 4.0 and the older 3.5.2 package include the heatshrink encoder at upstream revision
 `7d419e1fa4830d0b919b9b6a91fe2fb786cf3280`, copyright 2013-2015 Scott Vokes,
 under the ISC license. Source and the full notice are in
 [NUXTLINK/third_party/heatshrink](NUXTLINK/third_party/heatshrink/).
 The Linux native helper incorporates this encoder. The DOS assembly decoder,
-CRC and UART burst routines are project code. No FastLynx, Kermit or ZMODEM
-code is included.
+CRC and UART burst routines are project code. Version 4.0 can also use the
+system liblz4 under its BSD-2-Clause license; no liblz4 binary is bundled.
+No FastLynx, Kermit or ZMODEM code is included.
 
 ## 3D Checkers 88
 

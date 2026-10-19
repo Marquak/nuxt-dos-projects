@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NuXT Link 3.3.3: full-drive browser and reviewable serial transfer queues."""
+"""NuXT Link 4 serial file manager."""
 import os
 import stat
 import argparse
@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
-from link import BAUDS, PEERS, BLOCK_SIZES, SerialPort, Client, Cancelled, LinkError, RemoteError, VersionError, ports, dos_path, join_path
+from link import BAUDS, PEERS, BLOCK_SIZES, SerialPort, LanPort, Client, Cancelled, LinkError, RemoteError, VersionError, ports, dos_path, join_path
 from transfers import plan_download, plan_upload, execute, verify_backup, completion_columns, compression_stats
 from transfer_queue import TransferQueue, append_plan, execute_queue
 from operations import plan_delete, execute_delete
@@ -37,7 +37,9 @@ class App:
         self.info = {}
         self.profiles = Profiles(profile_path)
         self.state_dir = self.profiles.path.parent
-        settings = {**DEFAULTS, **(settings or {})}
+        supplied=settings or {}
+        settings = {**DEFAULTS, **supplied}
+        settings['transport']='serial'
         self.remote=dos_path(settings['remote'])
         self.local_items, self.remote_items = [], []
         build_interface(self, settings)
@@ -87,6 +89,22 @@ class App:
         found=ports();self.port_box.configure(values=found)
         if not self.device.get() and found:self.device.set(found[0])
 
+    def transport_changed(self, initial=False):
+        lan=self.transport.get()=='lan'
+        if lan:
+            self.port_box.grid_remove();self.address_box.grid()
+            self.target_label.configure(text='DOS IP')
+            self.block_size.set('1440')
+            self.block_box.configure(values=(1440,))
+        else:
+            self.address_box.grid_remove();self.port_box.grid()
+            self.target_label.configure(text='Device')
+            self.block_box.configure(values=tuple(size for size in BLOCK_SIZES if size not in (1024,1440,1464)))
+            if self.block_size.get() in ('1024','1440','1464'):self.block_size.set('4096')
+        if not initial:
+            if lan:self.compression.set(False)
+            self.update_controls()
+
     def sort_table(self,tree,column,reverse=None):
         rows=list(tree.get_children())
         def key(row):
@@ -126,12 +144,17 @@ class App:
 
     def connection_state(self):
         if not self.client:
-            self.connection_hint.set('Disconnected · Choose a device or saved profile')
+            self.connection_hint.set('Disconnected · Choose a DOS IP' if self.transport.get()=='lan' else 'Disconnected · Choose a device or saved profile')
             self.connection_label.configure(style='Hint.TLabel')
             self.apply_button.configure(state='disabled')
             return
         d=self.info
         if not d:return
+        if d.get('transport')=='lan':
+            self.connection_hint.set(f"Connected · LAN {self.address.get()} · {d['block_size']} bytes")
+            self.connection_label.configure(style='Good.TLabel')
+            self.apply_button.configure(state='disabled')
+            return
         pending=(str(d['baud']),d['flow'],d['peer'],str(d['block_size'])) != (
             self.speed.get(),self.flow.get(),self.peer.get(),self.block_size.get())
         errors=sum(d[key] for key in ('crc_errors','overruns','parity_errors','framing_errors','breaks','flow_timeouts'))
@@ -140,7 +163,7 @@ class App:
         else:
             flow='RTS/CTS' if d['flow']=='rtscts' else '3-wire'
             text=f"Connected · COM{d['com']} · {d['baud']} · {flow} · {d['block_size']} bytes"
-            if errors:text+=f' · {errors} errors / timeouts'
+            if errors:text+=' · Link counters recorded; see Diagnostics'
         self.connection_hint.set(text)
         self.connection_label.configure(style='Warning.TLabel' if pending or errors else 'Good.TLabel')
         self.apply_button.configure(state='normal' if pending and not self.busy else 'disabled')
@@ -151,16 +174,21 @@ class App:
                   self.up_button,self.go_button,self.refresh_button,self.path_box,self.partial_button,
                   self.mkdir_button,self.rename_button,self.delete_button,self.apply_button,self.diag_button,self.clock_button):
             w.configure(state='normal' if connected and not self.busy else 'disabled')
-        for w in (self.verify_button,self.save_button,self.remove_profile_button,self.ftdi_button):w.configure(state='disabled' if self.busy else 'normal')
+        lan=self.transport.get()=='lan'
+        for w in (self.verify_button,self.save_button,self.remove_profile_button):w.configure(state='disabled' if self.busy else 'normal')
+        self.ftdi_button.configure(state='disabled' if self.busy or lan else 'normal')
         self.connect_button.configure(text='Disconnect' if connected else 'Connect',
             state='disabled' if self.disconnect_pending or self.disconnecting or self.closing or (self.busy and not connected) else 'normal')
+        self.transport_box.configure(state='disabled' if connected or self.busy else 'readonly')
         self.port_box.configure(state='disabled' if connected or self.busy else 'normal')
+        self.address_box.configure(state='disabled' if connected or self.busy else 'normal')
         self.profile_box.configure(state='disabled' if connected or self.busy else 'normal')
         self.load_button.configure(state='disabled' if connected or self.busy else 'normal')
-        self.com_box.configure(state='disabled' if connected or self.busy else 'readonly')
-        for w in (self.speed_box,self.flow_box,self.peer_box,self.block_box):w.configure(state='disabled' if self.busy else 'readonly')
-        self.latency_box.configure(state='disabled' if self.busy else 'normal')
-        self.scan_button.configure(state='disabled' if connected or self.busy else 'normal')
+        self.com_box.configure(state='disabled' if connected or self.busy or lan else 'readonly')
+        for w in (self.speed_box,self.flow_box,self.peer_box,self.block_box):w.configure(state='disabled' if self.busy or lan else 'readonly')
+        for label in self.serial_labels:label.state(['disabled'] if lan else ['!disabled'])
+        self.latency_box.configure(state='disabled' if self.busy or lan else 'normal')
+        self.scan_button.configure(state='disabled' if connected or self.busy or lan else 'normal')
         self.cancel_button.configure(state='normal' if self.busy and self.can_cancel else 'disabled')
         self.clear_button.configure(state='normal' if self.plan and not self.busy else 'disabled')
         self.start_button.configure(state='normal' if connected and self.plan and not self.busy and self.plan.status!='Complete' else 'disabled')
@@ -184,6 +212,7 @@ class App:
     def work(self,title,action,cancellable=True):
         if self.busy:return
         self.busy=True;self.can_cancel=cancellable;self.started=time.monotonic();self.progress_file=None
+        self.file_label.configure(text='File')
         self.progress.configure(mode='indeterminate',value=0);self.progress.start(20)
         self.file_percent.set('…');self.detail.set('Waiting for the operation to finish…')
         self.status.set(title);self.log_message(title)
@@ -205,20 +234,32 @@ class App:
         if self.busy:return
         try:v=self.profile_values()
         except ValueError as exc:messagebox.showerror('Settings',str(exc));return
-        if not v['device']:messagebox.showinfo('Serial device','Choose a serial device.');return
+        if v['transport']=='serial' and not v['device']:
+            messagebox.showinfo('Serial device','Choose a serial device.');return
         remote=self.remote
         def action():
-            port=SerialPort(v['device'],9600,interrupted=self.stop_event);client=Client(port,9600);client.cancelled=self.cancel_event
+            if v['transport']=='lan':
+                port=LanPort(v['address'],interrupted=self.stop_event)
+                client=Client(port,115200,timeout=2.0)
+            else:
+                port=SerialPort(v['device'],9600,interrupted=self.stop_event)
+                client=Client(port,9600)
+            client.cancelled=self.cancel_event
             try:
-                hello,info=client.establish(v['baud'],v['flow'],v['peer'],v['block'],self.notify)
-                latency=self.latency_session
-                if latency and latency.device!=v['device']:latency.restore(authorize=True);latency=None
-                if latency is None:latency=LatencySession(v['device'])
-                self.latency_session=latency
-                if v['latency']:
-                    try:
-                        if latency.apply(v['latency']):self.notify(f"FTDI latency {v['latency']} ms")
-                    except OSError:self.notify('Use Apply FTDI latency to authorize the adapter setting.')
+                if v['transport']=='lan':
+                    hello=client.connect();info=client.diagnostics()
+                    if info.get('transport')!='lan':raise VersionError('Run NUXNET on DOS for LAN mode.')
+                else:
+                    hello,info=client.establish(v['baud'],v['flow'],v['peer'],v['block'],self.notify)
+                    if info.get('transport','serial')!='serial':raise VersionError('Run NUXFER on DOS for serial mode.')
+                    latency=self.latency_session
+                    if latency and latency.device!=v['device']:latency.restore(authorize=True);latency=None
+                    if latency is None:latency=LatencySession(v['device'])
+                    self.latency_session=latency
+                    if v['latency']:
+                        try:
+                            if latency.apply(v['latency']):self.notify(f"FTDI latency {v['latency']} ms")
+                        except OSError:self.notify('Use Apply FTDI latency to authorize the adapter setting.')
                 path=remote
                 try:entries=client.listing(path)
                 except RemoteError:
@@ -234,7 +275,7 @@ class App:
                     try:self.latency_session.restore()
                     except OSError:self.notify('FTDI latency still changed; close the client to restore it with authorization.')
                 raise
-        self.work('Connecting and applying the selected DOS/Linux settings…',action)
+        self.work('Connecting to DOS over LAN…' if v['transport']=='lan' else 'Connecting and applying the selected DOS/Linux settings…',action)
 
     def navigate(self,path=None):
         if self.busy or not self.client:return
@@ -303,7 +344,8 @@ class App:
             text+='Review the queue first. Completed deletions cannot be undone.'
             if not messagebox.askyesno('Confirm DOS deletion',text):return
             self.work('Running deletion queue…',lambda:('executed',execute_delete(self.client,plan,self.progress_event,protected=True)))
-        else:self.work('Running transfer queue…',lambda:('executed',execute_queue(self.client,plan,self.progress_event)))
+        else:self.work('Running transfer queue…',lambda:('executed',
+            execute_queue(self.client,plan,self.progress_event,self.phase_event)))
     def progress_event(self,index,job,done,total):
         now=time.monotonic(); key=(index,job.status)
         if done==total or key!=getattr(self,'progress_key',None) or now-getattr(self,'progress_time',0)>=.08:
@@ -312,6 +354,12 @@ class App:
                 # together after a repaint or pause, but did not transfer together.
                 self.events.put(('progress',(index,job.status,done,total,now)))
                 self.progress_key,self.progress_time=key,now
+    def phase_event(self,index,job,label,done,total):
+        now=time.monotonic();key=(index,label)
+        if done==0 or done==total or key!=getattr(self,'phase_key',None) or now-getattr(self,'phase_time',0)>=.08:
+            if done==0 or done==total or self.events.qsize()<20:
+                self.events.put(('phase',(index,label,done,total)))
+                self.phase_key,self.phase_time=key,now
     def cancel(self):
         self.cancel_event.set()
         if self.client:self.client.cancelled.set()
@@ -442,6 +490,21 @@ class App:
             while True:
                 kind,value=self.events.get_nowait()
                 if kind=='note':self.status.set(value);self.log_message(value)
+                elif kind=='phase':
+                    index,label,done,total=value
+                    if not self.plan:continue
+                    job=self.plan.jobs[index]
+                    self.progress.stop()
+                    if total:
+                        self.progress.configure(mode='determinate',value=100*done/total)
+                        self.file_percent.set(f'{min(100,int(100*done/total))}%')
+                    else:
+                        self.progress.configure(mode='indeterminate',value=0)
+                        self.progress.start(20);self.file_percent.set('—')
+                    self.file_label.configure(text='Verify' if label.startswith('Verifying') else 'File')
+                    self.status.set(f'{index+1}/{len(self.plan.jobs)} — {job.target} — {label}')
+                    self.detail.set(f'{done:,} / {total:,} bytes checked' if total else 'Waiting for DOS to finish the file.')
+                    self.queue_totals(index,job.meta.size)
                 elif kind=='progress':
                     index,status,done,total,recorded=value
                     if not self.plan:continue
@@ -454,6 +517,7 @@ class App:
                     rate=max(0,done-self.progress_base)/elapsed
                     eta=(total-done)/rate if rate>0 else None
                     self.progress.stop();self.progress.configure(mode='determinate',value=100 if not total else 100*done/total)
+                    self.file_label.configure(text='File')
                     self.file_percent.set(f"{min(100,int(self.progress['value']))}%")
                     self.status.set(f'{index+1}/{len(self.plan.jobs)} — {job.target} — {status}')
                     self.detail.set(f'{done:,} / {total:,} bytes • {rate/1024:.1f} file KiB/s • '
@@ -482,8 +546,13 @@ class App:
                     elif value[0] in ('diagnostics','settings'):
                         self.display_diagnostics(value[1]);self.status.set('Connection checked.' if value[0]=='diagnostics' else 'Settings confirmed on DOS and Linux.')
                         if value[0]=='diagnostics':
-                            d=value[1];lat=read_latency(self.device.get())
-                            messagebox.showinfo('Connection diagnostics',f"DOS COM{d['com']} · {d['baud']} baud · {d['flow']}\nPeer checks: {d['peer']} · block {d['block_size']} · FIFO {bool(d['fifo'])}\n\nCTS {bool(d['msr']&16)} · DSR {bool(d['msr']&32)} · DCD {bool(d['msr']&128)}\nCRC errors: {d['crc_errors']}\nUART overruns: {d['overruns']}\nParity errors: {d['parity_errors']}\nFraming errors: {d['framing_errors']}\nBreaks: {d['breaks']}\nTransmit/handshake timeouts: {d['flow_timeouts']}\nClient retries: {self.client.retries}\nFTDI latency: {str(lat)+' ms' if lat is not None else 'unavailable'}\nFree DOS space: {d['free_bytes']:,} bytes")
+                            d=value[1]
+                            if d.get('transport')=='lan':
+                                messagebox.showinfo('Connection diagnostics',
+                                    f"LAN · DOS {self.address.get()} · UDP 47588\nBlock {d['block_size']} bytes · client retries {self.client.retries}\nFrame CRC errors: {d['crc_errors']}\nFree DOS space: {d['free_bytes']:,} bytes")
+                            else:
+                                lat=read_latency(self.device.get())
+                                messagebox.showinfo('Connection diagnostics',f"DOS COM{d['com']} · {d['baud']} baud · {d['flow']}\nPeer checks: {d['peer']} · block {d['block_size']} · FIFO {bool(d['fifo'])}\n\nCTS {bool(d['msr']&16)} · DSR {bool(d['msr']&32)} · DCD {bool(d['msr']&128)}\nCRC errors: {d['crc_errors']}\nUART overruns: {d['overruns']}\nParity errors: {d['parity_errors']}\nFraming errors: {d['framing_errors']}\nBreaks: {d['breaks']}\nTransmit/handshake timeouts: {d['flow_timeouts']}\nClient retries: {self.client.retries}\nFTDI latency: {str(lat)+' ms' if lat is not None else 'unavailable'}\nFree DOS space: {d['free_bytes']:,} bytes")
                     elif value[0]=='clock':self.status.set('DOS date/time synced: '+value[1].strftime('%Y-%m-%d %H:%M:%S')+' (Linux local time).')
                     elif value[0]=='latency':self.status.set(f'FTDI latency set to {value[1]} ms; previous setting retained for restoration.')
                     elif value[0]=='disconnected':
@@ -536,7 +605,7 @@ class App:
         self.arrange_panes()
 
     def profile_values(self):
-        return validate(dict(device=self.device.get().strip(),baud=int(self.speed.get()),flow=self.flow.get(),peer=self.peer.get(),block=int(self.block_size.get()),compression=self.compression.get(),latency=int(self.latency.get()),com=self.doscom.get(),local=str(self.local),remote=self.remote))
+        return validate(dict(transport=self.transport.get(),address=self.address.get().strip(),device=self.device.get().strip(),baud=int(self.speed.get()),flow=self.flow.get(),peer=self.peer.get(),block=int(self.block_size.get()),compression=self.compression.get(),latency=int(self.latency.get()),com=self.doscom.get(),local=str(self.local),remote=self.remote))
 
     def save_profile(self):
         try:self.profiles.save(self.profile_name.get(),self.profile_values())
@@ -547,8 +616,9 @@ class App:
         if self.busy or self.client:return
         values=self.profiles.items.get(self.profile_name.get())
         if not values:return
+        self.transport.set('serial');self.transport_changed()
         self.compression.set(values['compression'])
-        for key,var in [('device',self.device),('baud',self.speed),('flow',self.flow),('peer',self.peer),('block',self.block_size),('latency',self.latency),('com',self.doscom)]:var.set(str(values[key]))
+        for key,var in [('address',self.address),('device',self.device),('baud',self.speed),('flow',self.flow),('peer',self.peer),('block',self.block_size),('latency',self.latency),('com',self.doscom)]:var.set(str(values[key]))
         self.remote=values['remote'];self.location.set(self.remote);self.local_navigate(values['local'])
 
     def remove_profile(self):
@@ -669,9 +739,10 @@ class App:
 
     def display_diagnostics(self,info):
         self.info=info
+        if info.get('transport')=='lan':self.block_size.set(str(info['block_size']))
         self.disk_space.set(f"Free {info['free_bytes']/1048576:.1f} / {info['total_bytes']/1048576:.1f} MiB")
         self.remote_frame.configure(text='DOS files · '+self.disk_space.get())
-        self.doscom.set('COM'+str(info['com']))
+        if info.get('transport')!='lan':self.doscom.set('COM'+str(info['com']))
         self.connection_state()
 
     def sync_clock(self):
@@ -680,16 +751,16 @@ class App:
 
     def diagnostics(self):
         if self.busy or not self.client:return
-        self.work('Testing connection and reading UART status…',lambda:('diagnostics',self.client.diagnostics()))
+        self.work('Checking LAN connection…' if self.transport.get()=='lan' else 'Testing connection and reading UART status…',lambda:('diagnostics',self.client.diagnostics()))
 
     def apply_connection(self):
-        if self.busy or not self.client:return
+        if self.busy or not self.client or self.transport.get()=='lan':return
         try:v=self.profile_values()
         except ValueError as exc:messagebox.showerror('Settings',str(exc));return
         self.work('Negotiating settings; an unconfirmed switch rolls back in about 12 seconds…',lambda:('settings',self.client.apply_settings(v['baud'],v['flow'],v['peer'],v['block'])),cancellable=False)
 
     def apply_ftdi(self):
-        if self.busy:return
+        if self.busy or self.transport.get()=='lan':return
         try:value=int(self.latency.get())
         except ValueError:messagebox.showerror('FTDI latency','Enter 0 to keep the current value, or 2..255 ms.');return
         if value==0:self.status.set('FTDI latency left unchanged.');return
@@ -725,10 +796,12 @@ class App:
                 try:
                     client.stopping.clear()
                     if not client.abort():warnings.append('DOS did not confirm the pause; reconnect to resume.')
+                    if getattr(client.transport,'mode',None)=='lan' and not client.goodbye():
+                        warnings.append('DOS did not confirm the disconnect.')
                 except Exception as exc:warnings.append('DOS pause: '+str(exc))
                 finally:
                     try:client.transport.close()
-                    except Exception as exc:warnings.append('Serial cleanup: '+str(exc))
+                    except Exception as exc:warnings.append('Connection cleanup: '+str(exc))
             if latency:
                 try:latency.restore(authorize=True)
                 except Exception as exc:warnings.append('Latency restoration: '+str(exc))
@@ -756,10 +829,11 @@ class App:
 
 
 def main():
-    parser=argparse.ArgumentParser(description='NuXT Link 3 serial file manager. Connection settings are negotiated with the DOS server.')
+    parser=argparse.ArgumentParser(description='NuXT Link 4 serial file manager.')
     parser.add_argument('--profile');parser.add_argument('--device')
     parser.add_argument('--baud',type=int,choices=BAUDS);parser.add_argument('--flow',choices=('none','rtscts'))
-    parser.add_argument('--peer',choices=tuple(PEERS));parser.add_argument('--block',type=int,choices=BLOCK_SIZES)
+    parser.add_argument('--peer',choices=tuple(PEERS));parser.add_argument('--block',type=int,
+                        choices=tuple(size for size in BLOCK_SIZES if size not in (1024,1440,1464)))
     parser.add_argument('--latency',type=int,help='FTDI milliseconds; 0 leaves the adapter unchanged')
     parser.add_argument('--compression',action=argparse.BooleanOptionalAction,default=None,
                         help='compress uploads when worthwhile (default: enabled)')
@@ -771,6 +845,9 @@ def main():
         if args.profile not in store.items:parser.error('Unknown saved profile')
         values.update(store.items[args.profile])
     values.update({k:v for k,v in vars(args).items() if k in DEFAULTS and v is not None})
+    values['transport']='serial'
+    if args.block is None and values.get('block') in (1024,1440,1464):
+        values['block']=4096
     try:values=validate(values)
     except ValueError as exc:parser.error(str(exc))
     root=tk.Tk();app=App(root,values)

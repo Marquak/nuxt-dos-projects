@@ -1,4 +1,4 @@
-import os,sys,pty,struct,termios,tempfile,threading,unittest
+import json,os,sys,pty,struct,termios,tempfile,threading,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'linux'))
@@ -13,7 +13,7 @@ class V3Tests(unittest.TestCase):
         class Port:
             def write(self,data,timeout):self.data=encode(ACK,data[3],b'NUXTLINK/2 C:\\ file server')
             def read(self,timeout):data=self.data;self.data=b'';return data
-        with self.assertRaisesRegex(VersionError,'both the NuXT Link 3.3.1'):
+        with self.assertRaisesRegex(VersionError,'NUXFER.COM'):
             Client(Port()).connect()
 
     def test_frame_limit_and_split_large_crc(self):
@@ -57,6 +57,28 @@ class V3Tests(unittest.TestCase):
             store.delete('Large')
             with self.assertRaises(ValueError):store.save('Bad',dict(baud=123))
             store.delete('NuXT');self.assertEqual(Profiles(path).items,{})
+
+    def test_first_run_imports_both_serial_profile_stores_without_changing_them(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {'XDG_CONFIG_HOME': folder}):
+            root=Path(folder)
+            fast=root/'nuxtlink-fast'/'profiles.json'
+            old=root/'nuxtlink'/'profiles.json'
+            for path in (fast,old):path.parent.mkdir(parents=True)
+            fast.write_text(json.dumps({'version':1,'profiles':{'NuXT':{'baud':115200,'block':4096}}}))
+            old.write_text(json.dumps({'version':1,'profiles':{
+                'NuXT':{'baud':57600,'block':2048},
+                'LAN':{'transport':'lan','address':'192.168.50.8'},
+                'Other':{'baud':38400}}}))
+            before=(fast.read_bytes(),old.read_bytes())
+            store=Profiles()
+            self.assertEqual(store.items['NuXT']['baud'],115200)
+            self.assertEqual(store.items['NuXT (old serial)']['baud'],57600)
+            self.assertEqual(store.items['Other']['baud'],38400)
+            self.assertNotIn('LAN',store.items)
+            self.assertFalse(store.path.exists())
+            store.save('New',{'baud':9600})
+            self.assertEqual((fast.read_bytes(),old.read_bytes()),before)
+            self.assertEqual(Profiles().items['New']['baud'],9600)
 
     def test_latency_restore_preserves_external_change(self):
         with patch('ftdi.read_latency',return_value=16),patch('ftdi.apply_latency',return_value=True) as apply:

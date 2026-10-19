@@ -25,7 +25,7 @@ class BaudPort:
         if self.pending and self.clock.now()>=self.deadline:self.server=self.old;self.pending=0
     def info(self):
         baud,flow,peer,block=self.server
-        return struct.pack('<8B6I2IHHB',6,1,BAUDS.index(baud),FLOWS.index(flow),PEERS[peer],1,0xb0,3,
+        return struct.pack('<8B6I2IHHB',8,1,BAUDS.index(baud),FLOWS.index(flow),PEERS[peer],1,0xb0,3,
                            0,0,0,0,0,0,1000000,2000000,4096,block,self.pending)+b'\\NUXFER.COM\0'
     def write(self,data,timeout):
         self.poll();kind,seq=data[2:4];payload=data[6:-2];self.writes.append((self.baud,kind))
@@ -33,7 +33,7 @@ class BaudPort:
         rate=self.baud;response=ACK
         if kind==HELLO:
             if self.hello_loss:self.hello_loss-=1;return
-            payload=b'NUXTLINK/6 C:\\ file server'
+            payload=b'NUXTLINK/8 C:\\ file server'
         elif kind==INFO:payload=self.info()
         elif kind==SETTINGS:
             if self.reject:response=ERROR;payload=b'Required CTS line is low'

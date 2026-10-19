@@ -1,4 +1,5 @@
 import json
+import errno
 import struct
 import sys
 import tempfile
@@ -13,6 +14,68 @@ from transfer_queue import append_plan, execute_queue
 
 
 class CompletionTests(unittest.TestCase):
+    def test_download_metadata_failure_restores_overwritten_file_and_stage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);dest=root/'DATA.BIN';dest.write_bytes(b'old data')
+            temp=root/'new.part';temp.write_bytes(b'verified new data')
+            meta=Metadata(temp.stat().st_size,0x5d53,0x6000,32)
+            with patch('link.preserve_metadata',side_effect=OSError('metadata write failed')):
+                with self.assertRaisesRegex(OSError,'metadata write failed'):
+                    commit_download(temp,dest,meta,True)
+            self.assertEqual(dest.read_bytes(),b'old data')
+            self.assertEqual(temp.read_bytes(),b'verified new data')
+            self.assertFalse((root/'new.part.previous').exists())
+
+    def test_download_overwrite_falls_back_when_hard_links_are_unavailable(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);dest=root/'DATA.BIN';dest.write_bytes(b'old data')
+            temp=root/'new.part';temp.write_bytes(b'verified new data')
+            meta=Metadata(temp.stat().st_size,0x5d53,0x6000,32)
+            with patch('link.os.link',side_effect=OSError(errno.EOPNOTSUPP,'no hard links')):
+                with patch('link.preserve_metadata',side_effect=OSError('metadata write failed')):
+                    with self.assertRaisesRegex(OSError,'metadata write failed'):
+                        commit_download(temp,dest,meta,True)
+            self.assertEqual(dest.read_bytes(),b'old data')
+            self.assertEqual(temp.read_bytes(),b'verified new data')
+            self.assertFalse((root/'new.part.previous').exists())
+
+    def test_download_metadata_failure_removes_new_destination(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);dest=root/'DATA.BIN'
+            temp=root/'new.part';temp.write_bytes(b'verified new data')
+            meta=Metadata(temp.stat().st_size,0x5d53,0x6000,32)
+            with patch('link.preserve_metadata',side_effect=OSError('metadata write failed')):
+                with self.assertRaisesRegex(OSError,'metadata write failed'):
+                    commit_download(temp,dest,meta,False)
+            self.assertFalse(dest.exists())
+            self.assertEqual(temp.read_bytes(),b'verified new data')
+
+    def test_download_commit_preserves_metadata_and_cleans_old_link(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);dest=root/'DATA.BIN';dest.write_bytes(b'old data')
+            temp=root/'new.part';temp.write_bytes(b'verified new data')
+            meta=Metadata(temp.stat().st_size,0x5d53,0x6000,32)
+            commit_download(temp,dest,meta,True)
+            self.assertEqual(dest.read_bytes(),b'verified new data')
+            self.assertEqual(local_metadata(dest),meta)
+            self.assertFalse(temp.exists())
+            self.assertFalse((root/'new.part.previous').exists())
+
+    def test_download_no_clobber_commit_and_existing_file_rejection(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);dest=root/'DATA.BIN'
+            temp=root/'new.part';temp.write_bytes(b'verified new data')
+            meta=Metadata(temp.stat().st_size,0x5d53,0x6000,32)
+            commit_download(temp,dest,meta,False)
+            self.assertEqual(dest.read_bytes(),b'verified new data')
+            self.assertEqual(local_metadata(dest),meta)
+            self.assertFalse(temp.exists())
+            temp.write_bytes(b'another verified file')
+            with self.assertRaises(FileExistsError):
+                commit_download(temp,dest,meta,False)
+            self.assertEqual(dest.read_bytes(),b'verified new data')
+            self.assertEqual(temp.read_bytes(),b'another verified file')
+
     def test_ratio_uses_transferred_portion_and_handles_empty_or_raw(self):
         job=Job('src','dst',Metadata(1000,1,1,32),'send',status='Complete',elapsed_seconds=63.2,
                 result={'resumed_bytes':600,'upload_payload_bytes':100})
@@ -59,15 +122,18 @@ class CompletionTests(unittest.TestCase):
     def test_staging_readback_mismatch_prevents_commit(self):
         with tempfile.TemporaryDirectory() as folder:
             src=Path(folder)/'DATA.BIN';src.write_bytes(b'A'*4096)
-            c=Client(None);calls=[]
+            c=Client(None);calls=[];phases=[]
             def request(kind,payload=b'',**kwargs):
                 calls.append(kind)
                 if kind==PUT_BEGIN:return struct.pack('<I',0)
                 if kind==PUT_STATUS:return struct.pack('<IIHB',0,0,0xffff,1)
-                if kind in (PUT_DATA,PUT_COMPRESSED,CANCEL):return b''
+                if kind in (PUT_DATA,PUT_COMPRESSED,PUT_ZERO_RLE,PUT_LZ4,CANCEL):return b''
                 if kind==PUT_VERIFY:return struct.pack('<IIHB',4096,4096,crc(src.read_bytes())^1,1)
                 raise AssertionError(f'Unexpected commit after bad readback: {kind}')
             c.request=request
-            with self.assertRaisesRegex(LinkError,'readback failed'):c.upload(src,'\\DATA.BIN')
+            with self.assertRaisesRegex(LinkError,'readback failed'):
+                c.upload(src,'\\DATA.BIN',phase=lambda label,d,t: phases.append((label,d,t)))
             self.assertIn(PUT_VERIFY,calls);self.assertNotIn(PUT_END,calls)
             self.assertEqual(calls[-1],CANCEL)
+            self.assertEqual(phases[0],('Verifying on DOS',0,4096))
+            self.assertEqual(phases[-1],('Verifying on DOS',4096,4096))

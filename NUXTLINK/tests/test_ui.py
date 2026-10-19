@@ -119,6 +119,23 @@ class UITests(unittest.TestCase):
         a.busy=False;a.update_controls()
         self.assertFalse(a.compression_check.instate(['disabled']))
 
+    def test_upload_readback_has_visible_progress_after_transfer_reaches_100_percent(self):
+        self.connect_fixture();a=self.app;plan=self.make_plan()
+        job=plan.jobs[0];job.status='Running';plan.status='Running'
+        a.progress_event(0,job,1000,1000)
+        a.phase_event(0,job,'Verifying on DOS',500,1000)
+        a.poll()
+        self.assertEqual(a.file_label.cget('text'),'Verify')
+        self.assertEqual(a.file_percent.get(),'50%')
+        self.assertIn('Verifying on DOS',a.status.get())
+        a.phase_event(0,job,'Saving on DOS',0,0)
+        a.poll()
+        self.assertEqual(str(a.progress.cget('mode')),'indeterminate')
+        a.progress_event(0,job,1000,1000)
+        a.poll()
+        self.assertEqual(a.file_label.cget('text'),'File')
+        self.assertEqual(a.file_percent.get(),'100%')
+
     def test_completed_queue_shows_time_ratio_and_sorts_numerically(self):
         self.connect_fixture();a=self.app;plan=self.make_plan()
         for job,seconds,payload in zip(plan.jobs,(120,9),(100,10)):
@@ -310,7 +327,7 @@ class UITests(unittest.TestCase):
         a.remote='\\REMOVED';a.device.set('/dev/fake');a.latency.set('0')
         port=Mock()
         client=Mock(drive='C:\\')
-        client.establish.return_value=('NUXTLINK/6 C:\\ file server',self.info)
+        client.establish.return_value=('NUXTLINK/8 C:\\ file server',self.info)
         client.listing.side_effect=[RemoteError('DOS error 3 (path missing)'),self.listing]
         with patch('nuxtlink.SerialPort',return_value=port),patch('nuxtlink.Client',return_value=client), \
              patch('nuxtlink.LatencySession'),patch('nuxtlink.messagebox.showerror') as error:
@@ -322,11 +339,19 @@ class UITests(unittest.TestCase):
         self.assertIn('previous folder',a.status.get().lower())
         port.close.assert_not_called()
 
+    def test_preview_has_only_serial_connection_controls(self):
+        a=self.app
+        self.assertEqual(a.transport.get(),'serial')
+        self.assertFalse(a.transport_box.winfo_ismapped())
+        self.assertFalse(a.address_box.winfo_ismapped())
+        self.assertTrue(a.port_box.winfo_ismapped())
+        self.assertEqual(a.profile_values()['transport'],'serial')
+
     def test_reconnect_does_not_hide_a_serial_failure_with_folder_fallback(self):
         self.connect_fixture();a=self.app;a.client=None
         a.remote='\\REMOVED';a.device.set('/dev/fake');a.latency.set('0')
         port=Mock();client=Mock(drive='C:\\')
-        client.establish.return_value=('NUXTLINK/6 C:\\ file server',self.info)
+        client.establish.return_value=('NUXTLINK/8 C:\\ file server',self.info)
         client.listing.side_effect=LinkError('No valid reply')
         with patch('nuxtlink.SerialPort',return_value=port),patch('nuxtlink.Client',return_value=client), \
              patch('nuxtlink.LatencySession'),patch('nuxtlink.messagebox.showerror') as error:

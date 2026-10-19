@@ -1,4 +1,4 @@
-/* NuXT Link 3.3.1. Open Watcom, 8086 tiny model, DOS 3.31+.
+/* NuXT Link 4 serial server. Open Watcom, 8086 tiny model, DOS 3.31+.
  * The DOS side owns paths and validates every request; the Linux side owns
  * recursion, queues and manifests. No directory tree is held in DOS memory.
  */
@@ -20,7 +20,8 @@ typedef unsigned long U32;
 #define PATHLEN 66
 #define CACHE "\\NX$CACHE"
 #define SIGN "NuXT Link 2 resume cache\r\n"
-static U8 req[CAP+6], prev[CAP+4], reply[CAP+8], record[96];
+static U8 req[CAP+6], prev[CAP+4], record[96];
+static U8 reply[CAP+8];
 static U8 block[4096];
 static U16 crc_table[256];
 static unsigned base, com=1, speed=3, fifo, saved[5];
@@ -35,9 +36,11 @@ static U32 position, total, scan_to;
 static U16 file_crc, expected_crc;
 static U8 meta[9];
 static unsigned overwrite, old_attr, list_active, upload_verified;
-static unsigned flow, peer, chunksize=128, rx_fault, readpos, readlen;
+static unsigned chunksize=128, readpos, readlen;
+static unsigned flow,peer,rx_fault;
 static U32 counters[6]; /* CRC, overrun, parity, framing, break, CTS timeout. */
-static unsigned pending, switch_tick, old_speed, old_flow, old_peer, old_chunk;
+static unsigned pending;
+static unsigned switch_tick, old_speed, old_flow, old_peer, old_chunk;
 static unsigned new_speed, new_flow, new_peer, new_chunk;
 static U32 switch_token;
 static void settings_poll(void);
@@ -69,8 +72,43 @@ static void pd(U8 *p,U32 x){pw(p,(U16)x);pw(p+2,(U16)(x>>16));}
 extern U16 crc_fast(const U8 *p,unsigned n,U16 seed,const U16 *table);
 #pragma aux crc_fast parm [si] [cx] [ax] [di] value [ax] modify [ax bx cx si];
 #define crc(p,n,c) crc_fast((p),(n),(c),crc_table)
+/* One control byte describes either 1..128 zeros or 1..128 literal bytes.
+ * This is deliberately cheaper than a dictionary search on an XT CPU. */
+static unsigned rle_pack(const U8 *src,unsigned n,U8 *dst,unsigned cap){
+    unsigned i=0,out=0,start,run,count;
+    while(i<n){
+        run=0;
+        while(i+run<n&&src[i+run]==0&&run<128)run++;
+        if(run>=3){
+            if(out>=cap)return 0;
+            dst[out++]=(U8)(0x80|(run-1));i+=run;
+        }else{
+            start=i;i+=run?run:1;
+            while(i<n&&i-start<128){
+                if(i+2<n&&src[i]==0&&src[i+1]==0&&src[i+2]==0)break;
+                i++;
+            }
+            count=i-start;
+            if(out+1+count>cap)return 0;
+            dst[out++]=(U8)(count-1);memcpy(dst+out,src+start,count);out+=count;
+        }
+    }
+    return out;
+}
+static int rle_unpack(const U8 *src,unsigned n,U8 *dst,unsigned expected){
+    unsigned i=0,out=0,count;U8 control;
+    while(i<n){
+        control=src[i++];count=(control&127)+1;
+        if(count>expected-out)return 0;
+        if(control&128)memset(dst+out,0,count);
+        else{if(count>n-i)return 0;memcpy(dst+out,src+i,count);i+=count;}
+        out+=count;
+    }
+    return out==expected;
+}
 extern unsigned hs_decode(const U8 *p,unsigned n,U8 *out,unsigned size);
 #pragma aux hs_decode parm [si] [cx] [di] [ax] value [ax] modify [ax bx cx dx si di];
+extern int lz4_unpack(const U8 *src,unsigned n,U8 *dst,unsigned expected);
 extern unsigned uart_tx_fill(unsigned port,const U8 *p,unsigned n,unsigned mask);
 #pragma aux uart_tx_fill parm [dx] [si] [cx] [bx] value [ax] modify [ax cx dx si di];
 static unsigned ticks(void){return *(volatile U16 __far *)MK_FP(0x40,0x6c);}
@@ -78,11 +116,13 @@ static void keys(void){
     if(*(U16 __far *)MK_FP(0x40,0x1a)!=*(U16 __far *)MK_FP(0x40,0x1c)){
         union REGS r;r.h.ah=0;int86(0x16,&r,&r);
         if(r.h.al==27)quitting=1;
-        if(!active&&!pending){if(r.h.al=='b'||r.h.al=='B')changing=1;
+        if(!active&&!pending){
+        if(r.h.al=='b'||r.h.al=='B')changing=1;
         if(r.h.al=='f'||r.h.al=='F')changing=2;
         if(r.h.al=='d'||r.h.al=='D')changing=3;
         if(r.h.al=='c'||r.h.al=='C')changing=4;
-        if(r.h.al=='s'||r.h.al=='S')changing=5;}
+        if(r.h.al=='s'||r.h.al=='S')changing=5;
+        }
     }
 }
 static int receive(void){
@@ -156,7 +196,13 @@ static int send(void){
 }
 static void error(const char *s){reply[2]=255;pw(reply+4,strlen(s));strcpy((char *)reply+6,s);}
 static void ioerror(unsigned e){char s[100];sprintf(s,"DOS error %u (path, disk full, protection or I/O failure)",e);error(s);}
-static void pause_file(void){if(handle>=0){_dos_close(handle);handle=-1;}active=0;list_active=0;readpos=readlen=0;upload_verified=0;}
+static void pause_file(void){
+    if(handle>=0){
+        _dos_close(handle);handle=-1;
+    }
+    active=0;list_active=0;readpos=readlen=0;
+    upload_verified=0;
+}
 static int name_ok(const char *s){
     unsigned n=0,e=0,dot=0;char stem[9];U8 ch;
     while((ch=(U8)*s++)!=0){
@@ -244,10 +290,17 @@ static int set_metadata(const char *p,const U8 *m){
     return f.wr_date==word(m+4)&&f.wr_time==word(m+6)&&(f.attrib&0x37)==m[8]?0:5;
 }
 static void scan_reply(int upload){
-    unsigned got,n,e;U32 left=scan_to-position;
-    n=left>sizeof(block)?sizeof(block):(unsigned)left;
-    if(n){e=_dos_read(handle,block,n,&got);if(e||got!=n){ioerror(e?e:5);pause_file();return;}
-        file_crc=crc(block,n,file_crc);position+=n;}
+    unsigned got,n,e,i;U32 left;
+    /* Two bounded DOS reads per request halve scan round trips without
+     * increasing the conventional-memory buffer or serial frame size. */
+    for(i=0;i<2;i++){
+        left=scan_to-position;
+        n=left>sizeof(block)?sizeof(block):(unsigned)left;
+        if(!n)break;
+        e=_dos_read(handle,block,n,&got);
+        if(e||got!=n){ioerror(e?e:5);pause_file();return;}
+        file_crc=crc(block,n,file_crc);position+=n;
+    }
     if(position==scan_to){
         if(active==6)upload_verified=1;
         if(active==3){_dos_close(handle);handle=-1;active=0;}
@@ -366,10 +419,14 @@ static void info_reply(void){
     union REGS r;unsigned i;U32 unit,freebytes=0,totalbytes=0;
     r.h.ah=0x36;r.h.dl=drive-'A'+1;intdos(&r,&r);
     if(r.x.ax!=0xffff){unit=(U32)r.x.ax*r.x.cx;freebytes=unit*r.x.bx;totalbytes=unit*r.x.dx;}
-    reply[6]=6;reply[7]=(U8)com;reply[8]=(U8)speed;reply[9]=(U8)flow;
+    reply[6]=
+    8;
+    reply[7]=(U8)com;reply[8]=(U8)speed;reply[9]=(U8)flow;
     reply[10]=(U8)peer;reply[11]=(U8)fifo;reply[12]=(U8)inp(base+6);reply[13]=(U8)inp(base+4);
     for(i=0;i<6;i++)pd(reply+14+i*4,counters[i]);
-    pd(reply+38,freebytes);pd(reply+42,totalbytes);pw(reply+46,CAP);pw(reply+48,chunksize);
+    pd(reply+38,freebytes);pd(reply+42,totalbytes);
+    pw(reply+46,CAP);
+    pw(reply+48,chunksize);
     reply[50]=(U8)pending;strcpy((char *)reply+51,program+2);pw(reply+4,46+strlen(program+2));
 }
 static int protected_path(const char *p){
@@ -454,7 +511,8 @@ invalid:
     error("Invalid date/time; use 1980-2099 and a valid calendar date");
 }
 static void dispatch(void){
-    unsigned n=word(req+2),e,got;U8 *p=req+4;struct find_t f;char pattern[72];
+    unsigned n=word(req+2),e,got,packed;
+    U8 *p=req+4;struct find_t f;char pattern[72];
     if(pending&&req[0]!=0x40&&req[0]!=0x42){error("Connection settings await confirmation");return;}
     switch(req[0]){
     case 0x40:if(n){error("Invalid diagnostics request");break;}info_reply();break;
@@ -478,7 +536,9 @@ static void dispatch(void){
     case 0x50:delete_entry(n);break;
     case 0x51:rename_entry(n);break;
     case 1:
-        pause_file();sprintf((char *)reply+6,"NUXTLINK/6 %c:\\ file server",drive);pw(reply+4,strlen((char *)reply+6));break;
+        pause_file();
+        sprintf((char *)reply+6,"NUXTLINK/8 %c:\\ file server",drive);
+        pw(reply+4,strlen((char *)reply+6));break;
     case 0x30:pause_file();break;
     case 0x31:
     case 0x32:
@@ -551,16 +611,42 @@ list_result:
         if(active!=1||!n||position+n>total){error("Invalid upload block or no upload active");break;}
         e=_dos_write(handle,p,n,&got);if(e||got!=n){ioerror(e?e:112);pause_file();break;}
         file_crc=crc(p,n,file_crc);position+=n;upload_verified=0;break;
+    case 0x16:
+    case 0x17:
+        if(active!=1||n<5||!word(p)||word(p)>chunksize||position+word(p)>total){
+            error("Invalid encoded upload block");break;
+        }
+        got=word(p);
+        if(!(req[0]==0x16?rle_unpack(p+4,n-4,block,got):
+             lz4_unpack(p+4,n-4,block,got))||crc(block,got,0xffff)!=word(p+2)){
+            error("Encoded upload data failed verification");break;
+        }
+        e=_dos_write(handle,block,got,&n);
+        if(e||n!=got){ioerror(e?e:112);pause_file();break;}
+        file_crc=crc(block,got,file_crc);position+=got;upload_verified=0;break;
     case 0x12:put_end(n);break;
     case 0x21:
+    case 0x25:
         if(n||active!=2){error("No download is ready");break;}
         got=0;n=total-position>chunksize?chunksize:(unsigned)(total-position);
         if(readpos==readlen){
-            readpos=0;readlen=total-position>sizeof(block)?sizeof(block):(unsigned)(total-position);
+            /* Packed 4096-byte replies need a three-byte header. Read 4093
+             * bytes too, avoiding a second round trip for every three-byte
+             * remainder at the end of a 4 KiB disk-buffer fill. */
+            unsigned limit=req[0]==0x25&&chunksize==4096?CAP-3:sizeof(block);
+            readpos=0;readlen=total-position>limit?limit:(unsigned)(total-position);
             e=_dos_read(handle,block,readlen,&got);
             if(e||got!=readlen){ioerror(e?e:5);pause_file();break;}
         }
         if(n>readlen-readpos)n=readlen-readpos;
+        if(req[0]==0x25){
+            if(n>CAP-3)n=CAP-3;
+            packed=n>35?rle_pack(block+readpos,n,reply+9,n-35):0;
+            reply[6]=packed?1:0;pw(reply+7,n);
+            if(packed)pw(reply+4,packed+3);
+            else{memcpy(reply+9,block+readpos,n);pw(reply+4,n+3);}
+            file_crc=crc(block+readpos,n,file_crc);readpos+=n;position+=n;break;
+        }
         memcpy(reply+6,block+readpos,n);readpos+=n;
         file_crc=crc(reply+6,n,file_crc);position+=n;pw(reply+4,n);break;
     case 0x22:
@@ -603,7 +689,7 @@ int main(int argc,char **argv){
     base=*(U16 __far *)MK_FP(0x40,(com-1)*2);if(!base){puts("COM port is not present in the BIOS table.");return 1;}
     old24=_dos_getvect(0x24);_dos_setvect(0x24, (void (__interrupt __far *)(void))MK_FP(code_segment(),(unsigned)critical));
     uart_open();reply[0]='N';reply[1]='X';
-    printf("\nNUXT LINK 3.3.1 - entire %c:\\ drive\n",drive);
+    printf("\nNUXT LINK 4.0 - entire %c:\\ drive\n",drive);
     show_settings();
     puts("Files, folders, hidden/system files and DOS metadata.\nEsc exits. Idle keys: B baud, F flow, D peer lines, C COM, S status.\nPartials survive disconnects. Defaults: COM1 9600 /FLOW:NONE.");
     last_tick=ticks();

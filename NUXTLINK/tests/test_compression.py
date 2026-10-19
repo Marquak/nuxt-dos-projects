@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'linux'))
 from heatshrink_codec import encode, packet
+from zero_rle import encode as rle_encode, decode as rle_decode, upload_packet as rle_packet
 from profiles import validate
 
 
@@ -26,6 +27,17 @@ def reference_decode(packed,length):
 
 
 class CompressionTests(unittest.TestCase):
+    def test_zero_run_roundtrip_and_rejects_bad_blocks(self):
+        rng=random.Random(2026)
+        for size in (1,2,3,127,128,129,4093,4096):
+            for data in (bytes(size), rng.randbytes(size), (b'X\0\0Y\0\0\0Z'*600)[:size]):
+                self.assertEqual(rle_decode(rle_encode(data),size),data)
+        data=bytes(128)
+        self.assertLess(len(rle_packet(data)),len(data))
+        for packed,length in ((b'\x00',1),(b'\xff',127),(b'\xff',129),
+                              (b'\x00X\x00',1)):
+            with self.assertRaises(ValueError):rle_decode(packed,length)
+
     def test_encoder_roundtrip_and_reset(self):
         rng=random.Random(87)
         for size in (1,15,128,512,2048,4096):

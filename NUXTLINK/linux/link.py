@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import select
+import shutil
 import struct
 import json
 import hashlib
@@ -17,21 +18,26 @@ import termios
 import threading
 import time
 import secrets
+import socket
 
 BAUDS = (1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200)
 MAX_PAYLOAD = 4096
-BLOCK_SIZES = (128, 256, 512, 2048, 4096)
+BLOCK_SIZES = (128, 256, 512, 1024, 1440, 1464, 2048, 4096)
+LAN_PORT = 47588
 MAGIC = b"NX"
 HELLO, FIRST, NEXT = 1, 2, 3
 PUT_BEGIN, PUT_DATA, PUT_END = 0x10, 0x11, 0x12
 PUT_COMPRESSED = 0x14
+PUT_ZERO_RLE = 0x16
+PUT_LZ4 = 0x17
 PUT_VERIFY = 0x15
 GET_BEGIN, GET_DATA, GET_END = 0x20, 0x21, 0x22
+GET_PACKED = 0x25
 CANCEL, ACK, ERROR = 0x30, 0x80, 0xFF
 STAT, MKDIR, META, HASH, HASH_STEP = 4, 5, 6, 7, 8
 PUT_STATUS, GET_STATUS = 0x13, 0x24
 INFO, SETTINGS, CONFIRM, DELETE, RENAME = 0x40, 0x41, 0x42, 0x50, 0x51
-CLOCK = 0x43
+CLOCK, GOODBYE = 0x43, 0x44
 FLOWS = ('none', 'rtscts')
 PEERS = {'none': 0, 'dsr': 32, 'dcd': 128, 'both': 160}
 MAX_FILE = 0x7FFFFFFF
@@ -242,7 +248,59 @@ def preserve_metadata(path, meta: Metadata):
         pass  # Sidecar index is authoritative on filesystems without xattrs.
 
 
-def checksums(path, limit=None):
+def commit_download(temp, destination, meta, overwrite):
+    """Keep the old destination until file contents and metadata both commit."""
+    temp, destination = Path(temp), Path(destination)
+    previous = temp.with_name(temp.name + '.previous')
+    had_old = overwrite and destination.exists()
+    if had_old:
+        if previous.exists() or previous.is_symlink():
+            raise LinkError(f'Previous download backup needs inspection: {previous}')
+        try:
+            os.link(destination, previous)
+        except OSError:
+            # FAT and some mounted folders cannot make hard links. Copying is
+            # slower, but preserves the old file before an overwrite begins.
+            try:
+                shutil.copy2(destination, previous)
+            except OSError:
+                previous.unlink(missing_ok=True)
+                raise
+    committed = False
+    try:
+        if overwrite:
+            os.replace(temp, destination)
+        else:
+            os.link(temp, destination)  # Atomic no-clobber commit.
+        committed = True
+        preserve_metadata(destination, meta)
+    except BaseException:
+        try:
+            if committed:
+                if overwrite:
+                    os.replace(destination, temp)  # Retain the verified download.
+                    if had_old:
+                        os.replace(previous, destination)
+                else:
+                    destination.unlink()  # The staging hard link remains.
+            elif had_old:
+                previous.unlink()
+        except OSError as rollback:
+            raise LinkError(f'Download commit failed and rollback failed; inspect {destination}, {temp}, and {previous}') from rollback
+        raise
+    # Cleanup failure must not turn a verified, committed file into a failed job.
+    # A retained hard link can be inspected and removed later.
+    try:
+        if overwrite:
+            if had_old:
+                previous.unlink()
+        else:
+            temp.unlink()
+    except OSError:
+        pass
+
+
+def checksums(path, limit=None, progress=None):
     checksum, digest, done = 0xffff, hashlib.sha256(), 0
     with Path(path).open('rb') as stream:
         while limit is None or done < limit:
@@ -252,6 +310,8 @@ def checksums(path, limit=None):
             checksum = crc(block, checksum)
             digest.update(block)
             done += len(block)
+            if progress is not None:
+                progress(done, limit)
     return done, checksum, digest.hexdigest()
 
 
@@ -428,6 +488,57 @@ class SerialPort:
                 os.close(fd)
 
 
+class LanPort:
+    """One complete protocol frame per unfragmented IPv4/UDP datagram."""
+    mode = 'lan'
+
+    def __init__(self, address: str, *, interrupted=None):
+        try:
+            socket.inet_pton(socket.AF_INET, address)
+        except OSError as exc:
+            raise ValueError('Enter the DOS machine IPv4 address.') from exc
+        self.interrupted = interrupted if interrupted is not None else threading.Event()
+        self.address = address
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self.sock.setblocking(False)
+            self.sock.connect((address, LAN_PORT))
+        except BaseException:
+            self.close()
+            raise
+
+    def check_interrupted(self):
+        if self.interrupted.is_set():
+            raise Cancelled('Disconnect requested; resumable files retained.')
+
+    def write(self, data: bytes, timeout: float):
+        if len(data) > 1472:
+            raise ValueError('LAN packet exceeds the DOS receive limit.')
+        end = time.monotonic() + timeout
+        while True:
+            self.check_interrupted()
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError('LAN send timed out')
+            _, ready, _ = select.select([], [self.sock], [], min(.1, remaining))
+            if ready:
+                sent = self.sock.send(data)
+                if sent != len(data):
+                    raise LinkError('Incomplete LAN datagram')
+                return
+
+    def read(self, timeout: float) -> bytes:
+        self.check_interrupted()
+        ready, _, _ = select.select([self.sock], [], [], max(0, min(.1, timeout)))
+        self.check_interrupted()
+        return self.sock.recv(1514) if ready else b''
+
+    def close(self):
+        sock, self.sock = self.sock, None
+        if sock is not None:
+            sock.close()
+
+
 class Client:
     """Single-worker, stop-and-wait client; retries use the identical sequence."""
     def __init__(self, transport, baud=38400, timeout=None, attempts=5):
@@ -476,13 +587,15 @@ class Client:
             self.parser.buffer.clear()
             if attempt + 1 < self.attempts:
                 self.retries += 1
+        if getattr(self.transport, 'mode', None) == 'lan':
+            raise LinkError('No LAN reply. Check NUXNET, the packet driver, MTCPCFG, DOS IP and Linux firewall.')
         raise LinkError('No valid reply. Check the DOS server, matching baud rates, cable, and port. Lower the speed if needed.')
 
     def connect(self) -> str:
         hello = self.request(HELLO).decode('ascii', errors='replace')
-        if not hello.startswith('NUXTLINK/6 '):
-            raise VersionError('Install both the NuXT Link 3.3.1 DOS server and Linux client.')
-        match = re.fullmatch(r'NUXTLINK/6 ([A-Z]:\\) .+', hello)
+        if not hello.startswith('NUXTLINK/8 '):
+            raise VersionError('Run the matching NuXT Link 4 NUXFER.COM on DOS.')
+        match = re.fullmatch(r'NUXTLINK/8 ([A-Z]:\\) .+', hello)
         if not match:
             raise LinkError('Invalid server greeting or drive')
         self.drive = match.group(1)
@@ -495,7 +608,7 @@ class Client:
         Servers start at 9600. A still-running server may be at its
         previous speed. Never send break or reset modem lines to force it.
         """
-        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in BLOCK_SIZES:
+        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in BLOCK_SIZES or block_size in (1024,1440,1464):
             raise ValueError('Unsupported connection settings')
         attempts, timeout = self.attempts, self.timeout
         rates = list(dict.fromkeys((9600, baud, 38400, 115200, 57600, 19200, 4800, 2400, 1200)))
@@ -539,7 +652,7 @@ class Client:
             data = self.request(CLOCK, payload, cancellable=False)
         except RemoteError as exc:
             if str(exc) == 'Unknown command':
-                raise VersionError('Date/time sync needs DOS server 3.2.1 or newer. Update NUXFER and restart it.') from exc
+                raise VersionError('Date/time sync needs NUXFER.COM on DOS. Restart that server.') from exc
             raise
         try:
             year, month, day, hour, minute, second, hundredth = struct.unpack('<H6B', data)
@@ -580,10 +693,14 @@ class Client:
                   'crc_errors', 'overruns', 'parity_errors', 'framing_errors', 'breaks', 'flow_timeouts',
                   'free_bytes', 'total_bytes', 'max_payload', 'block_size', 'pending')
         info = dict(zip(fields, struct.unpack(fmt, data[:size])))
-        if (info['version'] != 6 or info['baud_index'] >= len(BAUDS) or info['flow_id'] > 1 or
-            info['peer_mask'] not in PEERS.values() or info['com'] not in (1,2,3,4) or
-            info['block_size'] not in BLOCK_SIZES or info['max_payload'] != MAX_PAYLOAD):
+        lan = info['com'] == 0
+        if (info['version'] != 8 or info['baud_index'] >= len(BAUDS) or info['flow_id'] > 1 or
+            info['peer_mask'] not in PEERS.values() or info['com'] not in (0,1,2,3,4) or
+            info['block_size'] not in BLOCK_SIZES or
+            (lan and (info['block_size'] != 1440 or info['max_payload'] != 1440)) or
+            (not lan and (info['block_size'] in (1024,1440,1464) or info['max_payload'] != MAX_PAYLOAD))):
             raise LinkError('Unsupported diagnostics version or settings')
+        info['transport'] = 'lan' if lan else 'serial'
         info['baud'] = BAUDS[info['baud_index']]
         info['flow'] = FLOWS[info['flow_id']]
         info['peer'] = next((k for k,v in PEERS.items() if v == info['peer_mask']), 'none')
@@ -592,7 +709,7 @@ class Client:
         return info
 
     def apply_settings(self, baud, flow='none', peer='none', block_size=128):
-        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in BLOCK_SIZES:
+        if baud not in BAUDS or flow not in FLOWS or peer not in PEERS or block_size not in BLOCK_SIZES or block_size in (1024,1440,1464):
             raise ValueError('Unsupported connection settings')
         old = self.diagnostics()
         desired = (baud, flow, peer, block_size)
@@ -700,6 +817,20 @@ class Client:
         finally:
             self.attempts, self.timeout = old, timeout
 
+    def goodbye(self):
+        """Tell the LAN DOS server this client has disconnected; never wait long."""
+        if getattr(self.transport, 'mode', None) != 'lan' or self.stopping.is_set():
+            return False
+        old_attempts, old_timeout = self.attempts, self.timeout
+        try:
+            self.attempts, self.timeout = 1, min(self.timeout, .5)
+            self.request(GOODBYE, cancellable=False)
+            return True
+        except (OSError, LinkError):
+            return False
+        finally:
+            self.attempts, self.timeout = old_attempts, old_timeout
+
     def listing(self, path='\\'):
         result, kind, payload = [], FIRST, wire_path(path)
         while True:
@@ -755,7 +886,8 @@ class Client:
             self.abort()
             raise
 
-    def upload(self, source, path, progress=lambda done,total: None, *, meta=None, overwrite=False):
+    def upload(self, source, path, progress=lambda done,total: None, *, meta=None, overwrite=False,
+               phase=lambda label,done,total: None):
         source, path = Path(source), dos_path(path)
         meta = meta or local_metadata(source)
         size, checksum, digest = checksums(source)
@@ -765,6 +897,8 @@ class Client:
         compressed_blocks = raw_blocks = wire_bytes = 0
         if self.compress_uploads:
             from heatshrink_codec import packet as compress_packet
+            from zero_rle import upload_packet as rle_packet
+            from lz4_codec import packet as lz4_packet
         try:
             reply = self.request(PUT_BEGIN, meta.pack()+struct.pack('<HB', checksum, overwrite)+wire_path(path))
             if len(reply) != 4:
@@ -781,23 +915,35 @@ class Client:
                     data = stream.read(min(self.block_size, size-done))
                     if not data:
                         raise LinkError('Local file became shorter during transfer')
-                    packed = compress_packet(data) if self.compress_uploads else None
-                    if packed is not None:
-                        self.request(PUT_COMPRESSED, packed)
-                        compressed_blocks += 1
-                        wire_bytes += len(packed)
-                    else:
-                        self.request(PUT_DATA, data)
+                    choices = [(len(data), PUT_DATA, data)]
+                    if self.compress_uploads:
+                        packed = compress_packet(data)
+                        zero_packed = rle_packet(data)
+                        lz4_packed = lz4_packet(data)
+                        if packed is not None:
+                            choices.append((len(packed), PUT_COMPRESSED, packed))
+                        if len(zero_packed) < len(data) - 32:
+                            choices.append((len(zero_packed), PUT_ZERO_RLE, zero_packed))
+                        if lz4_packed is not None:
+                            choices.append((len(lz4_packed), PUT_LZ4, lz4_packed))
+                    _, command, payload = min(choices, key=lambda item: item[0])
+                    self.request(command, payload)
+                    if command == PUT_DATA:
                         raw_blocks += 1
-                        wire_bytes += len(data)
+                    else:
+                        compressed_blocks += 1
+                    wire_bytes += len(payload)
                     done += len(data)
                     progress(done, size)
             after = source.stat()
             if (before.st_size, before.st_mtime_ns, before.st_ino) != (after.st_size, after.st_mtime_ns, after.st_ino):
                 raise LinkError('Local file changed during transfer; upload retained without committing')
-            verified_size, verified_crc = self.scan(PUT_VERIFY)
+            phase('Verifying on DOS', 0, size)
+            verified_size, verified_crc = self.scan(PUT_VERIFY,
+                lambda done,total: phase('Verifying on DOS',done,total))
             if verified_size != size or verified_crc != checksum:
                 raise LinkError('DOS staging-file readback failed; original destination and partial retained')
+            phase('Saving on DOS', 0, 0)
             reply = self.request(PUT_END, struct.pack('<H', checksum))
             if reply != struct.pack('<H', checksum) or self.stat(path) != meta:
                 raise LinkError('Upload data or DOS metadata verification failed')
@@ -809,7 +955,8 @@ class Client:
             self.abort()
             raise
 
-    def download(self, path, destination, progress=lambda done,total: None, *, overwrite=False, expected_meta=None):
+    def download(self, path, destination, progress=lambda done,total: None, *, overwrite=False,
+                 expected_meta=None, phase=lambda label,done,total: None):
         path, destination = dos_path(path), Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         folder = metadata_dir(destination.parent) / 'partials'
@@ -817,6 +964,7 @@ class Client:
         identity = getattr(self, 'drive', '') + path + str(destination.absolute())
         token = hashlib.sha256(identity.encode()).hexdigest()[:24]
         temp, state = folder / (token+'.part'), folder / (token+'.json')
+        download_payload_bytes = compressed_blocks = raw_blocks = 0
         try:
             meta = self.stat(path)
             if expected_meta is not None and meta != expected_meta:
@@ -845,10 +993,30 @@ class Client:
             with temp.open('ab') as stream:
                 progress(done, meta.size)
                 while done < meta.size:
-                    data = self.request(GET_DATA)
+                    packed = self.request(GET_PACKED)
+                    if len(packed) < 3:
+                        raise LinkError('Short DOS download block')
+                    mode, decoded = struct.unpack_from('<BH', packed)
+                    if not 1 <= decoded <= min(self.block_size, meta.size-done):
+                        raise LinkError('Invalid DOS download block length')
+                    if mode == 0:
+                        data = packed[3:]
+                        if len(data) != decoded:
+                            raise LinkError('Short raw DOS download block')
+                        raw_blocks += 1
+                    elif mode == 1:
+                        from zero_rle import decode as decode_rle
+                        try:
+                            data = decode_rle(packed[3:], decoded)
+                        except ValueError as exc:
+                            raise LinkError('Invalid DOS zero-run block') from exc
+                        compressed_blocks += 1
+                    else:
+                        raise LinkError('Unknown DOS download encoding')
                     if not data or len(data) > meta.size-done:
                         raise LinkError('Unexpected remote file length')
                     stream.write(data)
+                    download_payload_bytes += len(packed)
                     checksum = crc(data, checksum)
                     done += len(data)
                     progress(done, meta.size)
@@ -857,18 +1025,17 @@ class Client:
                 os.fsync(stream.fileno())
             if result != struct.pack('<H', checksum):
                 raise LinkError('Downloaded file checksum did not match; partial retained')
-            _, local_crc, digest = checksums(temp)
+            phase('Verifying download', 0, meta.size)
+            _, local_crc, digest = checksums(temp, progress=lambda done,_:
+                phase('Verifying download',done,meta.size))
             if local_crc != checksum:
                 raise LinkError('Local disk verification failed; partial retained')
-            if overwrite:
-                os.replace(temp, destination)
-            else:
-                os.link(temp, destination)  # Atomic no-clobber commit on the same filesystem.
-                temp.unlink()
-            preserve_metadata(destination, meta)
+            commit_download(temp, destination, meta, overwrite)
             state.unlink(missing_ok=True)
             progress(meta.size, meta.size)
-            return {'crc16': checksum, 'sha256': digest, 'resumed_bytes': offset, 'metadata': asdict(meta)}
+            return {'crc16': checksum, 'sha256': digest, 'resumed_bytes': offset, 'metadata': asdict(meta),
+                    'download_payload_bytes': download_payload_bytes,
+                    'compressed_blocks': compressed_blocks, 'raw_blocks': raw_blocks}
         except BaseException:
             self.abort()
             raise

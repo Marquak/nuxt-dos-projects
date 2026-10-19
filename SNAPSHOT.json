@@ -1,5 +1,5 @@
 {
-  "snapshot_date": "2026-10-17",
+  "snapshot_date": "2026-10-19",
   "collection": "NuXT DOS projects",
   "projects": {
     "NUXMENU": "1.5",
@@ -7,7 +7,7 @@
     "STARFIELD": "1.0",
     "MATRIX": "2.0",
     "INVADERS": "2.0",
-    "NUXTLINK": "3.3.3 (DOS server 3.3.1, wire v6)",
+    "NUXTLINK": "4.0 serial (wire v8)",
     "SUNSET": "3.2",
     "DUNE2FIX": "1.1 combined XMS/manual-check patcher only",
     "NUXTDASH": "1.3",
@@ -15,7 +15,8 @@
     "NUXTRIS": "1.2",
     "TEXTMODE": "1.0",
     "CHECKERS88": "1.2.1",
-    "NUXTRIS-MP": "0.6.4 preview (serial and LAN)"
+    "NUXTRIS-MP": "0.6.4 preview (serial and LAN)",
+    "NUXTLINK32": "3.5.2 LAN/serial archive (wire v6)"
   },
   "binaries": {
     "CHECKERS88/CHECK88.EXE": "cc4600f475d7bdbb48849c1514e81cea4a6263243c8a38a979f1679ce14cad07",
@@ -27,7 +28,7 @@
     "NUXMENU/MENU.EXE": "1a1c222a1e31a07e206fb2a4da9146a73aa60d0a09713693795dd33778a2853b",
     "NUXMENU/NUI.EXE": "65c77ed0b5c4b3f017a01bdd6bedf8614c5c09eb7720bbf4bde98545e060f075",
     "NUXTDASH/DASH.COM": "4605d3619252737db8c85fcfad2e4c398048d7b1ea21ade8cd25866e9a27c75c",
-    "NUXTLINK/NUXFER.COM": "0b0a1c98d861d928e594000768bba74b06bbad844f4831ae9961bac9ea799a8c",
+    "NUXTLINK/NUXFER.COM": "4ce4556f7a2cddff41fb81f34a81d902027e39abd059507e40a0f285d7c37335",
     "NUXTRIS/NUXTRIS.EXE": "aeb9d888ce61d643d4c8700bcc87511bf6170143d39da8d80b484e366d96d0e2",
     "NUXTROIDS/NUXTROID.EXE": "5d7c3f23ace21dd3e560420a685db4b2aef23944a4c32542a1432111b3de895a",
     "ORBIT87/ORBIT87.EXE": "129c4e932fd7c862dcfa080ea265e3ae88e129a17bffaa00a3765d9faa43c08b",
@@ -35,7 +36,9 @@
     "STARFIELD/STAR.EXE": "b8fd1fd38ae86d15b31e67b74438aa278e716b5128fd80f8025de843d7c384cb",
     "SUNSET/SUNSET.EXE": "1891a5b5c5191ba144d63998ef73698e9a2b40b3701b07cd892a38ed712e372f",
     "TEXTMODE/TEXTMODE.COM": "43d02da28de0a35e1e53e4597d13d6089f746cfaa98c251a5be1f930b6881bac",
-    "NUXTRIS-MP/NXTNET.EXE": "e7c2d707da801a5c085fdb311d685a3823e7390ce01a6979b0aa20806fed7250"
+    "NUXTRIS-MP/NXTNET.EXE": "e7c2d707da801a5c085fdb311d685a3823e7390ce01a6979b0aa20806fed7250",
+    "NUXTLINK32/NUXNET.EXE": "a98c79b137d566338c1a9084d95f79e776fa53df776bd1b3d2a778af53a0c37d",
+    "NUXTLINK32/NUXFER.COM": "e216e99764d5c9c41d284d7897dad876e61db58894ff5eafeb1354d81baae9ca"
   },
   "toolchain": "Open Watcom 2.0 beta Oct 5 2026; GNU binutils 2.47",
   "commercial_game_executables_included": false

@@ -38,10 +38,11 @@ def elapsed_label(seconds):
 
 def compression_stats(job):
     """Original bytes / acknowledged payload, for the successful attempt only."""
-    if job.action != 'send' or 'upload_payload_bytes' not in job.result:
+    key = {'send': 'upload_payload_bytes', 'receive': 'download_payload_bytes'}.get(job.action)
+    if not key or key not in job.result:
         return None
     original = job.meta.size - job.result.get('resumed_bytes', 0)
-    payload = job.result['upload_payload_bytes']
+    payload = job.result[key]
     if original <= 0 or payload <= 0:
         return None
     return original / payload, 100 * (1 - payload / original)
@@ -50,7 +51,7 @@ def compression_stats(job):
 def completion_columns(job, status=None):
     if (status or job.status) != 'Complete' or job.action not in ('send', 'receive'):
         return '', ''
-    stats = compression_stats(job)
+    stats = None if job.action == 'receive' and not job.result.get('compressed_blocks') else compression_stats(job)
     if stats is not None:
         ratio, saved = stats
         compression = f'{ratio:.2f}:1 ({saved:.0f}% saved)'
@@ -67,7 +68,7 @@ def completion_report(job):
     elapsed, compression = completion_columns(job)
     if not elapsed:
         return ''
-    scope = ' (last resumed portion)' if job.action == 'send' and job.result.get('resumed_bytes') else ''
+    scope = ' (last resumed portion)' if job.result.get('resumed_bytes') else ''
     return f'Time: {elapsed} active; compression: {compression}{scope}'
 
 
@@ -387,7 +388,7 @@ def save_report(plan, paths):
     report.write_text('\n'.join(lines)+'\n', encoding='utf8')
 
 
-def execute(client, plan, progress=lambda index,job,done,total: None):
+def execute(client, plan, progress=lambda index,job,done,total: None, stage=None):
     paths = report_paths(plan)
     plan.errors = [e for e in plan.errors if not e.get('runtime')]
     plan.status = 'Running'
@@ -437,14 +438,18 @@ def execute(client, plan, progress=lambda index,job,done,total: None):
                         client.set_metadata(job.target, job.meta)
                     job.status = 'Verified'
                 elif plan.direction == 'download':
+                    phase = {} if stage is None else {'phase': lambda label,d,t: stage(index,job,label,d,t)}
                     job.result = client.download(job.source, job.target,
-                        lambda d,t: progress(index, job, d, t), overwrite=job.overwrite, expected_meta=job.meta)
+                        lambda d,t: progress(index, job, d, t), overwrite=job.overwrite,
+                        expected_meta=job.meta, **phase)
                     if Metadata(**job.result['metadata']) != job.meta:
                         raise LinkError('Source metadata changed since preview; refresh the plan')
                     job.status = 'Complete'
                 else:
+                    phase = {} if stage is None else {'phase': lambda label,d,t: stage(index,job,label,d,t)}
                     job.result = client.upload(job.source, job.target,
-                        lambda d,t: progress(index, job, d, t), meta=job.meta, overwrite=job.overwrite)
+                        lambda d,t: progress(index, job, d, t), meta=job.meta,
+                        overwrite=job.overwrite, **phase)
                     job.status = 'Complete'
             except RemoteError as exc:
                 job.status, job.reason = 'Failed', str(exc)

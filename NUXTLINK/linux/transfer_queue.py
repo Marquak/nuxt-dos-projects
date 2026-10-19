@@ -109,16 +109,18 @@ def queue_report(queue):
     return str(path)
 
 
-def execute_queue(client, queue, progress=lambda index,job,done,total: None):
+def execute_queue(client, queue, progress=lambda index,job,done,total: None, stage=None):
     if not isinstance(queue, TransferQueue):
-        return execute(client, queue, progress)
+        return execute(client, queue, progress, stage)
     queue.status = 'Running'
     try:
         offset = 0
         for plan in queue.plans:
             if client.cancelled.is_set(): raise Cancelled('Queue cancelled; remaining batches retained.')
             if plan.status != 'Complete':
-                execute(client, plan, lambda i,j,d,t,base=offset: progress(base+i,j,d,t))
+                execute(client, plan, lambda i,j,d,t,base=offset: progress(base+i,j,d,t),
+                        None if stage is None else lambda i,j,label,d,t,base=offset:
+                        stage(base+i,j,label,d,t))
             offset += len(plan.jobs)
         # A later batch can create children in an earlier batch's directory.
         # Restore all such directories once more, deepest first, after ALL writes.

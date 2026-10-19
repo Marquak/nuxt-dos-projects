@@ -40,7 +40,7 @@ class Tip:
 
 def build_interface(app, settings):
     a, root = app, app.root
-    root.title('NuXT Link 3.3.3 - serial file manager')
+    root.title('NuXT Link 4 - serial file manager')
     root.geometry(f'{min(1180, root.winfo_screenwidth()-40)}x{min(820, root.winfo_screenheight()-80)}')
     root.minsize(960, 700)
     root.protocol('WM_DELETE_WINDOW', a.close_window)
@@ -65,7 +65,7 @@ def build_interface(app, settings):
     header = ttk.Frame(outer)
     header.pack(fill='x', pady=(0, 4))
     ttk.Label(header, text='NuXT Link', style='Title.TLabel').pack(side='left')
-    ttk.Label(header, text='3.3.3  /  Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
+    ttk.Label(header, text='4.0 / Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
     profiles = ttk.Frame(header)
     profiles.pack(side='right')
     ttk.Label(profiles, text='Profile').pack(side='left', padx=5)
@@ -83,16 +83,24 @@ def build_interface(app, settings):
     conn = ttk.LabelFrame(outer, text='Connection', padding=6)
     conn.pack(fill='x')
     conn.columnconfigure(1, weight=1)
-    for attr, key in [('device','device'), ('speed','baud'), ('flow','flow'), ('peer','peer'),
+    for attr, key in [('device','device'), ('address','address'), ('transport','transport'),
+                      ('speed','baud'), ('flow','flow'), ('peer','peer'),
                       ('block_size','block'), ('latency','latency'), ('doscom','com')]:
         setattr(a, attr, tk.StringVar(value=str(settings[key])))
-    ttk.Label(conn, text='Device').grid(row=0, column=0, padx=(0,6))
+    a.target_label = ttk.Label(conn, text='Device')
+    a.target_label.grid(row=0, column=0, padx=(0,6))
     a.port_box = ttk.Combobox(conn, textvariable=a.device, width=24)
     a.port_box.grid(row=0, column=1, sticky='ew')
-    ttk.Label(conn, text='Baud').grid(row=0, column=2, padx=(10,4))
+    a.address_box = ttk.Entry(conn, textvariable=a.address)
+    a.address_box.grid(row=0, column=1, sticky='ew')
+    a.address_box.grid_remove()
+    a.serial_labels = []
+    label = ttk.Label(conn, text='Baud');label.grid(row=0, column=2, padx=(10,4))
+    a.serial_labels.append(label)
     a.speed_box = ttk.Combobox(conn, textvariable=a.speed, values=BAUDS, width=8, state='readonly')
     a.speed_box.grid(row=0, column=3)
-    ttk.Label(conn, text='Flow').grid(row=0, column=4, padx=(10,4))
+    label = ttk.Label(conn, text='Flow');label.grid(row=0, column=4, padx=(10,4))
+    a.serial_labels.append(label)
     a.flow_box = ttk.Combobox(conn, textvariable=a.flow, values=('none','rtscts'), width=7, state='readonly')
     a.flow_box.grid(row=0, column=5)
     Tip(a.flow_box, 'none: basic 3-wire cable.\nrtscts: hardware flow control with RTS/CTS wires connected.\nApply changes updates both ends while idle.')
@@ -102,6 +110,9 @@ def build_interface(app, settings):
     a.connect_button.grid(row=0, column=7)
     options = ttk.Frame(conn)
     options.grid(row=1, column=0, columnspan=8, sticky='ew', pady=(6,0))
+    # Keep the transport variable for the shared connection code, but this
+    # preview has no LAN control or LAN server.
+    a.transport_box = ttk.Combobox(options, textvariable=a.transport, values=('serial',), width=7, state='disabled')
     a.advanced_open = tk.BooleanVar(value=False)
     ttk.Checkbutton(options, text='Connection options', variable=a.advanced_open,
                     command=a.toggle_advanced).pack(side='left')
@@ -122,7 +133,9 @@ def build_interface(app, settings):
             ('Require peer','peer_box',a.peer,tuple(PEERS),6),
             ('Block bytes','block_box',a.block_size,BLOCK_SIZES,5),
             ('FTDI ms','latency_box',a.latency,(0,2,4,8,16),4)]:
-        ttk.Label(a.advanced, text=text).pack(side='left', padx=(0,4))
+        label = ttk.Label(a.advanced, text=text)
+        label.pack(side='left', padx=(0,4))
+        a.serial_labels.append(label)
         box = ttk.Combobox(a.advanced, textvariable=var, values=values, width=width,
                            state='normal' if attr=='latency_box' else 'readonly')
         box.pack(side='left', padx=(0,14))
@@ -134,6 +147,7 @@ def build_interface(app, settings):
     Tip(a.block_box, 'Payload bytes per packet. Larger blocks reduce overhead. CRC and file verification remain enabled at every size.')
     Tip(a.latency_box, 'FTDI USB latency in milliseconds. 0 leaves it unchanged. Applied on connect, or with Apply FTDI. Previous value is restored on disconnect.')
     a.advanced.grid_remove()
+    a.transport_changed(initial=True)
 
     options = ttk.Frame(outer)
     options.pack(fill='x', pady=5)
@@ -148,7 +162,7 @@ def build_interface(app, settings):
     a.compression = tk.BooleanVar(value=settings.get('compression', True))
     a.compression_check = ttk.Checkbutton(options, text='Compress uploads', variable=a.compression)
     a.compression_check.pack(side='left', padx=10)
-    Tip(a.compression_check, 'Compress uploads when a block saves at least 25% and 32 bytes. Poorly compressible blocks stay raw. Applies to the next queue run; saved with profiles.')
+    Tip(a.compression_check, 'Use zero-run or heatshrink compression when it shrinks an upload block. Poorly compressible blocks stay raw. Applies to the next queue run; saved with profiles.')
     a.backup_button = ttk.Menubutton(options, text='Backups')
     a.backup_button.pack(side='right')
     menu = tk.Menu(a.backup_button, tearoff=False)
@@ -171,7 +185,8 @@ def build_interface(app, settings):
     a.status_label.grid(row=0, column=0, columnspan=3, sticky='w')
     a.detail_label = ttk.Label(footer, textvariable=a.detail, style='Hint.TLabel')
     a.detail_label.grid(row=1, column=0, columnspan=3, sticky='w', pady=(2,4))
-    ttk.Label(footer, text='File', style='Hint.TLabel').grid(row=2, column=0, sticky='w', padx=(0,8))
+    a.file_label = ttk.Label(footer, text='File', style='Hint.TLabel')
+    a.file_label.grid(row=2, column=0, sticky='w', padx=(0,8))
     a.progress = ttk.Progressbar(footer, maximum=100)
     a.progress.grid(row=2, column=1, sticky='ew', pady=2)
     a.file_percent = tk.StringVar(value='—')
@@ -291,7 +306,7 @@ def build_interface(app, settings):
     a.queue_tree = a.table(queued, ('status','action','source','path','size','elapsed','compression'),
                            ('Status','Action','Source','Destination / issue','Bytes','Time','Compression'),
                            (90,85,225,225,85,100,165))
-    Tip(a.queue_tree, 'Time includes active transfer, retries and verification, excluding queue waits and pauses.\nCompression is original bytes : upload payload bytes, with % saved.\nFor resumed uploads, compression describes the final resumed portion. Double-click for details.')
+    Tip(a.queue_tree, 'Time includes active transfer, retries and verification, excluding queue waits and pauses.\nCompression is original bytes : transfer payload bytes, with % saved.\nFor resumed files, compression describes the final resumed portion. Double-click for details.')
     a.queue_tree.bind('<Double-1>', a.show_job)
     a.queue_tree.bind('<Return>', a.show_job)
     for tag, color in [('complete','#236146'), ('error','#a32833'), ('running','#155a89'), ('muted','#64717b')]:
