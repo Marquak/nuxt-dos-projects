@@ -5,12 +5,16 @@ inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass. Sections below the current
 release notes document earlier publication passes.
 
+## NuXT Link 4.1 LZ4 upload choice
+
+The physical NuXT A/B tests at 115200 baud and 4096-byte blocks found faster verified uploads when Linux favored LZ4 over slightly smaller heatshrink packets. See [NUXTLINK/TESTING.md](NUXTLINK/TESTING.md) for times, file checks, and the separate 57600-baud comparison. The DOS wire protocol remains version 8.
+
 ## NuXT Link 4.0 serial promotion
 
 The 0.3.2 Fast preview became the main serial release, `NUXTLINK/NUXFER.COM`,
 with its matching Linux client and wire version 8. The earlier 3.5.2 UDP LAN
-package remains in `NUXTLINK32`; its `NUXNET.EXE` still needs its own wire-v6
-Linux client. Personal profiles and transfer reports are not in either package.
+package used a wire-v6 client and is not included in the current checkout.
+Personal profiles and transfer reports are not in this package.
 The new serial client imports serial profiles from the Fast preview and the
 older combined client into a separate store without editing those sources.
 

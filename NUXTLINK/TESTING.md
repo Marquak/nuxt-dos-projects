@@ -1,4 +1,17 @@
-# NuXT Link 4.0 release checks (19 October 2026)
+# NuXT Link 4.1 release checks (19 October 2026)
+
+The 4.1 Linux client prefers LZ4 to heatshrink only at 115200 baud and 4096-byte blocks, and only when the LZ4 packet is at most 512 bytes larger. A local A/B test against the physical NuXT used the existing wire-v8 DOS server, RTS/CTS, unique temporary DOS names, staged upload readback, and an independent DOS file CRC. Every reported run had zero retries. The executable was also downloaded and checked by SHA-256 after the initial pair and the 512-byte run. These times include DOS verification and commit:
+
+| Source | 4.0 smallest-packet choice | 4.1 LZ4 preference |
+|---|---:|---:|
+| 367,760-byte DOS executable | 57.12–57.23 s | 41.83 s |
+| 256 KiB mixed disk-image slice | 40.65–40.68 s | 31.85 s |
+
+A separate 57600-baud A/B test temporarily enabled the same preference for the mixed slice. It took 57.50 s with the old choice and 49.36 s with LZ4, with zero retries and matching DOS CRCs. The 4.1 default still applies only at 115200/4096; slower baud rates may lose that gain as the extra bytes take longer to send. No physical 9600-baud A/B test was run. The 4.1 DOS executable changes only its startup version label and retains wire version 8.
+
+The 4.1 DOS rebuild is 27,894 bytes and differs from the 4.0 binary in one banner byte. The Linux suite ran 96 tests: 75 passed and 21 Tk widget tests were skipped because no display was available. A disposable QEMU/MS-DOS 6.22 image passed zero, mixed, and random upload/download roundtrips, explicit LZ4 decoding, and malformed zero-run recovery. The physical A/B tests used the wire-compatible 4.0 DOS binary; the new 4.1 banner has not been started separately on the NuXT.
+
+## Earlier 4.0 checks
 
 The 4.0 promotion changes the DOS executable name and banner, Linux title and profile store, but retains serial wire version 8 and the 0.3.2 transfer logic. On the physical NuXT, a 128 KiB random file upload was deliberately stopped after 16 KiB. A new serial connection resumed at exactly 16,384 bytes, finished the upload, downloaded the file, and matched every byte against the source SHA-256 (`e40c632817f9369c6ea1ced3006503147bd1b15c20592f57f9ffd5e038bdaca5`). The unique test file was then removed from DOS. This used the 0.3.2 preview binary; the rebuilt 4.0 binary still requires a final physical startup check.
 

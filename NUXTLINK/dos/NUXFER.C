@@ -1,4 +1,4 @@
-/* NuXT Link 4 serial server. Open Watcom, 8086 tiny model, DOS 3.31+.
+/* NuXT Link 4.1 serial server. Open Watcom, 8086 tiny model, DOS 3.31+.
  * The DOS side owns paths and validates every request; the Linux side owns
  * recursion, queues and manifests. No directory tree is held in DOS memory.
  */
@@ -689,7 +689,7 @@ int main(int argc,char **argv){
     base=*(U16 __far *)MK_FP(0x40,(com-1)*2);if(!base){puts("COM port is not present in the BIOS table.");return 1;}
     old24=_dos_getvect(0x24);_dos_setvect(0x24, (void (__interrupt __far *)(void))MK_FP(code_segment(),(unsigned)critical));
     uart_open();reply[0]='N';reply[1]='X';
-    printf("\nNUXT LINK 4.0 - entire %c:\\ drive\n",drive);
+    printf("\nNUXT LINK 4.1 - entire %c:\\ drive\n",drive);
     show_settings();
     puts("Files, folders, hidden/system files and DOS metadata.\nEsc exits. Idle keys: B baud, F flow, D peer lines, C COM, S status.\nPartials survive disconnects. Defaults: COM1 9600 /FLOW:NONE.");
     last_tick=ticks();

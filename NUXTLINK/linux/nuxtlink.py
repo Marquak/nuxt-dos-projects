@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NuXT Link 4 serial file manager."""
+"""NuXT Link 4.1 serial file manager."""
 import os
 import stat
 import argparse
@@ -829,7 +829,7 @@ class App:
 
 
 def main():
-    parser=argparse.ArgumentParser(description='NuXT Link 4 serial file manager.')
+    parser=argparse.ArgumentParser(description='NuXT Link 4.1 serial file manager.')
     parser.add_argument('--profile');parser.add_argument('--device')
     parser.add_argument('--baud',type=int,choices=BAUDS);parser.add_argument('--flow',choices=('none','rtscts'))
     parser.add_argument('--peer',choices=tuple(PEERS));parser.add_argument('--block',type=int,

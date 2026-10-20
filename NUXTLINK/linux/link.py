@@ -546,6 +546,9 @@ class Client:
         self.timeout = timeout or max(3.0, (512+16)*10/baud + 1.0)
         self.baud, self.flow, self.peer, self.block_size = baud, "none", "none", 128
         self.compress_uploads = True
+        # On the tested 115200/4 KiB link, faster DOS LZ4 decoding outweighs
+        # up to 512 extra wire bytes compared with a heatshrink packet.
+        self.lz4_slack_bytes = 512
         self.attempts = attempts
         self.sequence = 0
         self.parser = Parser()
@@ -594,7 +597,7 @@ class Client:
     def connect(self) -> str:
         hello = self.request(HELLO).decode('ascii', errors='replace')
         if not hello.startswith('NUXTLINK/8 '):
-            raise VersionError('Run the matching NuXT Link 4 NUXFER.COM on DOS.')
+            raise VersionError('Run a NuXT Link 4.x NUXFER.COM on DOS.')
         match = re.fullmatch(r'NUXTLINK/8 ([A-Z]:\\) .+', hello)
         if not match:
             raise LinkError('Invalid server greeting or drive')
@@ -886,6 +889,16 @@ class Client:
             self.abort()
             raise
 
+    def upload_choice(self, choices):
+        chosen = min(choices, key=lambda item: item[0])
+        if (self.lz4_slack_bytes and self.baud == 115200 and
+                self.block_size == 4096 and chosen[1] == PUT_COMPRESSED):
+            for candidate in choices:
+                if (candidate[1] == PUT_LZ4 and
+                        candidate[0] <= chosen[0] + self.lz4_slack_bytes):
+                    return candidate
+        return chosen
+
     def upload(self, source, path, progress=lambda done,total: None, *, meta=None, overwrite=False,
                phase=lambda label,done,total: None):
         source, path = Path(source), dos_path(path)
@@ -926,7 +939,7 @@ class Client:
                             choices.append((len(zero_packed), PUT_ZERO_RLE, zero_packed))
                         if lz4_packed is not None:
                             choices.append((len(lz4_packed), PUT_LZ4, lz4_packed))
-                    _, command, payload = min(choices, key=lambda item: item[0])
+                    _, command, payload = self.upload_choice(choices)
                     self.request(command, payload)
                     if command == PUT_DATA:
                         raw_blocks += 1

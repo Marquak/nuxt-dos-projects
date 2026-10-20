@@ -26,8 +26,9 @@ all possible third-party claims.
   synthetic captures for throughput ideas; no FastLynx binary or source is included.
   The 4.0 DOS source inherits GPL-3.0-or-later terms from the earlier combined
   serial/LAN NuXT Link source, which adapted mTCP packet-driver registration.
-  The Linux client remains MIT licensed. The separate NUXTLINK32 package keeps
-  the prior combined serial/LAN source and its GPL notices.
+  The Linux client remains MIT licensed. The older combined serial/LAN package
+  is not included in this release; its provenance is retained here for the
+  current DOS source.
 - NUXTROIDS: original game, geometry, scenery and sound, reusing earlier NuXT
   project code. Asteroids projects, RBIL, FreeDOS INFOPlus and id Software
   drawing code were references; no Atari assets or external game code copied.

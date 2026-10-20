@@ -40,7 +40,7 @@ class Tip:
 
 def build_interface(app, settings):
     a, root = app, app.root
-    root.title('NuXT Link 4 - serial file manager')
+    root.title('NuXT Link 4.1 - serial file manager')
     root.geometry(f'{min(1180, root.winfo_screenwidth()-40)}x{min(820, root.winfo_screenheight()-80)}')
     root.minsize(960, 700)
     root.protocol('WM_DELETE_WINDOW', a.close_window)
@@ -65,7 +65,7 @@ def build_interface(app, settings):
     header = ttk.Frame(outer)
     header.pack(fill='x', pady=(0, 4))
     ttk.Label(header, text='NuXT Link', style='Title.TLabel').pack(side='left')
-    ttk.Label(header, text='4.0 / Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
+    ttk.Label(header, text='4.1 / Serial file manager', style='Hint.TLabel').pack(side='left', padx=12)
     profiles = ttk.Frame(header)
     profiles.pack(side='right')
     ttk.Label(profiles, text='Profile').pack(side='left', padx=5)

@@ -1,8 +1,13 @@
-# NuXT Link 4.0 (19 October 2026)
+# NuXT Link 4.1 (19 October 2026)
+
+- At 115200 baud with 4096-byte blocks, choose LZ4 over heatshrink when the LZ4 packet is no more than 512 bytes larger. This reduced real NuXT upload time for an ordinary executable and mixed disk-image data while preserving CRC checks and staged readback. Other link settings keep the smaller-packet choice.
+- Keep serial wire version 8. The 4.0 DOS server is compatible with the 4.1 Linux client; the new DOS binary changes its startup version label only.
+
+## Earlier 4.0 release
 
 - Promote the tested Fast serial build to the main NuXT Link release. The DOS program is now `NUXFER.COM`; serial wire version 8 is unchanged from the 0.3.2 preview.
 - Import serial profiles from the Fast preview and the earlier combined serial/LAN client into a new profile store. Both earlier stores remain untouched.
-- Keep NuXT Link 3.5.2 available separately for LAN. Its UDP `NUXNET.EXE` uses wire version 6 and must be paired with its own Linux client.
+- The earlier LAN build used wire version 6 and needed its own Linux client. It is not included in the 4.1 release.
 - Pass a physical NuXT interrupted upload and resume across a serial reconnect, then download and compare all 128 KiB byte for byte.
 
 ## Earlier 0.3.2 preview

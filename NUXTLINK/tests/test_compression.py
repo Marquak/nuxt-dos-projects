@@ -8,6 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'linux'))
 from heatshrink_codec import encode, packet
 from zero_rle import encode as rle_encode, decode as rle_decode, upload_packet as rle_packet
 from profiles import validate
+from link import Client, PUT_COMPRESSED, PUT_DATA, PUT_LZ4, PUT_ZERO_RLE
 
 
 def reference_decode(packed,length):
@@ -27,6 +28,22 @@ def reference_decode(packed,length):
 
 
 class CompressionTests(unittest.TestCase):
+    def test_upload_codec_choice_at_tested_link_settings(self):
+        client = Client(None, 115200)
+        self.assertEqual(client.lz4_slack_bytes, 512)
+        choices = [(4096, PUT_DATA, b'r'), (1800, PUT_COMPRESSED, b'h'),
+                   (1840, PUT_ZERO_RLE, b'z'), (2200, PUT_LZ4, b'l')]
+        client.baud, client.block_size = 115200, 4096
+        self.assertEqual(client.upload_choice(choices)[1], PUT_LZ4)
+        client.baud = 57600
+        self.assertEqual(client.upload_choice(choices)[1], PUT_COMPRESSED)
+        client.baud, client.block_size = 115200, 2048
+        self.assertEqual(client.upload_choice(choices)[1], PUT_COMPRESSED)
+        client.block_size = 4096
+        self.assertEqual(client.upload_choice(choices[:-1])[1], PUT_COMPRESSED)
+        self.assertEqual(client.upload_choice(choices[:-1] + [(2313, PUT_LZ4, b'l')])[1], PUT_COMPRESSED)
+        self.assertEqual(client.upload_choice([(100, PUT_ZERO_RLE, b'z')] + choices)[1], PUT_ZERO_RLE)
+
     def test_zero_run_roundtrip_and_rejects_bad_blocks(self):
         rng=random.Random(2026)
         for size in (1,2,3,127,128,129,4093,4096):

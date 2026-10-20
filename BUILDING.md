@@ -37,9 +37,8 @@ For a single project:
 The NuXTLink 4 DOS build writes `NUXTLINK/NUXFER.COM` directly. There are no
 alternate-name binaries. Build its Linux helper with
 `(cd NUXTLINK && sh linux/build_codec.sh)`.
-The older LAN package is in `NUXTLINK32`; build its packet-driver server with
-`(cd NUXTLINK32 && sh dos/BUILDNET.SH)` using Open Watcom. Keep that server
-with its own Linux client because the LAN wire version differs from 4.0.
+This checkout includes only the current serial NuXTLink release. Earlier
+LAN builds used a different wire version and are not part of this package.
 Build scripts select the required CPU target; do not replace them with generic
 compiler defaults. V20 does not support arbitrary 286/386 instructions, and
 8087 assembly must remain compatible with the original coprocessor.

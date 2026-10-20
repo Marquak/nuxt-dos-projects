@@ -28,8 +28,7 @@ publishers in here.
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Fly a spaceship, dodge asteroids and blast them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | 1.2 | `NUXTRIS.EXE` | Clear rows of falling blocks in endless play or a 25-line challenge. |
 | [NUXTRIS-MP](NUXTRIS-MP/) | 0.6.4 preview | `NXTNET.EXE` on both PCs | Play a two-board Tetris score race over serial or LAN. |
-| [NUXTLINK](NUXTLINK/) | 4.0 | `NUXFER.COM` | Move files between Linux and DOS over serial, back up folders, and sync its clock. |
-| [NUXTLINK32](NUXTLINK32/) | 3.5.2 LAN package | `NUXNET.EXE` | Use the earlier LAN client and packet-driver DOS server together. |
+| [NUXTLINK](NUXTLINK/) | 4.1 | `NUXFER.COM` | Move files between Linux and DOS over serial, back up folders, and sync its clock. |
 | [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset to an AdLib synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Fix the XMS startup error and skip the manual-word check in your US 1.07 copy of Dune II. |
@@ -50,11 +49,12 @@ For NuXTris Multiplayer, copy `NXTNET.EXE` to both computers. LAN play needs
 a packet driver and `MTCPCFG` set to the full DOS path of your mTCP config
 file, for example `SET MTCPCFG=C:\NET\MTCP.CFG`. See its
 [connection guide](NUXTRIS-MP/README.md) before starting a LAN game.
-For serial NuXT Link, also run `sh NUXTLINK/linux/launch.sh` on Linux; it needs Python 3
-and Tkinter. Version 4.0 uses serial wire protocol v8, so update the DOS server
-and Linux client together. Keep the 3.5.2 LAN package in its own folder; its
-`NUXNET.EXE` pairs only with `NUXTLINK32/linux/launch.sh`. Keep your existing
-NUXMENU.DAT when updating the menu, and NUXTRIS.DAT/BAK when updating NuXTris.
+For NuXT Link, also run `sh NUXTLINK/linux/launch.sh` on Linux; it needs Python 3
+and Tkinter. Version 4.1 uses serial wire protocol v8 and works with the 4.0
+DOS server.
+
+Keep your existing NUXMENU.DAT when updating the menu, and NUXTRIS.DAT/BAK
+when updating NuXTris.
 
 The higher resolutions are partly for fun and testing. Don't expect a V20 to
 fly at 1024x768, even with an 8087. Modes above standard VGA depend on the
