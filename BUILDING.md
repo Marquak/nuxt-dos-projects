@@ -19,8 +19,9 @@ export WATCOM=/path/to/watcom
 sh BUILD_ALL.SH
 ```
 
-This rebuilds all thirteen compiled DOS projects, including both ORBIT builds,
-NuXTris Multiplayer and NuXTLink's native Linux compression helper. DUNE2FIX is a Python script;
+This rebuilds the compiled DOS projects, including both ORBIT builds,
+the three NuXTris executables, and NuXTLink's native Linux compression helper.
+DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
 
@@ -31,7 +32,7 @@ For a single project:
 (cd NUXTDASH && sh BUILD.SH)
 (cd ORBIT87 && sh BUILD.SH)
 (cd NUXTLINK && sh dos/BUILD.SH)
-(cd NUXTRIS-MP && sh BUILD.SH)
+(cd NUXTRIS && sh BUILD_ALL.SH)
 ```
 
 The NuXTLink 4 DOS build writes `NUXTLINK/NUXFER.COM` directly. There are no
@@ -73,14 +74,12 @@ the art and previews; `python3 SUNSET/tools/export_opl_bank.py` regenerates the
 Furnace instrument bank. MATRIX and ORBIT fonts and INVADERS sprite bytes are
 included as source. See THIRD_PARTY.md for tool/runtime license information.
 
-NuXTroids and NuXTris support `sh BUILD.SH --test` with WATCOM set. Their
-CHECK.EXE programs and test files are for a disposable DOS test directory.
-See their TESTS.TXT files for the recorded validation.
-
-NuXTris Multiplayer also has focused checks with `sh BUILD.SH --test` and
-`sh BUILD.SH --menu-test`. Its `TESTS.TXT` explains the DOSBox-X LAN and serial
-checks. Keep `NXTMULT.CFG` and `NXTMATCH.TXT` out of source snapshots; they are
-player settings and match history.
+NuXTroids supports `sh BUILD.SH --test` with WATCOM set. For NuXTris, run
+`sh BUILD_ALL.SH` in its folder. Its SP, MP, and selector sources have their
+own focused test build flags; [NUXTRIS/TESTS.TXT](NUXTRIS/TESTS.TXT) records
+the selector checks, while `SOURCE/SP/TESTS.TXT` and `SOURCE/MP/TESTS.TXT`
+cover game and connection checks. Keep `NUXTRIS.DAT`, `NXTMULT.CFG`, and
+`NXTMATCH.TXT` out of source snapshots; they are player state.
 
 Build Checkers with `(cd CHECKERS88 && sh BUILD.SH)`. Its generated music header
 is included; `python3 CHECKERS88/MUSIC/CONVERT.PY` regenerates it from the bundled

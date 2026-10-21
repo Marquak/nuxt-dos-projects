@@ -1,0 +1,890 @@
+/* NuXTris multiplayer. Original game code, MIT; LAN packet-driver adapter
+ * uses GPL-3.0-or-later code adapted from mTCP, so this combined build is
+ * distributed under GPL-3.0-or-later.
+ * Reuses the finished single-player renderer, controls, sound and rules.
+ * The single-player executable and its save file are never overwritten. */
+#define main single_player_main
+#include "GAME.C"
+#undef main
+#include "LINK.H"
+#include "SERIAL.H"
+#include <errno.h>
+#define MP_FX_TICKS 40
+#define MP_FX_FADE 20
+#define MP_MARATHON 0
+#define MP_SPRINT 1
+#define MP_BTYPE 2
+#define MP_SPRINT_LINES 40
+static unsigned role=1, comnum=1, mpmode=MP_MARATHON, startlevel, startheight, transport;
+static unsigned char joinip[4]={192,168,50,203};
+static unsigned long baudrate=38400;
+static int optflow=1, bridge, showlink, quickstart;
+static uint16_t roundnum=1;
+static int rematchwant, resceneneeded;
+static LDecoder decoder;
+static uint32_t nonce, peernonce;
+static uint16_t seed, sequence, received, peerack, request, handled, finalseq;
+static unsigned phase, peerphase, matchticks, lastreceive, lastsend, peerflags;
+static unsigned lastcheck;
+static unsigned char lastpacket[LSIZE];
+static int packetvalid;
+static int havepeer, paused, desiredpause, requestpending, finalsent, saved, peersaved;
+static int aborting, loss, began, remstarted, started, ended, mpquit;
+static int quitconfirm, exitrequested;
+static unsigned flash, cleardelay, deadline, badframes;
+static unsigned char localfx, peerfxseen, peerfxack;
+static int fxowner, fxspawn;
+static unsigned char mpwinner, mpgoal; /* Winner: 0 draw, 1 host, 2 joiner. */
+static uint32_t finalrightscore;
+static unsigned finalrightlines, finalrightlevel;
+static int urgent=1;
+static char pname[9]="PLAYER", peername[9]="WAITING";
+static char helpname[13]="NXTNET";
+static char resultpath[160], failure[80];
+#include "LAN.H"
+static Game opponent;
+static uint32_t peerscore;
+static unsigned char picturecache[2][BH][BW];
+static unsigned char boarddirty[2]={1,1};
+static char mphud[16][24], mpdetail[48];
+static int nextcache[2]={-1,-1};
+static uint32_t scorecache[2]={0xffffffffUL,0xffffffffUL};
+static unsigned linecache[2]={65535,65535}, levelcache[2]={65535,65535};
+static int secondcache=-1;
+static unsigned clockremain=65535, clockboundary;
+static unsigned short lastpause;
+static unsigned diaglast;
+static void mp_round_reset(void);
+#ifdef LINKTEST
+static int testpause, testresume, testrematch, testinfo;
+static int testfx, testfxrole=1, testfxdone, testfxcaptured;
+static int testhitch, testhitchdone, testautopaused, testfxcleared;
+static int testgoal, testgoaltriggered;
+static int teststage, teststagetriggered;
+static unsigned teststageone, teststagecap;
+static unsigned teststartcrc, teststartpiece;
+static unsigned trace[16][4], traced;
+static unsigned boardchecks, packets_sent, packets_skipped, clockdivisions;
+static unsigned char stale_snapshot[LSIZE];
+static int stale_ready,stale_checked;
+#endif
+#if defined(LINKTEST) || defined(MENUTEST)
+static void mp_capture(const char *path) {
+    FILE *f=fopen(path,"wb");
+    volatile unsigned char __far *v=MK_FP(0xa000,0);
+    unsigned p,y,x; unsigned char row[80];
+    if(!f) return;
+    for(p=0;p<4;p++) {
+        outpw(0x3ce,(p<<8)|4);
+        for(y=0;y<480;y++) {
+            for(x=0;x<80;x++) row[x]=v[y*80+x];
+            fwrite(row,1,80,f);
+        }
+    }
+    fclose(f); outpw(0x3ce,4);
+}
+#endif
+static void mp_text(char *cache,int x,int y,const char *s) {
+    unsigned masks[7],d,shift;
+    int i,r,oldlen,newlen;
+    char a,b;
+    if(!strcmp(cache,s)) return;
+    oldlen=strlen(cache); newlen=strlen(s);
+    ink(15);
+    for(i=0;i<oldlen || i<newlen;i++,x+=12) {
+        a=i<oldlen?cache[i]:' '; b=i<newlen?s[i]:' ';
+        if(a==b) continue;
+        shift=x&7;
+        for(r=0;r<7;r++) { d=glyph(a,r)^glyph(b,r); masks[r]=(hudwide[d>>3]<<6)>>shift; }
+        hudpatch(y*80+(x>>3),masks,2);
+    }
+    strcpy(cache,s);
+}
+static void mp_hud(int n,int x,int y,const char *s) {
+    mp_text(mphud[n],x,y,s);
+}
+static void mp_small(char *cache,int x,int y,const char *s) {
+    char a[2]={0,0},b[2]={0,0}; unsigned i,oldlen,newlen;
+    if(!strcmp(cache,s)) return;
+    oldlen=strlen(cache); newlen=strlen(s); raster(0x18);
+    for(i=0;i<oldlen || i<newlen;i++,x+=6) {
+        a[0]=i<oldlen?cache[i]:' '; b[0]=i<newlen?s[i]:' ';
+        if(a[0]!=b[0]) { textxy(x,y,a,15,1); textxy(x,y,b,15,1); }
+    }
+    strcpy(cache,s);
+}
+static void mp_fail(const char *why) {
+    if(aborting) return;
+    strcpy(failure,why); aborting=1; phase=LABORT; urgent=1; deadline=ticks;
+    silence();
+}
+static void mp_fx_brightness(unsigned frame) {
+    int brightness=frame>MP_FX_FADE?55:(frame*55)/MP_FX_FADE;
+    fxbrightness(brightness);
+}
+static void mp_new_game(void) {
+    rng=seed;
+    /* Marathon keeps the core's ten-line level progression. Sprint fixes
+       gravity; B-Type starts with a shared pile and advances every 25 lines. */
+    new_game(mpmode==MP_MARATHON?0:1,startlevel,
+        mpmode==MP_BTYPE?startheight:0);
+#ifdef LINKTEST
+    teststartcrc=lcrc((unsigned char *)game.grid,sizeof(game.grid));
+    teststartpiece=game.kind;
+#endif
+}
+static unsigned mp_clear_rows(void) {
+    unsigned cleared=clear_rows();
+    if(mpmode==MP_BTYPE) {
+        unsigned level=startlevel+game.lines/25;
+        game.level=level>9?9:level;
+    }
+    return cleared;
+}
+static unsigned char mp_outcome(void) {
+    if(mpmode==MP_SPRINT) {
+        if(game.lines>=MP_SPRINT_LINES && opponent.lines<MP_SPRINT_LINES) return 1;
+        if(opponent.lines>=MP_SPRINT_LINES && game.lines<MP_SPRINT_LINES) return 2;
+        if(game.lines>=MP_SPRINT_LINES && opponent.lines>=MP_SPRINT_LINES) return 0;
+    }
+    if(game.over && !opponent.over) return 2;
+    if(opponent.over && !game.over) return 1;
+    return 0;
+}
+static void mp_pack(unsigned char *b) {
+    unsigned i;
+    memset(b,0,LSIZE);
+    b[0]='N'; b[1]='T'; b[2]=LVERSION; b[3]=role;
+    lput32(b+4,nonce); lput32(b+8,peernonce);
+    lput16(b+12,sequence+1); lput16(b+14,received);
+    b[16]=phase;
+    b[17]=(paused?1:0)|(active?2:0)|(game.over?4:0)|(saved>0?8:0)|(saved<0?16:0)|(rematchwant?32:0)|(flash>1?64:0);
+    lput16(b+18,role?handled:request); b[20]=desiredpause;
+    b[21]=startlevel; b[22]=mpmode; lput16(b+23,seed);
+    lput16(b+25,matchticks); lput32(b+27,game.score); lput32(b+31,settledscore);
+    lput16(b+35,game.lines); b[37]=game.level; b[38]=game.kind; b[39]=game.next;
+    b[40]=game.x; b[41]=game.y;
+    for(i=0;i<8;i++) b[42+i]=game.shape[i];
+    memcpy(b+50,pname,8);
+    for(i=0;i<100;i++) b[58+i]=((unsigned char *)game.grid)[i*2]|(((unsigned char *)game.grid)[i*2+1]<<4);
+    lput16(b+158,roundnum);
+    b[160]=localfx; b[161]=peerfxseen;
+    b[162]=startheight; b[163]=mpwinner;
+    lput32(b+164,finalrightscore); lput16(b+168,finalrightlines);
+    b[170]=finalrightlevel; b[171]=mpgoal;
+}
+static void mp_finish(void) {
+    if(phase!=LRUN) return;
+    if(game.full) { mp_clear_rows(); cleardelay=0; }
+    if(role) {
+        mpwinner=mp_outcome();
+        mpgoal=mpmode==MP_SPRINT &&
+            (game.lines>=MP_SPRINT_LINES || opponent.lines>=MP_SPRINT_LINES);
+        finalrightscore=peerscore; finalrightlines=opponent.lines;
+        finalrightlevel=opponent.level;
+    }
+    settledscore=game.score;
+    active=0; phase=LFINISH; urgent=1; ended=ticks;
+    boarddirty[role?0:1]=1;
+    silence();
+}
+static void mp_round_reset(void) {
+    phase=LCONNECT; peerphase=LCONNECT; peerflags=0;
+    paused=desiredpause=requestpending=finalsent=saved=peersaved=0;
+    request=handled=finalseq=0;
+    aborting=loss=began=remstarted=quitconfirm=exitrequested=rematchwant=0;
+    flash=cleardelay=fallticks=0; packetvalid=0; urgent=1;
+    localfx=peerfxseen=peerfxack=0; fxowner=fxspawn=0;
+    failure[0]=0; matchticks=0; mpwinner=mpgoal=0;
+    finalrightscore=0; finalrightlines=finalrightlevel=0;
+#ifdef LINKTEST
+    testpause=testresume=0;
+#endif
+    mp_new_game(); settledscore=peerscore=0;
+    active=1; opponent=game; resceneneeded=1;
+    silence(); inputs_flush();
+}
+static void mp_accept(const unsigned char *b) {
+    unsigned i, incomingphase=b[16], otherboard=role?1:0;
+    unsigned char cell, cell2, *grid=(unsigned char *)opponent.grid;
+    uint32_t n=lget32(b+4), echo=lget32(b+8);
+    uint16_t seq=lget16(b+12), r=lget16(b+18), incominground=lget16(b+158);
+#ifdef LINKTEST
+    if(traced<16) { trace[traced][0]=phase; trace[traced][1]=incomingphase;
+        trace[traced][2]=seq; trace[traced++][3]=echo==nonce; }
+#endif
+    if(b[3]==role || (echo && echo!=nonce)) return;
+    if(peernonce && n!=peernonce) return;
+    if(phase>=LREADY && echo!=nonce) return;
+    if(havepeer && !lnewer(seq,received)) return;
+#ifdef LINKTEST
+    if(incominground==1 && incomingphase==LFINISH) {
+        memcpy(stale_snapshot,b,LSIZE); stale_ready=1;
+    }
+#endif
+    if(incominground!=roundnum) {
+        /* A next-round proposal is accepted only after our own rematch vote
+           and completed saves. Older rounds cannot mutate the new board. */
+        if(role || phase!=LFINISH || !rematchwant || saved<=0 || !peersaved ||
+            roundnum==65535 || incominground!=roundnum+1 || incomingphase!=LREADY) return;
+        roundnum=incominground; seed=lget16(b+23);
+        mp_round_reset(); phase=LREADY;
+    }
+    /* Once committed, a different set of rules/seed is never accepted. */
+    if(phase>=LREADY && (b[21]!=startlevel || b[22]!=mpmode ||
+        b[162]!=startheight || lget16(b+23)!=seed)) {
+        if(role && incomingphase==LCONNECT) return;
+        mp_fail("RULES CHANGED - MATCH CANCELLED"); return;
+    }
+    if(role && phase==LCONNECT && incomingphase!=LCONNECT && echo!=nonce) return;
+    if(!role && phase==LCONNECT) {
+        startlevel=b[21]; mpmode=b[22]; startheight=b[162]; seed=lget16(b+23);
+    }
+    peernonce=n; received=seq; peerack=lget16(b+14); havepeer=1;
+    if((peerflags^b[17])&2 || opponent.kind!=b[38] ||
+        opponent.x!=(int8_t)b[40] || opponent.y!=(int8_t)b[41]) boarddirty[otherboard]=1;
+    lastreceive=ticks; loss=0; peerphase=incomingphase; peerflags=b[17]; peersaved=(peerflags&8)!=0;
+    peerfxack=b[161];
+    if(phase==LRUN && incomingphase==LRUN && b[160]!=peerfxseen) {
+        if(flash && fxowner!=(role?1:0)) fxowner=2;
+        else fxowner=role?1:0;
+        peerfxseen=b[160]; flash=MP_FX_TICKS; urgent=1; resceneneeded=1;
+        sound_event(5);
+    }
+    memcpy(peername,b+50,8); peername[8]=0;
+    peerscore=lget32(b+31); opponent.score=lget32(b+27); opponent.lines=lget16(b+35);
+    opponent.level=b[37]; opponent.kind=b[38]; opponent.next=b[39];
+    opponent.x=(int8_t)b[40]; opponent.y=(int8_t)b[41]; opponent.over=(peerflags&4)!=0;
+    for(i=0;i<8;i++) {
+        if(opponent.shape[i]!=(int8_t)b[42+i]) boarddirty[otherboard]=1;
+        opponent.shape[i]=(int8_t)b[42+i];
+    }
+    for(i=0;i<100;i++,grid+=2) {
+        cell=b[58+i]&15; cell2=b[58+i]>>4;
+        if(grid[0]!=cell || grid[1]!=cell2) boarddirty[otherboard]=1;
+        grid[0]=cell; grid[1]=cell2;
+    }
+    if(incomingphase==LABORT) {
+        mp_fail(saved>0?"OTHER PLAYER LEFT - LOCAL RESULT SAVED":"OTHER PLAYER LEFT - NOT SAVED"); return;
+    }
+    if(phase==LCONNECT && (!role || echo==nonce)) {
+        mp_new_game(); settledscore=0; active=1; phase=LREADY; urgent=1;
+        boarddirty[role?0:1]=1;
+#ifdef LINKTEST
+        if(mpmode==MP_MARATHON) { unsigned y,x; for(y=10;y<20;y++) for(x=0;x<10;x++)
+            game.grid[y][x]=x==((y&1)?1:8)?0:3; }
+#endif
+    }
+    if(role) {
+        if(phase==LREADY && peerphase==LREADY) { phase=LRUN; began=1; urgent=1; }
+        if(lnewer(r,handled)) { handled=r; paused=b[20]; urgent=1; lastpause=ticks; inputs_flush(); }
+    } else {
+        if(phase==LREADY && peerphase==LRUN) { phase=LRUN; began=1; urgent=1; }
+        if(paused!=!!(peerflags&1)) { inputs_flush(); lastpause=ticks; }
+        paused=(peerflags&1)!=0;
+        if(requestpending && r==request) requestpending=0;
+        matchticks=lget16(b+25);
+        if(phase==LRUN && incomingphase==LFINISH) {
+            mpwinner=b[163]; mpgoal=b[171];
+            finalrightscore=lget32(b+164); finalrightlines=lget16(b+168);
+            finalrightlevel=b[170];
+            game.full=0; cleardelay=0; mp_finish();
+            game.score=settledscore=finalrightscore;
+            game.lines=finalrightlines; game.level=finalrightlevel;
+        }
+    }
+    if(phase==LRUN && peerphase>=LRUN) {
+        if(!remstarted) { remstarted=1; started=ticks; inputs_flush(); }
+    }
+}
+static void mp_service(void) {
+    /* A busy LAN can refill the four receive slots while we drain them.
+       Bound each call so packet processing cannot monopolize the loop. */
+    unsigned budget=transport?8:1024;
+    int c, result, sent;
+    unsigned char b[LSIZE];
+    if(transport) {
+        while(budget-- && (result=lan_read())!=0) {
+            if(result>0) {
+                uint16_t old=received; int was=havepeer;
+                mp_accept(lan_payload);
+                if(havepeer && (!was || old!=received)) lan_accept_source();
+            } else ++badframes;
+        }
+    } else {
+        while(budget-- && (c=serial_get())>=0) {
+            result=ldecode(&decoder,(unsigned)c);
+            if(result>0) mp_accept(decoder.data);
+            else if(result<0) ++badframes;
+        }
+        serial_pump();
+    }
+    if((transport || txpos==txlen) &&
+       (urgent || (unsigned)(ticks-lastcheck)>=(transport?4:(baudrate<=9600?18:4))) &&
+       (!transport || ticks!=lastcheck)) {
+        lastcheck=ticks;
+        mp_pack(b);
+        if(urgent || !packetvalid || lchanged(b,lastpacket) ||
+            (unsigned)(ticks-lastsend)>=(transport?12:(baudrate<=9600?18:12))) {
+            lput16(b+LCRC,lcrc(b,LCRC));
+            sent=transport?lan_send(b):serial_send(b);
+            if(sent) {
+                urgent=0; ++sequence; lastsend=ticks;
+                memcpy(lastpacket,b,LSIZE); packetvalid=1;
+                if(phase==LFINISH && !finalsent) { finalsent=1; finalseq=sequence; }
+#ifdef LINKTEST
+                ++packets_sent;
+            }
+            else ++packets_skipped;
+#else
+            }
+#endif
+#ifdef LINKTEST
+        } else {
+            ++packets_skipped;
+#endif
+        }
+    }
+    if(havepeer && (unsigned)(ticks-lastreceive)>36) loss=1;
+    /* Wait until the user cancels, both before connecting and after a loss.
+       Once declared lost, latch it until an accepted snapshot arrives; this
+       avoids a 16-bit tick wrap temporarily restarting disconnected play. */
+}
+static void mp_save(void) {
+    FILE *f;
+    char key[24],line[160];
+    const char *a=role?pname:peername, *b=role?peername:pname;
+    uint32_t sa=role?game.score:opponent.score,sb=finalrightscore;
+    unsigned crc;
+    if(saved || phase!=LFINISH || peerphase!=LFINISH || !finalsent ||
+        !(peerack==finalseq || lnewer(peerack,finalseq))) return;
+    sprintf(key,"%08lX%08lX%04X ",role?nonce:peernonce,role?peernonce:nonce,roundnum);
+    /* Text journal with per-record CRC. Match identity makes retry idempotent. */
+    f=fopen(resultpath,"rb");
+    if(!f && errno!=ENOENT) { saved=-1; return; }
+    if(f) {
+        while(fgets(line,sizeof(line),f)) {
+            char *star=strchr(line,'*');
+            if(!strncmp(line,key,21) && star &&
+                sscanf(star+1,"%x",&crc)==1 && crc==lcrc((unsigned char *)line,star-line)) {
+                fclose(f); saved=1; return;
+            }
+        }
+        if(ferror(f)) { fclose(f); saved=-1; return; }
+        fclose(f);
+    }
+    sprintf(line,"%s%s: %09lu / %s: %09lu | %s LEVEL %u PILE %u WIN %u ",
+        key,a,sa,b,sb,mpmode==MP_MARATHON?"MARATHON":
+        mpmode==MP_SPRINT?"SPRINT 40":"B-TYPE",startlevel,
+        mpmode==MP_BTYPE?startheight:0,mpwinner);
+    crc=lcrc((unsigned char *)line,strlen(line));
+    f=fopen(resultpath,"ab");
+    if(!f) { saved=-1; return; }
+    /* Leading newline isolates an interrupted previous append. */
+    if(fprintf(f,"\r\n%s*%04X\r\n",line,crc)<0) saved=-1;
+    if(fflush(f) || ferror(f)) saved=-1;
+    if(fclose(f)) saved=-1;
+    if(!saved) saved=1;
+}
+static void mp_next(void) {
+    spawn(); active=!game.over; fallticks=0; if(game.over) urgent=1;
+    boarddirty[role?0:1]=1;
+}
+static void mp_play_tick(void) {
+    int d,cw,ccw,down,downedge,period;
+    if(game.over) return;
+    if(joyenabled) joy_poll();
+    oldup=joyup;
+    cw=edge(72)|edge(17)|edge(45)|edge(57)|edge(28)|joyedge;
+    ccw=edge(44)|joyback;
+    down=keys[80]||keys[31]||joydown;
+    downedge=edge(80)|edge(31)|(joydown&&!olddown); olddown=joydown;
+#ifdef LINKTEST
+    down=1; /* Exercise real soft-drop, lock, score and snapshot updates. */
+    if((ticks&15)==0 && move_side(role?1:-1)) boarddirty[role?0:1]=1;
+    if((ticks&31)==0) cw=1;
+#endif
+    if(cleardelay) {
+        if(!--cleardelay) {
+            clearnum=mp_clear_rows(); settledscore=game.score;
+            sound_event(clearnum==4?5:2);
+            if(clearnum==4) {
+                flash=MP_FX_TICKS; fxowner=role?0:1; fxspawn=1;
+                ++localfx; urgent=1; resceneneeded=1;
+            } else mp_next();
+        }
+        return;
+    }
+    d=repeat_dir((keys[77]||keys[32]||joyright)-(keys[75]||keys[30]||joyleft),&moveheld,&moveage);
+    if(d && move_side(d)) boarddirty[role?0:1]=1;
+    if(cw || ccw) if(rotate_shape(cw?1:0)) boarddirty[role?0:1]=1;
+    period=fall_period(); if(down && period>2) period=2;
+    if(downedge) fallticks=period;
+    if(++fallticks>=(unsigned)period) {
+        fallticks=0;
+        boarddirty[role?0:1]=1;
+        if(!drop_one(down)) {
+            clearnum=lock_shape(); settledscore=game.score; active=0; if(game.over) urgent=1;
+            sound_event(1);
+            if(!game.over) { if(clearnum) cleardelay=8; else mp_next(); }
+        }
+    }
+}
+static void mp_pause(int value) {
+    if(role) paused=value;
+    else if(!requestpending) { ++request; desiredpause=value; requestpending=1; }
+    urgent=1; inputs_flush(); silence(); lastpause=ticks;
+}
+static void mp_tick(void) {
+    int escape=edge(1), p=edge(25), enter=(paused || phase==LFINISH)?edge(28):0;
+    if(joyenabled && (phase!=LRUN || paused || loss || quitconfirm)) {
+        joy_poll(); enter|=joyedge; escape|=joyback;
+    }
+#ifdef LINKTEST
+    /* Exercise Esc confirmation, N cancellation, and the shared pause. */
+    if(phase==LRUN && !testinfo) { makes[61]=1; testinfo=1; }
+    if(!role && remstarted && !testpause && (unsigned)(ticks-started)>45) {
+        testpause=1; escape=1;
+    }
+    if(!role && quitconfirm && (unsigned)(ticks-started)>63) makes[49]=1;
+#endif
+    if(exitrequested) { if((unsigned)(ticks-deadline)>36) mpquit=1; return; }
+    if(quitconfirm) {
+        if(edge(21) || enter) {
+            mp_fail(saved>0?"LEFT MATCH - LOCAL RESULT SAVED":"MATCH CANCELLED - NOT SAVED");
+            exitrequested=1; deadline=ticks; urgent=1;
+        } else if(escape || edge(49)) { quitconfirm=0; inputs_flush(); }
+        if(quitconfirm && phase==LRUN && !paused && !requestpending) mp_pause(1);
+        return;
+    }
+    if(escape) {
+        quitconfirm=1;
+        if(phase==LRUN && !paused && !requestpending) mp_pause(1);
+        inputs_flush();
+        return;
+    }
+    if(edge(59)) { theme=(theme+1)%4; settheme(); }
+    if(edge(60)) { soundmode=(soundmode+1)%4; silence(); }
+    if(edge(61)) { showlink=!showlink; diaglast=ticks-18; }
+    if(edge(37)) joy_off();
+    if(aborting) return;
+    if(phase==LFINISH) {
+        mp_save();
+        if((enter || edge(19)) && saved>0 && peersaved && !loss && roundnum<65535) {
+            rematchwant=1; urgent=1;
+        }
+        if(role && rematchwant && (peerflags&32) && saved>0 && peersaved && !loss) {
+            ++roundnum; seed=(uint16_t)(seed*25173U+13849U); if(!seed) seed=1;
+            mp_round_reset(); phase=LREADY;
+        }
+#ifdef LINKTEST
+        if(saved && peersaved && (unsigned)(ticks-ended)>180) {
+            if(testrematch && roundnum==1) { rematchwant=1; urgent=1; }
+            else mpquit=1;
+        }
+#endif
+        return;
+    }
+    if(phase!=LRUN) return;
+    /* The effect is already a short automatic hold. Do not turn a key press
+       during it into a persistent shared pause. A pre-existing manual pause
+       can still be resumed here. */
+    if(flash && !paused) p=0;
+    if(p || (enter && paused)) mp_pause(!paused);
+#ifdef LINKTEST
+    if(role && paused && !testresume && (unsigned)(ticks-lastpause)>MP_FX_TICKS+4) {
+        testresume=1; mp_pause(0);
+    }
+#endif
+    /* Finish the effect even if play is paused or the link has gone quiet.
+       Those conditions stop gameplay, not the animation or its cleanup. */
+    if(flash) {
+        if(--flash) {
+            mp_fx_brightness(flash);
+        } else {
+#ifdef LINKTEST
+            if(testhitch && paused) testfxcleared=1;
+#endif
+            fxbrightness(0); resceneneeded=1;
+            if(fxspawn) { fxspawn=0; mp_next(); }
+            inputs_flush(); urgent=1;
+        }
+        return;
+    }
+    if(paused || loss || requestpending || !remstarted || peerphase<LREADY) return;
+#ifdef LINKTEST
+    if(teststage && role && mpmode==MP_BTYPE && !teststagetriggered) {
+        unsigned x;
+        game.lines=24;
+        for(x=0;x<BW;x++) game.grid[BH-1][x]=1;
+        game.full=1UL<<(BH-1); mp_clear_rows(); teststageone=game.level;
+        game.lines=249;
+        for(x=0;x<BW;x++) game.grid[BH-1][x]=1;
+        game.full=1UL<<(BH-1); mp_clear_rows(); teststagecap=game.level;
+        teststagetriggered=1; boarddirty[0]=1; urgent=1;
+    }
+    if(testfx && role==testfxrole && !testfxdone) {
+        unsigned y,x;
+        testfxdone=1;
+        memset(game.grid,0,sizeof(game.grid));
+        for(y=16;y<20;y++) for(x=0;x<10;x++) if(x!=4) game.grid[y][x]=3;
+        game.kind=4; game.x=4; game.y=18;
+        game.shape[0]=0; game.shape[1]=-2;
+        game.shape[2]=0; game.shape[3]=-1;
+        game.shape[4]=0; game.shape[5]=0;
+        game.shape[6]=0; game.shape[7]=1;
+        boarddirty[0]=1; urgent=1;
+    }
+#endif
+    if(!role && (game.over || (mpmode==MP_SPRINT && game.lines>=MP_SPRINT_LINES))) return;
+    if(role) {
+#ifdef LINKTEST
+        if(testgoal && mpmode==MP_SPRINT && remstarted &&
+            (unsigned)(ticks-started)>80 && !testgoaltriggered) {
+            game.lines=MP_SPRINT_LINES; testgoaltriggered=1; urgent=1;
+        }
+        if(remstarted && (unsigned)(ticks-started)>160) game.over=1;
+#endif
+        if(matchticks<65535) ++matchticks;
+        if(game.over || opponent.over || (mpmode==MP_SPRINT &&
+            (game.lines>=MP_SPRINT_LINES || opponent.lines>=MP_SPRINT_LINES))) {
+            mp_finish(); return;
+        }
+    }
+    mp_play_tick();
+}
+static void mp_board(int n,Game *g,int moving) {
+    unsigned char cells[BH][BW];
+    int i,x,y,ox=n?428:12;
+    if(!boarddirty[n]) return;
+    boarddirty[n]=0;
+#ifdef LINKTEST
+    ++boardchecks;
+#endif
+    memcpy(cells,g->grid,sizeof(cells));
+    if(moving) for(i=0;i<4;i++) {
+        x=g->x+g->shape[i*2]; y=g->y+g->shape[i*2+1];
+        if(x>=0 && x<BW && y>=0 && y<BH) cells[y][x]=g->kind+1;
+    }
+    raster(0x18);
+    for(y=0;y<BH;y++) for(x=0;x<BW;x++) if(cells[y][x]!=picturecache[n][y][x]) {
+        if(picturecache[n][y][x]) block(ox+x*20,52+y*20,picturecache[n][y][x]);
+        if(cells[y][x]) block(ox+x*20,52+y*20,cells[y][x]);
+        picturecache[n][y][x]=cells[y][x];
+    }
+}
+static void mp_preview(int n,int k) {
+    int i,old=nextcache[n],y=n?302:128;
+    if(old==k) return;
+    raster(0x18);
+    if(old>=0) for(i=0;i<4;i++) block(288+shapes[old][2*i]*20,y+shapes[old][2*i+1]*20,old+1);
+    for(i=0;i<4;i++) block(288+shapes[k][2*i]*20,y+shapes[k][2*i+1]*20,k+1);
+    nextcache[n]=k;
+}
+static void mp_render(void) {
+    Game *g[2]; uint32_t score[2]; int i,seconds; char s[48],detail[48];
+    const char *status,*winner;
+    g[role?0:1]=&game; g[role?1:0]=&opponent;
+    score[role?0:1]=settledscore; score[role?1:0]=peerscore;
+    mp_board(role?0:1,&game,active);
+    if(havepeer) mp_board(role?1:0,&opponent,(peerflags&2)!=0);
+    for(i=0;i<2;i++) {
+        mp_hud(i,i?432:16,10,i==(role?0:1)?pname:peername);
+        if(scorecache[i]!=score[i]) {
+            hudnumber(s,score[i],9); mp_hud(2+i,i?432:16,30,s); scorecache[i]=score[i];
+        }
+        if(linecache[i]!=g[i]->lines || levelcache[i]!=g[i]->level) {
+            sprintf(s,"%03u / %02u",g[i]->lines,g[i]->level);
+            mp_hud(4+i,244,i?362:188,s); linecache[i]=g[i]->lines; levelcache[i]=g[i]->level;
+        }
+        mp_preview(i,g[i]->next);
+    }
+    if(secondcache<0 || (matchticks!=clockremain &&
+        (matchticks<clockremain || matchticks>=clockboundary))) {
+        seconds=((unsigned long)matchticks*32768UL)/1193182UL;
+        clockboundary=((unsigned long)(seconds+1)*1193182UL+32767UL)/32768UL;
+        if(seconds!=secondcache) {
+            sprintf(s,"%u:%02u",seconds/60,seconds%60);
+            mp_hud(6,292,62,s); secondcache=seconds;
+        }
+#ifdef LINKTEST
+        ++clockdivisions;
+#endif
+    }
+    clockremain=matchticks;
+    detail[0]=0;
+    if(quitconfirm) status="LEAVE MATCH?";
+    else if(aborting) status="MATCH CLOSED";
+    else if(phase<LREADY) status="CONNECTING";
+    else if(phase==LREADY || !remstarted) status="GET READY";
+    else if(phase==LFINISH) {
+        if(saved<0) status="SAVE FAILED";
+        else if(peerflags&16) status="PEER DISK ERR";
+        else if(saved && (peersaved || loss)) {
+            if(!mpwinner) status="DRAW";
+            else {
+                winner=mpwinner==1?(role?pname:peername):(role?peername:pname);
+                sprintf(s,"%s WINS",winner); status=s;
+                if(mpgoal)
+                    sprintf(detail,"%s CLEARED 40 LINES FIRST",winner);
+                else sprintf(detail,"%s WON BY SURVIVING",winner);
+            }
+        }
+        else status="SAVING";
+    } else if(loss) status="LINK WAIT";
+    else if(paused || requestpending) status="PAUSED";
+    else if(flash) status="TETRIS!";
+    else status=mpmode==MP_MARATHON?"MARATHON":
+        mpmode==MP_SPRINT?"SPRINT 40":"B-TYPE";
+    mp_hud(7,244,234,status);
+    if(quitconfirm) strcpy(detail,"Y:YES N:NO");
+    mp_small(mpdetail,220,262,detail);
+    mp_hud(9,232,390,phase==LFINISH && saved>0 && peersaved && !loss && roundnum<65535?
+        (rematchwant?"WAITING REMATCH":((peerflags&32)?"REMATCH? ENTER":"ENTER: REMATCH")):"");
+    mp_hud(11,244,410,phase==LFINISH || paused || loss || aborting?"ESC: MENU":"");
+    mp_hud(10,244,430,soundnames[soundmode]);
+    if((unsigned)(ticks-diaglast)>=18) {
+        diaglast=ticks;
+        if(showlink) {
+            sprintf(s,"RX AGE %u MS",havepeer?(unsigned)((unsigned long)(unsigned)(ticks-lastreceive)*32768UL/1193UL):0);
+            if(!havepeer) strcpy(s,"RX WAITING");
+            else if(loss) strcpy(s,"RX LOST");
+            mp_hud(12,232,78,s);
+            sprintf(s,"REJECT %u",badframes); mp_hud(13,244,207,flash?"":s);
+            if(transport) {
+                sprintf(s,"NET DROP %u",lan_dropped); mp_small(mphud[14],244,448,s);
+                sprintf(s,"NET SEND %u",lan_senterror); mp_small(mphud[15],244,458,s);
+            } else {
+                sprintf(s,"UART %u",uart_errors); mp_small(mphud[14],244,448,s);
+                sprintf(s,"OVERFLOW %u",rxoverflow); mp_small(mphud[15],244,458,s);
+            }
+        } else {
+            mp_hud(12,232,78,""); mp_hud(13,244,207,"");
+            mp_small(mphud[14],244,448,""); mp_small(mphud[15],244,458,"");
+        }
+    }
+}
+static void mp_scene(void) {
+    char s[48];
+    memset(picturecache,0,sizeof(picturecache)); memset(mphud,0,sizeof(mphud)); mpdetail[0]=0;
+    boarddirty[0]=boarddirty[1]=1;
+    nextcache[0]=nextcache[1]=-1; scorecache[0]=scorecache[1]=0xffffffffUL;
+    linecache[0]=linecache[1]=levelcache[0]=levelcache[1]=65535;
+    secondcache=-1; clockremain=65535; diaglast=ticks-18;
+    wipe();
+    if(flash) {
+        outline_text(53,222,"TETRIS!",13,14);
+        mp_fx_brightness(flash);
+        ink(14); raster(0x10);
+        segment(25,200,190,209); segment(450,209,615,200);
+        segment(25,333,190,321); segment(450,321,615,333);
+        if(fxowner==2) sprintf(s,"%s + %s GOT A TETRIS!",role?pname:peername,role?peername:pname);
+        else sprintf(s,"%s GOT A TETRIS!",fxowner==(role?0:1)?pname:peername);
+        textxy(220,208,s,15,1);
+    }
+    raster(0x10); ink(15);
+    rect(8,48,208,408); rect(424,48,208,408);
+    textxy(286,42,"TIME",15,1);
+    textxy(274,108,"LEFT NEXT",15,1); textxy(274,282,"RIGHT NEXT",15,1);
+    textxy(258,174,"LINES / LEVEL",15,1); textxy(258,348,"LINES / LEVEL",15,1);
+    if(transport && role) {
+        sprintf(s,"HOST %u.%u.%u.%u",lan_local[0],lan_local[1],lan_local[2],lan_local[3]);
+        textxy(250,94,s,11,1);
+    }
+    textxy(14,458,"LEFT/RIGHT/A/D MOVE  DOWN/S DROP  UP/W/X ROTATE  Z REVERSE",15,1);
+    textxy(14,470,"P PAUSE  ESC MENU  F1 THEME  F2 SOUND  F3 LINK",15,1);
+    raster(0x18);
+}
+#include "MPMENU.H"
+static void mp_help(void) {
+    printf("NUXTRIS MULTIPLAYER 1.0 - run %s for the menu\n",helpname);
+    printf("%s /HOST /NAME:BOB [/COM:1] [/BAUD:38400] [/RTS] [/SPRINT] [/LEVEL:0]\n",helpname);
+    printf("%s /JOIN /NAME:JON [/COM:1] [/BAUD:38400] [/RTS]\n",helpname);
+    puts("Serial: both ends need the same baud and cable setting. /3WIRE or /RTS.\n"
+         "LAN: /LAN /IP:host-address on JOIN; packet driver and MTCPCFG needed.\n"
+         "COM1 or COM2, baud 9600/19200/38400/57600/115200. /LEVEL:0..9\n"
+         "/J calibrate joystick before connecting. /A AdLib /P speaker /B both /S silent.\n"
+         "Modes: /MARATHON (default), /SPRINT (40 lines), /BTYPE (25-line stages).\n"
+         "/HEIGHT:0..5 sets the shared starting pile in B-Type. Host sets rules.\n"
+         "First top-out ends any match; the surviving player wins.\n"
+         "Both players get the same pieces. Either can pause/resume both.\n"
+         "/QUICK skips the menu. /BRIDGE locks physical settings for DOSBOXX.SH.\n"
+         "Paired results: NXTMATCH.TXT. Settings: NXTMULT.CFG. F3 toggles link info.");
+}
+int main(int argc,char **argv) {
+    unsigned i,oldmode,last,now,elapsed; int joylaunch=0,namegiven=0;
+    uint32_t option;
+    struct dostime_t dt; struct dosdate_t dd;
+    {
+        const char *base=argv[0], *slash=strrchr(base,'\\'), *dot;
+        if(slash) base=slash+1;
+        slash=strrchr(base,'/'); if(slash) base=slash+1;
+        dot=strchr(base,'.');
+        i=dot?(unsigned)(dot-base):(unsigned)strlen(base);
+        if(i && i<=8) { memcpy(helpname,base,i); helpname[i]=0; }
+    }
+    mp_paths(argv[0]); mp_cfgload();
+    for(i=1;i<(unsigned)argc;i++) {
+        const char *v=strchr(argv[i],':');
+        if(!stricmp(argv[i],"/HOST")) { role=1; }
+        else if(!stricmp(argv[i],"/JOIN")) { role=0; }
+        else if(!strnicmp(argv[i],"/NAME:",6)) {
+            if(!v[1] || strlen(v+1)>8) { mp_help(); return 1; }
+            memset(pname,0,sizeof(pname)); strcpy(pname,v+1); strupr(pname); namegiven=1;
+        }
+        else if(!strnicmp(argv[i],"/COM:",5)) {
+            if(!lnumber(v+1,2,&option) || !option) { mp_help(); return 1; } comnum=option;
+        }
+        else if(!strnicmp(argv[i],"/BAUD:",6)) {
+            if(!lnumber(v+1,115200UL,&option)) { mp_help(); return 1; } baudrate=option;
+        }
+        else if(!stricmp(argv[i],"/LAN")) transport=1;
+        else if(!stricmp(argv[i],"/SERIAL")) transport=0;
+        else if(!strnicmp(argv[i],"/IP:",4)) {
+            if(!lan_parseip(v+1,joinip)) { mp_help(); return 1; }
+        }
+        else if(!stricmp(argv[i],"/MARATHON")) mpmode=MP_MARATHON;
+        else if(!stricmp(argv[i],"/SPRINT")) mpmode=MP_SPRINT;
+        else if(!stricmp(argv[i],"/BTYPE")) mpmode=MP_BTYPE;
+        else if(!strnicmp(argv[i],"/LEVEL:",7)) {
+            if(!lnumber(v+1,9,&option)) { mp_help(); return 1; } startlevel=option;
+        }
+        else if(!strnicmp(argv[i],"/HEIGHT:",8)) {
+            if(!lnumber(v+1,5,&option)) { mp_help(); return 1; } startheight=option;
+        }
+        else if(!stricmp(argv[i],"/RTS")) optflow=1;
+        else if(!stricmp(argv[i],"/3WIRE")) optflow=0;
+        else if(!stricmp(argv[i],"/QUICK")) quickstart=1;
+        else if(!stricmp(argv[i],"/BRIDGE")) bridge=1;
+#ifdef LINKTEST
+        else if(!stricmp(argv[i],"/TESTREMATCH")) testrematch=1;
+        else if(!stricmp(argv[i],"/TESTFX")) testfx=1;
+        else if(!stricmp(argv[i],"/TESTFXJOIN")) { testfx=1; testfxrole=0; }
+        else if(!stricmp(argv[i],"/TESTHITCH")) { testhitch=1; testfx=1; }
+        else if(!stricmp(argv[i],"/TESTGOAL")) testgoal=1;
+        else if(!stricmp(argv[i],"/TESTSTAGE")) teststage=1;
+#endif
+        else if(!stricmp(argv[i],"/J")) joylaunch=1;
+        else if(!stricmp(argv[i],"/A")) soundmode=1;
+        else if(!stricmp(argv[i],"/P")) soundmode=2;
+        else if(!stricmp(argv[i],"/B")) soundmode=3;
+        else if(!stricmp(argv[i],"/S")) soundmode=0;
+        else { mp_help(); return stricmp(argv[i],"/?")?1:0; }
+    }
+    if(!cfgloaded && !namegiven) strcpy(pname,role?"AMIGO":"PLAYER2");
+    if(bridge) comnum=1;
+#ifdef LINKTEST
+    quickstart=1;
+#endif
+    if((comnum!=1 && comnum!=2) || mpmode>MP_BTYPE || startlevel>9 || startheight>5 ||
+        !lname((unsigned char *)pname) || (baudrate!=9600 && baudrate!=19200 &&
+        baudrate!=38400 && baudrate!=57600 && baudrate!=115200)) { mp_help(); return 1; }
+    oldmode=modequery();
+    if(!video_start()) { biosmode(oldmode); puts("Cannot set VGA 640x480."); return 1; }
+    speakerbits=inp(0x61)&3; audiofound=adlib();
+    if(audiofound) instruments(); else if(soundmode==1) soundmode=2;
+    install();
+    if(joylaunch) joy_calibrate();
+    for(;;) {
+    if(!quickstart && !mp_menu()) break;
+    quickstart=0; uinotice[0]=0;
+    _dos_gettime(&dt); _dos_getdate(&dd);
+    nonce=*(uint32_t __far *)MK_FP(0x40,0x6c) ^ ((uint32_t)dd.year<<20) ^
+        ((uint32_t)dd.month<<16) ^ ((uint32_t)dd.day<<11) ^ ((uint32_t)dt.hsecond<<24) ^
+        ((uint32_t)inp(0x40)<<8) ^ ((uint32_t)ticks<<3) ^ (role?0x71234a51UL:0x42bc9231UL);
+    if(!nonce) nonce=1;
+    seed=(uint16_t)(nonce^(nonce>>16)); if(!seed) seed=1;
+    peernonce=0; havepeer=0; sequence=received=peerack=0; roundnum=1;
+    badframes=0; mpquit=0; strcpy(peername,"WAITING");
+    memset(&decoder,0,sizeof(decoder)); mp_round_reset();
+    flowcontrol=bridge?0:optflow;
+    if(transport) {
+        if(!lan_open(joinip)) { strcpy(uinotice,lan_reason); continue; }
+    } else if(!serial_open(comnum,baudrate)) {
+        strcpy(uinotice,"COM PORT NOT FOUND - CHECK CONNECTION"); continue;
+    }
+    lastreceive=lastsend=lastcheck=ticks; mp_scene(); resceneneeded=0; last=ticks;
+    while(!mpquit) {
+        mp_service();
+        now=ticks; elapsed=(unsigned)(now-last);
+        if(!elapsed) continue;
+        last=now;
+#ifdef LINKTEST
+        if(testhitch && role && flash && !testhitchdone) {
+            elapsed=19; testhitchdone=1;
+        }
+#endif
+        /* A slow redraw is not a pause request. Skip catch-up work and let
+           play continue on the next update, including after Tetris effects. */
+        if(elapsed>18) elapsed=1;
+#ifdef LINKTEST
+        if(testhitchdone==1) {
+            testautopaused=paused;
+            paused=1; urgent=1; lastpause=ticks;
+            testhitchdone=2;
+        }
+#endif
+        while(elapsed-- && !mpquit) { audio_tick(); mp_tick(); mp_service(); }
+        if(resceneneeded) { mp_scene(); resceneneeded=0; }
+        mp_render();
+#ifdef LINKTEST
+        if(testfx && flash && !testfxcaptured) { mp_capture("FX.RAW"); testfxcaptured=1; }
+        if(roundnum==2 && phase==LRUN && stale_ready && !stale_checked) {
+            unsigned oldseq=received; uint32_t oldscore=opponent.score;
+            lput16(stale_snapshot+12,received+1);
+            lput16(stale_snapshot+LCRC,lcrc(stale_snapshot,LCRC));
+            mp_accept(stale_snapshot); stale_checked=1;
+            if(received!=oldseq || opponent.score!=oldscore || phase!=LRUN) {
+                mp_fail("STALE ROUND ACCEPTED"); mpquit=1;
+            }
+        }
+        if((unsigned)(ticks-lastreceive)>600 || ticks>1200) { mp_fail("AUTOTEST TIMEOUT"); mpquit=1; }
+#endif
+    }
+#ifdef LINKTEST
+    mp_capture("SCREEN.RAW");
+#endif
+#ifdef LINKTEST
+    { FILE *diag=fopen("UART.TXT","w"); if(diag) {
+        fprintf(diag,"IRQcount %u head %u tail %u seq %u accepted %u phase %u IER %02X IIR %02X LSR %02X PIC %02X FIFO %d\n",
+            irqcount,rxhead,rxtail,sequence,received,phase,inp(portbase+1),inp(portbase+2),inp(portbase+5),inp(0x21),hasfifo);
+        for(i=0;i<traced;i++) fprintf(diag,"phase %u incoming %u seq %u echo %u\n",trace[i][0],trace[i][1],trace[i][2],trace[i][3]);
+        fclose(diag); }
+    }
+#endif
+    if(transport) lan_close(); else serial_close();
+    silence();
+#ifdef LINKTEST
+    break;
+#else
+    mp_cfgsave(); inputs_flush();
+#endif
+    }
+    uninstall();
+    outp(0x61,(inp(0x61)&0xfc)|speakerbits); biosmode(oldmode);
+    printf("%s\n",failure[0]?failure:(saved>0?(peersaved?"Match complete. Both scores saved.":"Local result saved; other player save unconfirmed."):"Match ended."));
+    if(saved>0) printf("Results: %s\n",resultpath);
+    if(saved<0) printf("Could not save %s\n",resultpath);
+    if(transport) printf("Rejected frames: %u  network drops: %u  send errors: %u\n",
+        badframes,lan_dropped,lan_senterror);
+    else {
+        printf("Rejected frames: %u  UART errors: %u  receive overflows: %u\n",badframes,uart_errors,rxoverflow);
+        printf("UART: overrun %u  parity %u  framing %u  break %u\n",
+            uart_overrun,uart_parity,uart_framing,uart_break);
+    }
+#ifdef LINKTEST
+    printf("TEST role=%u phase=%u peer=%u saved=%d peersaved=%d score=%lu other=%lu pause=%d resume=%d elapsed=%u dead=%d otherdead=%d round=%u mode=%u pile=%u winner=%u\n",
+        role,phase,peerphase,saved,peersaved,game.score,opponent.score,testpause,testresume,matchticks,game.over,opponent.over,roundnum,mpmode,startheight,mpwinner);
+    printf("COST ticks=%u boardchecks=%u packets=%u skipped=%u clockdiv=%u\n",ticks,boardchecks,packets_sent,packets_skipped,clockdivisions);
+    printf("REMATCH stale_checked=%d info=%d\n",stale_checked,showlink);
+    printf("FX test=%d triggered=%d captured=%d local=%u remote=%u acknowledged=%u flash=%u\n",
+        testfx,testfxdone,testfxcaptured,localfx,peerfxseen,peerfxack,flash);
+    printf("RULES start_crc=%u first_piece=%u goal_triggered=%d\n",
+        teststartcrc,teststartpiece,testgoaltriggered);
+    if(teststage) printf("STAGES reached=%d first=%u cap=%u\n",
+        teststagetriggered,teststageone,teststagecap);
+    if(testhitch) printf("HITCH injected=%d auto_paused=%d effect_cleared_while_paused=%d\n",
+        testhitchdone,testautopaused,testfxcleared);
+#endif
+    return aborting || saved<0 ? 1:0;
+}

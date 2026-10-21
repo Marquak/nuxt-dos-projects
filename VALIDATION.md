@@ -1,9 +1,25 @@
-# Snapshot checks, 2026-10-19
+# Snapshot checks, 2026-10-21
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass. Sections below the current
 release notes document earlier publication passes.
+
+## Combined NuXTris release
+
+The current `NUXTRIS` folder contains one menu and two games: `NUXTRIS.EXE`,
+`SP_TRIS.EXE` 1.3, and `MP_TRIS.EXE` 1.0. The older separate multiplayer folder
+and single-player 1.2 files were removed. The selector opens one game at a
+time and returns to its menu after the game exits. Existing player scores,
+settings and match history were not included in the repository. Keep personal
+files when installing this update.
+
+The local release package passed DOSBox-X launcher, return, missing-file and
+VGA checks. SP 1.3 passed 144 focused checks; MP 1.0 is the tested 0.7.0
+gameplay promoted with a corrected help label. Its prior serial and LAN
+checks are in `NUXTRIS/SOURCE/MP/TESTS.TXT`. This exact combined package still
+needs a physical NuXT launch check. The repository files were compared with
+the local release and the checksum inventory was regenerated.
 
 ## NuXT Link 4.1 LZ4 upload choice
 
@@ -39,7 +55,8 @@ publication pass.
 
 The owner reported smooth NuXT-to-DOSBox-X LAN play with 0.6.1. Version 0.6.2
 was checked in DOSBox-X after a diagnostic counter fix, as recorded in
-`NUXTRIS-MP/TESTS.TXT`. This upload does not claim a fresh NuXT hardware run.
+The historical 0.6.2 tests are retained in repository history. This earlier
+upload did not claim a fresh NuXT hardware run.
 The repository's project introductions were edited for clearer, more natural
 wording without changing their binaries or technical requirements.
 

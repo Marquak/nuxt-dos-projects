@@ -1,0 +1,44 @@
+NUXTRIS MULTIPLAYER 1.0 - 2026-10-20
+
+Version 1.0 keeps the 0.7.0 gameplay and wire format. The help screen now
+identifies the actual executable name, NXTNET or MP_TRIS. The release was
+rebuilt with Open Watcom; the host packet/CRC test and four Linux serial
+launcher tests passed. DOSBox-X /? displayed the 1.0 banner.
+
+- Replaced timed score race and sudden death with Marathon, Sprint 40 and a
+  custom B-Type endurance mode. Game Boy B-Type normally ends at 25 lines;
+  this version raises the level every 25 lines, caps it at 9, and continues
+  until top-out. Height 0..5 builds a shared seeded starting pile.
+- The host decides the winner: first 40 lines in Sprint, or the survivor of
+  a top-out in any mode. A simultaneous goal or simultaneous top-out is a
+  draw. Host-final scores, right-side lines, level and win reason are sent
+  so both result journals agree even if the joiner advanced while the final
+  packet was in flight. The clock now counts active game time upward.
+- Match wire version 4 adds the mode, pile height and final outcome. Older
+  NuXTris multiplayer EXEs cannot join. Settings version 3 loads previous
+  versions and maps their old mode to Marathon without discarding names or
+  connection settings. Scores remain in NXTMATCH.TXT.
+- Open Watcom release, LINKTEST and MENUTEST builds compiled cleanly.
+  The host codec check passed 1,392 single-bit corruptions plus field,
+  escape, sequence and packet-change checks.
+- Two-client DOSBox-X serial matches completed in all three modes at
+  38400 baud. Marathon's forced slow frame did not auto-pause and its
+  TETRIS! backdrop cleared while play was paused. Sprint reached its
+  40-line goal. B-Type at height 3 produced the same starting pile checksum
+  and first piece on both PCs. An injected real row clear took B-Type from
+  24 to 25 lines and level 0 to 1, then from 249 to 250 lines and the
+  level-9 cap. The second B-Type match ended with the higher-scoring player
+  topping out and the survivor winning as requested. Host and joiner
+  journals were byte-identical in each check. UART errors and receive
+  overflows were zero. One Marathon run rejected one startup frame and
+  recovered.
+- A disposable DOSBox-X NE2000/packet-driver LAN smoke check exchanged
+  94 valid version-4 snapshots with zero game frame rejects, network drops
+  or send errors. The synthetic peer stopped, so LINKTEST's later timeout
+  was expected. This was a transport check, not a complete LAN match.
+- A DOSBox-X menu test saved B-Type, level 1 and height 1, then reloaded
+  the exact bytes. A copied version-2 settings file migrated to version 3,
+  retaining name, connection, address and level; mode became Marathon and
+  height 0. The 11-row menu capture was inspected and fits the frame.
+- The working 0.6.6 output remains separate. Physical NuXT-to-PC playtests
+  of the new modes and wire version 4 are pending.

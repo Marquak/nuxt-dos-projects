@@ -1,120 +1,25 @@
-NUXTRIS 1.2 - verification, 2026-10-13
+NUXTRIS SELECTOR - 2026-10-20
 
-129 checks passed in DOSBox-X, including all 105 previous checks.
-- Eight-character keyboard name ends at a valid insertion position.
-- Backspace removes the final character; typing can refill that position.
-- Ninth character is ignored without changing existing letters.
-- Arrow/gamepad navigation and editing handle the full-name position.
-- Repeated Backspace cannot move before the start of the name buffer.
-- Initial and incremental menus/name screens match full-render reference
-  four-plane framebuffer hashes, including shorter strings and erasure.
-- Menu selection changes no text glyphs and performs no full clear.
-- One deleted name character updates one glyph and performs no full clear.
-- Name cursor movement updates no glyphs and performs no full clear.
-- Unchanged screens perform no glyph updates or full clears.
-- Changing/removing centred status notices leaves no old text.
-- An external screen clear invalidates caches for calibration return.
+The Open Watcom build targets V20/80186-compatible 16-bit real mode.
+The launcher map reports 18,576 bytes of static DOS memory including
+its 2,048-byte stack. Only the launcher and one child game are resident.
 
-The independent UI references in UITEST.H retain the old full redraw
-approach. The new checks call actual name-input/rendering routines; they
-do not depend on playing a whole game to reach score entry. No game rules,
-save format, audio or assembly renderer changes. No 86Box testing.
+In disposable DOSBox-X folders, CHECK.EXE launched the actual SP 1.3
+and MP 1.0 executables with /? and returned to the menu after each.
+It also showed a missing-MP error when MP_TRIS.EXE was absent. The game
+handoff checks returned to VGA mode 12h without failures. Four-plane
+VGA captures of the initial menu, moved selection, returned menu, and
+missing-file message were decoded and visually checked.
 
-Built in a private folder using the existing Open Watcom flags. Release
-DGROUP is 10,864 bytes including its 4 KiB stack, within the 64 KiB limit.
-Source/test changes, build and reports: work/nuxtris-v12/.
-These checks verify drawing work avoided, not physical NuXT speed.
-User scores and multiplayer files were not modified.
+The MP 1.0 help screen displayed NXTNET for the standalone file and
+MP_TRIS for the renamed combined-package file.
 
-Earlier validation follows. It was not all repeated for version 1.2.
+A second selector test launched the SP and MP automated game builds
+without the short /? path. Both entered VGA, installed their input code,
+then exited back to the selector. SP reported 144 passed, 0 failed; MP
+completed its scripted B-Type menu and wrote its settings file.
 
-NUXTRIS 1.1 - verification, 2026-10-11
-
-Release build: Open Watcom 2, DOS small model, V20/80186 instructions.
-Assembly handles VGA lines, masked clears, and timed gameport sampling.
-No 8087 instructions are needed. No 86Box tests were run.
-
-PASS (1.0, unchanged rule/save code): 78 shared checks on Linux with AddressSanitizer and
-UndefinedBehaviorSanitizer. Leak checking disabled because the local
-execution sandbox uses ptrace; the rules use fixed arrays, not heap storage.
-PASS (1.1): 105 checks using the compiled 16-bit DOS test executable under
-DOSBox 0.74-3. Includes the same 78 rule/save checks, existing video/input
-checks and 13 added HUD/display-timing checks. The earlier 1.0 suite also
-passed 92 checks under QEMU with FreeDOS.
-
-New HUD checks:
-- No score formatting or glyph writes during soft drop before landing.
-- Internal soft-drop points accrue immediately; display commits on lock.
-- Pause/full scene rebuild preserves the last committed display score.
-- Landing with immediate next-piece spawn updates the complete score.
-- Line bonus, level and line count update after clearing finishes.
-- Four-line celebration and Type B completion retain the final total.
-- Decimal field widths/carries through 999,999,999 match printf output.
-- Byte-exact four-plane comparison with the independent pixel renderer,
-  both HUD alignments, all glyphs, digit carries and shorter text.
-- Erasure restores the entire framebuffer with no surrounding corruption.
-No core rules, save format, drop speed or input handling changed.
-AdLib carrier attenuation is reduced by four steps on all three voices
-(lead 5 to 1, accompaniment 14 to 10). Modulator/envelope settings, note
-sequences and PC speaker code are unchanged.
-
-Rules and persistence:
-- Full 65535-state nonzero RNG cycle, 1000 complete seven-piece bags.
-- Seven legal spawns, four-rotation cycles, clockwise/reverse inverse.
-- Side/floor/top boundaries, blocked rotation, atomic lock-out.
-- One-cell soft drop, no points for blocked drops or normal gravity.
-- Single and four-line scoring, separated row compaction, level changes.
-- Type B heights with guaranteed holes, 25-line target and fixed speed.
-- Score saturation, ordered named tables, values beyond 16-bit range.
-- Save/reload with preferences, CRC/semantic corruption rejection.
-- Truncated DAT recovery from BAK, failed write preserves previous data.
-
-VGA and timing:
-- XOR block erases cleanly, unaligned clear preserves neighboring pixels.
-- Moving and rotating pieces restores identical four-plane video contents.
-- Theme changes touch the DAC, not framebuffer contents.
-- TETRIS! background appears and cleanup restores the exact normal scene.
-- Soft drop moves once immediately, then every two game ticks.
-- Horizontal movement has delayed repeat.
-- Timer runs; original timer/keyboard vectors are restored.
-
-Interactive emulator checks (1.0 unless specified):
-- A fresh 1.1 DOSBox fixed-1500-cycle run repeats virtual joystick
-  calibration, rotation/movement, sustained soft drop, theme changes,
-  pause/menu and clean DOS exit. Captures: work/nuxtris-hud/interactive.
-- DOSBox 0.74-3, normal core, fixed 1500 cycles, standard emulated gameport.
-- A virtual two-axis/two-button controller exercised all three calibration
-  positions, start, clockwise and reverse rotation, both directions, soft
-  drop, pause/menu and clean exit.
-- Calibration waits for a centred/released stick before allowing input;
-  the last calibration corner no longer changes menu options.
-- Captured all four frame/text themes with unchanged piece colours.
-- QEMU showcase exercised Type B start, a four-line clear/fade, Type B
-  completion, typing AMIGO, and saving the named result. Saved bytes checked.
-- AdLib and PC speaker audio captured separately; both contain tone output.
-- Missing AdLib/joystick fallback and clean DOS exit checked.
-- Release binary remained byte-identical after source formatting.
-
-Limits:
-Emulator cycles are not a measured NuXT speed. This release has not yet
-been tested on the user's physical V20/Trident/AdLib/gameport hardware.
-The targets are DOS 6.22 and standard VGA mode 12h. The 1.1 checks used
-DOSBox's DOS; older QEMU runs used FreeDOS. The upstream rule core has been substantially adapted, so
-upstream behaviour alone is not treated as verification of this port.
-
-Reproduce: WATCOM=/path/to/watcom sh BUILD.SH --test
-Run CHECK.EXE in a disposable DOS folder; its report is CHECKS.TXT.
-CHECK /SHOW additionally runs the timed visual/audio/score-entry showcase.
-
-AdLib loudness check (1.1):
-The same isolated landing/clear/fanfare sequence was captured under QEMU
-with the old and new SOUND.H. AdLib peak rose from 9371 to 13237 (about
-3 dB); neither capture clipped. PC speaker peaks were both 24576 and
-active-sample RMS agreed within 0.01%. Capture lengths differ slightly
-with emulator scheduling; this is a level check, not waveform identity
-or a subjective judgment on the physical AdLib. Files and harness are in
-work/nuxtris-hud/audio; no 86Box tests.
-
-Release was independently rebuilt byte-identically. ZIP contents were
-byte-verified against the release folder. Only the EXE needs replacing;
-existing NUXTRIS.DAT/BAK files are compatible and were not modified.
+The SP 1.3 source still passes its 144 focused checks in DOSBox-X.
+The MP 1.0 gameplay code is unchanged from its 0.7.0 preview apart from
+the help version label. Earlier MP test results are in SOURCE/MP/TESTS.TXT.
+This three-program package still needs a physical NuXT launch check.
