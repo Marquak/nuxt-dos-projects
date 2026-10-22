@@ -22,4 +22,15 @@ completed its scripted B-Type menu and wrote its settings file.
 The SP 1.3 source still passes its 144 focused checks in DOSBox-X.
 The MP 1.0 gameplay code is unchanged from its 0.7.0 preview apart from
 the help version label. Earlier MP test results are in SOURCE/MP/TESTS.TXT.
-This three-program package still needs a physical NuXT launch check.
+The replacement selector still needs a physical NuXT retest.
+
+PATH FIX - 2026-10-21
+
+The original NuXT run found both child EXEs but reported CANNOT OPEN GAME
+FOLDER. The selector now removes the trailing backslash before DOS CHDIR
+and, when the game is already in the current folder, can launch it without
+changing directories. DOSBox-X checks passed with the game in a named
+subfolder and DOS starting from the root: SP launched, MP launched, and
+Failed was 0. A forced CHDIR failure launched both games from the current
+folder with Failed 0. Removing MP_TRIS.EXE showed the missing-file case with
+Failed 0. The replacement still needs a physical NuXT check.

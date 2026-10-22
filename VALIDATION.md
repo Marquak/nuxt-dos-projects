@@ -21,6 +21,13 @@ checks are in `NUXTRIS/SOURCE/MP/TESTS.TXT`. This exact combined package still
 needs a physical NuXT launch check. The repository files were compared with
 the local release and the checksum inventory was regenerated.
 
+The first NuXT launch reported `CANNOT OPEN GAME FOLDER` after finding the
+child EXE. The selector now strips the trailing backslash before DOS `CHDIR`
+and uses the current folder directly when that is where the child resides.
+Focused DOSBox-X checks passed from a different starting directory, with a
+forced `CHDIR` failure, and with the MP EXE missing. The replacement launcher
+still needs a physical NuXT retest.
+
 ## NuXT Link 4.1 LZ4 upload choice
 
 The physical NuXT A/B tests at 115200 baud and 4096-byte blocks found faster verified uploads when Linux favored LZ4 over slightly smaller heatshrink packets. See [NUXTLINK/TESTING.md](NUXTLINK/TESTING.md) for times, file checks, and the separate 57600-baud comparison. The DOS wire protocol remains version 8.

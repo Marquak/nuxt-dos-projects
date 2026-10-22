@@ -48,8 +48,8 @@ Source and license texts are included under SOURCE. Coded with GPT-6
 Codex, with game design and NuXT testing by Marquak.
 
 The selector's launch, return, missing-file display, and menu VGA output
-passed DOSBox-X tests. The SP 1.3 build passed 144 focused DOSBox-X checks.
+passed DOSBox-X tests. A 2026-10-21 fix trims the folder path used for DOS
+CHDIR and launches from the current folder if CHDIR still fails there. The SP 1.3 build passed 144 focused DOSBox-X checks.
 MP 1.0 is the 0.7.0 preview gameplay promoted to a release; its prior
 two-client DOSBox-X serial matches and LAN smoke test are documented in
-SOURCE/MP/TESTS.TXT. This exact combined package still needs a physical
-NuXT check.
+SOURCE/MP/TESTS.TXT. The replacement selector still needs a physical NuXT retest.

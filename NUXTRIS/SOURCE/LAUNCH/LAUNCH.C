@@ -174,20 +174,32 @@ static void menu_draw(const char *notice) {
 static int setup_paths(void) {
     char full[260], *slash;
     size_t length;
-    if (!_cmdname(full)) return 0;
-    slash = strrchr(full, '\\');
-    if (!slash) return 0;
-    length = slash - full + 1;
-    if (length + 12 >= sizeof(game_dir)) return 0;
-    memcpy(game_dir, full, length);
-    game_dir[length] = 0;
     if (!getcwd(original_dir, sizeof(original_dir))) return 0;
     original_drive = _getdrive();
+    game_dir[0] = 0;
+    if (_cmdname(full)) {
+        slash = strrchr(full, '\\');
+        if (slash) {
+            length = slash - full + 1;
+            if (length + 12 < sizeof(game_dir)) {
+                memcpy(game_dir, full, length);
+                game_dir[length] = 0;
+            }
+        }
+    }
     return 1;
 }
 static int enter_game_dir(void) {
+    char dir[260];
+    size_t length = strlen(game_dir);
+#ifdef LAUNCH_TEST
+    if (getenv("LAUNCHTEST_CHDIR_FAIL")) return 0;
+#endif
+    strcpy(dir, game_dir);
+    /* DOS CHDIR rejects a trailing backslash on some non-root paths. */
+    if (length > 3 && dir[length - 1] == '\\') dir[length - 1] = 0;
     if (game_dir[1] == ':' && _chdrive(toupper(game_dir[0]) - 'A' + 1)) return 0;
-    return chdir(game_dir) == 0;
+    return chdir(dir) == 0;
 }
 static void restore_dir(void) {
     _chdrive(original_drive);
@@ -195,15 +207,29 @@ static void restore_dir(void) {
 }
 static const char *run_game(unsigned item) {
     const char *args[3];
+    const char *selected_dir = game_dir;
     int result;
-    strcpy(game_file, game_dir);
-    strcat(game_file, filenames[item]);
-    if (access(game_file, 0))
-        return item ? "MP_TRIS.EXE MISSING" : "SP_TRIS.EXE MISSING";
+    game_file[0] = 0;
+    if (game_dir[0]) {
+        strcpy(game_file, game_dir);
+        strcat(game_file, filenames[item]);
+    }
+    if (!game_dir[0] || access(game_file, 0)) {
+        /* DOS launchers may not supply a usable executable path. */
+        if (access(filenames[item], 0))
+            return item ? "MP_TRIS.EXE MISSING" : "SP_TRIS.EXE MISSING";
+        selected_dir = original_dir;
+        strcpy(game_file, filenames[item]);
+    }
     biosmode(original_mode);
-    if (!enter_game_dir()) {
-        video_start();
-        return "CANNOT OPEN GAME FOLDER";
+    if (selected_dir == game_dir && !enter_game_dir()) {
+        restore_dir();
+        if (access(filenames[item], 0)) {
+            video_start();
+            return "CANNOT OPEN GAME FOLDER";
+        }
+        /* The child is in the current folder, so no CHDIR is needed. */
+        strcpy(game_file, filenames[item]);
     }
     args[0] = game_file;
 #ifdef LAUNCH_TEST
@@ -257,9 +283,12 @@ static int selftest(void) {
     FILE *f;
     int failed = 0, mp_present;
     const char *notice;
-    strcpy(game_file, game_dir);
-    strcat(game_file, filenames[1]);
-    mp_present = access(game_file, 0) == 0;
+    if (game_dir[0]) {
+        strcpy(game_file, game_dir);
+        strcat(game_file, filenames[1]);
+    } else game_file[0] = 0;
+    mp_present = (game_dir[0] && access(game_file, 0) == 0) ||
+                 access(filenames[1], 0) == 0;
     capture_screen("MENU.RAW");
     cursor(selected);
     selected = 1;

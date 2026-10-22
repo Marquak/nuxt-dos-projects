@@ -40,8 +40,9 @@ adapter adapts mTCP code. Coded with GPT-6 Codex, with game design and NuXT
 testing by Marquak.
 
 The selector, SP 1.3, and MP 1.0 passed the DOSBox-X checks described in
-[TESTS.TXT](TESTS.TXT). This exact combined package still needs a physical
-NuXT launch check.
+[TESTS.TXT](TESTS.TXT). The first physical NuXT run found the child EXEs but
+could not switch to their folder. The replacement selector fixes that path
+handling and passed focused DOSBox-X checks; it still needs a NuXT retest.
 
 ![Single-player game](SCREENSHOT.PNG)
 ![Multiplayer game](MP-SCREENSHOT.PNG)
