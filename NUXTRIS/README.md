@@ -41,8 +41,9 @@ testing by Marquak.
 
 The selector, SP 1.3, and MP 1.0 passed the DOSBox-X checks described in
 [TESTS.TXT](TESTS.TXT). The first physical NuXT run found the child EXEs but
-could not switch to their folder. The replacement selector fixes that path
-handling and passed focused DOSBox-X checks; it still needs a NuXT retest.
+could not open their folder. The selector now starts the games beside it
+without changing directories. This passed focused DOSBox-X checks; it still
+needs a NuXT retest.
 
 ![Single-player game](SCREENSHOT.PNG)
 ![Multiplayer game](MP-SCREENSHOT.PNG)

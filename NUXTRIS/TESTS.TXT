@@ -1,7 +1,7 @@
 NUXTRIS SELECTOR - 2026-10-20
 
 The Open Watcom build targets V20/80186-compatible 16-bit real mode.
-The launcher map reports 18,576 bytes of static DOS memory including
+The launcher map reports 17,872 bytes of static DOS memory including
 its 2,048-byte stack. Only the launcher and one child game are resident.
 
 In disposable DOSBox-X folders, CHECK.EXE launched the actual SP 1.3
@@ -24,13 +24,12 @@ The MP 1.0 gameplay code is unchanged from its 0.7.0 preview apart from
 the help version label. Earlier MP test results are in SOURCE/MP/TESTS.TXT.
 The replacement selector still needs a physical NuXT retest.
 
-PATH FIX - 2026-10-21
+SELECTOR PATH CHECK - 2026-10-21
 
 The original NuXT run found both child EXEs but reported CANNOT OPEN GAME
-FOLDER. The selector now removes the trailing backslash before DOS CHDIR
-and, when the game is already in the current folder, can launch it without
-changing directories. DOSBox-X checks passed with the game in a named
-subfolder and DOS starting from the root: SP launched, MP launched, and
-Failed was 0. A forced CHDIR failure launched both games from the current
-folder with Failed 0. Removing MP_TRIS.EXE showed the missing-file case with
-Failed 0. The replacement still needs a physical NuXT check.
+FOLDER. The selector now starts sibling EXEs by path, without DOS CHDIR or
+a drive change. DOSBox-X launched and returned from both games when the
+current directory was the game folder, then again when DOS started from
+the drive root and invoked the selector by path. Both runs reported
+Failed 0. With MP_TRIS.EXE removed, it showed the missing-file message
+and reported Failed 0. The replacement still needs a physical NuXT check.

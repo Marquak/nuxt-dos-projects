@@ -1,9 +1,6 @@
 /* NuXTris game selector. 16-bit DOS, VGA 640x480x16. */
 #include <conio.h>
-#include <ctype.h>
-#include <direct.h>
 #include <dos.h>
-#include <errno.h>
 #include <io.h>
 #include <malloc.h>
 #include <process.h>
@@ -25,8 +22,8 @@ extern void dot(int, int);
 extern void segment(int, int, int, int);
 #pragma aux segment parm[ax][bx][cx][dx] modify[ax bx cx dx si di]
 
-static char game_dir[260], original_dir[260], game_file[260];
-static unsigned original_drive, original_mode, selected;
+static char game_dir[260], game_file[260];
+static unsigned original_mode, selected;
 static const char *const filenames[2] = {"SP_TRIS.EXE", "MP_TRIS.EXE"};
 static const char *const choices[3] = {"SINGLE PLAYER", "MULTIPLAYER", "EXIT TO DOS"};
 
@@ -171,11 +168,9 @@ static void menu_draw(const char *notice) {
     if (notice && *notice) centered(442, notice, 12);
     cursor(selected);
 }
-static int setup_paths(void) {
+static void setup_paths(void) {
     char full[260], *slash;
     size_t length;
-    if (!getcwd(original_dir, sizeof(original_dir))) return 0;
-    original_drive = _getdrive();
     game_dir[0] = 0;
     if (_cmdname(full)) {
         slash = strrchr(full, '\\');
@@ -187,50 +182,19 @@ static int setup_paths(void) {
             }
         }
     }
-    return 1;
 }
-static int enter_game_dir(void) {
-    char dir[260];
-    size_t length = strlen(game_dir);
-#ifdef LAUNCH_TEST
-    if (getenv("LAUNCHTEST_CHDIR_FAIL")) return 0;
-#endif
-    strcpy(dir, game_dir);
-    /* DOS CHDIR rejects a trailing backslash on some non-root paths. */
-    if (length > 3 && dir[length - 1] == '\\') dir[length - 1] = 0;
-    if (game_dir[1] == ':' && _chdrive(toupper(game_dir[0]) - 'A' + 1)) return 0;
-    return chdir(dir) == 0;
-}
-static void restore_dir(void) {
-    _chdrive(original_drive);
-    chdir(original_dir);
+static const char *game_path(unsigned item) {
+    strcpy(game_file, game_dir);
+    strcat(game_file, filenames[item]);
+    return game_file;
 }
 static const char *run_game(unsigned item) {
     const char *args[3];
-    const char *selected_dir = game_dir;
     int result;
-    game_file[0] = 0;
-    if (game_dir[0]) {
-        strcpy(game_file, game_dir);
-        strcat(game_file, filenames[item]);
-    }
-    if (!game_dir[0] || access(game_file, 0)) {
-        /* DOS launchers may not supply a usable executable path. */
-        if (access(filenames[item], 0))
-            return item ? "MP_TRIS.EXE MISSING" : "SP_TRIS.EXE MISSING";
-        selected_dir = original_dir;
-        strcpy(game_file, filenames[item]);
-    }
+    game_path(item);
+    if (access(game_file, 0))
+        return item ? "MP_TRIS.EXE MISSING" : "SP_TRIS.EXE MISSING";
     biosmode(original_mode);
-    if (selected_dir == game_dir && !enter_game_dir()) {
-        restore_dir();
-        if (access(filenames[item], 0)) {
-            video_start();
-            return "CANNOT OPEN GAME FOLDER";
-        }
-        /* The child is in the current folder, so no CHDIR is needed. */
-        strcpy(game_file, filenames[item]);
-    }
     args[0] = game_file;
 #ifdef LAUNCH_TEST
     if ((item == 0 && getenv("LAUNCHTEST_SP")) ||
@@ -245,7 +209,6 @@ static const char *run_game(unsigned item) {
 #endif
     _heapshrink();
     result = spawnv(P_WAIT, game_file, args);
-    restore_dir();
     if (!video_start()) {
         biosmode(original_mode);
         puts("VGA 640x480x16 mode could not be restored.");
@@ -283,12 +246,7 @@ static int selftest(void) {
     FILE *f;
     int failed = 0, mp_present;
     const char *notice;
-    if (game_dir[0]) {
-        strcpy(game_file, game_dir);
-        strcat(game_file, filenames[1]);
-    } else game_file[0] = 0;
-    mp_present = (game_dir[0] && access(game_file, 0) == 0) ||
-                 access(filenames[1], 0) == 0;
+    mp_present = access(game_path(1), 0) == 0;
     capture_screen("MENU.RAW");
     cursor(selected);
     selected = 1;
@@ -307,7 +265,6 @@ static int selftest(void) {
     menu_draw(notice);
     capture_screen("BACKMP.RAW");
     biosmode(original_mode);
-    restore_dir();
     f = fopen("CHECK.TXT", "wt");
     if (f) {
         fprintf(f, "SP return: %s\nMP: %s\nFailed: %d\n",
@@ -321,10 +278,7 @@ static int selftest(void) {
 int main(void) {
     unsigned key, scan, ascii;
     const char *notice;
-    if (!setup_paths()) {
-        puts("Cannot locate NUXTRIS.EXE or its folder.");
-        return 1;
-    }
+    setup_paths();
     original_mode = modequery();
     if (!video_start()) {
         biosmode(original_mode);
@@ -356,6 +310,5 @@ int main(void) {
         }
     }
     biosmode(original_mode);
-    restore_dir();
     return 0;
 }
