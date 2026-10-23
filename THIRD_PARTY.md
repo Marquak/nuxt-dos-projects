@@ -29,6 +29,14 @@ all possible third-party claims.
   The Linux client remains MIT licensed. The older combined serial/LAN package
   is not included in this release; its provenance is retained here for the
   current DOS source.
+- SLINKXT: continues the serial-only NuXT Link DOS and Linux code. The DOS
+  source retains GPL-3.0-or-later terms; the Linux client is MIT licensed.
+  Its BSUM 1.1-derived checksum is credited to Mateusz Viste under MIT terms.
+  Its DOS LZ4 decoder adapts Jim Leonard's 8088 code under his Demoscene
+  License, reproduced in `SLINKXT/JIM-ORIGINAL-LICENSE.TXT`. The DOS banner
+  greets Jim. The heatshrink encoder is ISC licensed and the system liblz4,
+  when installed, retains its BSD license. SlinkX artwork was supplied by
+  the project owner.
 - NUXTROIDS: original game, geometry, scenery and sound, reusing earlier NuXT
   project code. Asteroids projects, RBIL, FreeDOS INFOPlus and id Software
   drawing code were references; no Atari assets or external game code copied.
@@ -58,7 +66,7 @@ all possible third-party claims.
 
 ## Open Watcom runtime
 
-NUXMENU/NUI.EXE, ORBIT87, STARFIELD, MATRIX, NUXTLINK, SUNSET, NUXTROIDS,
+NUXMENU/NUI.EXE, ORBIT87, STARFIELD, MATRIX, NUXTLINK, SLINKXT, SUNSET, NUXTROIDS,
 NUXTRIS and CHECKERS88 binaries are linked
 using Open Watcom 2.0. Their compiler/runtime portions are not relicensed by
 the repository's MIT license. The Sybase Open Watcom Public License 1.0 is
@@ -86,8 +94,10 @@ those tools separately does not make their source part of this repository.
 
 Commercial DOS/Windows files, BIOS ROMs, complete disk images, third-party game
 files, external audio/video, user CF backups, hardware diagnostic dumps, serial
-adapter identities, saved transfer histories and user menu databases are not
-part of this snapshot. The supplied preview PNGs are program/procedural output.
+saved transfer histories and user menu databases are not part of this
+snapshot. The Slink-XT Linux screenshot was supplied by the owner and shows
+the selected serial adapter and local test paths. Other preview PNGs are
+program/procedural output.
 
 ## Screenshots
 

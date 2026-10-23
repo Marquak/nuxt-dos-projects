@@ -1,5 +1,5 @@
 {
-  "snapshot_date": "2026-10-21",
+  "snapshot_date": "2026-10-23",
   "collection": "NuXT DOS projects",
   "projects": {
     "NUXMENU": "1.5",
@@ -7,14 +7,15 @@
     "STARFIELD": "1.0",
     "MATRIX": "2.0",
     "INVADERS": "2.0",
-    "NUXTLINK": "4.1 serial (wire v8)",
+    "NUXTLINK": "4.1 serial (wire v8), deprecated",
     "SUNSET": "3.2",
     "DUNE2FIX": "1.1 combined XMS/manual-check patcher only",
     "NUXTDASH": "1.3",
     "NUXTROIDS": "1.3",
     "NUXTRIS": "combined selector, SP 1.3 and MP 1.0 (serial and LAN)",
     "TEXTMODE": "1.0",
-    "CHECKERS88": "1.2.1"
+    "CHECKERS88": "1.2.1",
+    "SLINKXT": "1.0 serial (wire v1)"
   },
   "binaries": {
     "CHECKERS88/CHECK88.EXE": "cc4600f475d7bdbb48849c1514e81cea4a6263243c8a38a979f1679ce14cad07",
@@ -35,7 +36,8 @@
     "SUNSET/SUNSET.EXE": "1891a5b5c5191ba144d63998ef73698e9a2b40b3701b07cd892a38ed712e372f",
     "TEXTMODE/TEXTMODE.COM": "43d02da28de0a35e1e53e4597d13d6089f746cfaa98c251a5be1f930b6881bac",
     "NUXTRIS/SP_TRIS.EXE": "3f54cb5444a7ee578172834a54282716b3d27127be14dc65d44c899517e984f0",
-    "NUXTRIS/MP_TRIS.EXE": "ebd8f3e053edcb8ecfac143c636074746e18d182a5daef08657bc6769c078eaf"
+    "NUXTRIS/MP_TRIS.EXE": "ebd8f3e053edcb8ecfac143c636074746e18d182a5daef08657bc6769c078eaf",
+    "SLINKXT/SLINK.COM": "9db69dc1c22644656f1976b09baa919cc3fe083dbeef6989f77cf237c0f23b06"
   },
   "toolchain": "Open Watcom 2.0 beta Oct 5 2026; GNU binutils 2.47",
   "commercial_game_executables_included": false

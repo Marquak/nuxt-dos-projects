@@ -1,9 +1,21 @@
-# Snapshot checks, 2026-10-21
+# Snapshot checks, 2026-10-23
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass. Sections below the current
 release notes document earlier publication passes.
+
+## Slink-XT 1.0
+
+`SLINKXT/SLINK.COM` is the 8088-compatible DOS server and the matching Linux
+client is under `SLINKXT/linux`. The 1.0 rebuild passed 90 host checks with
+21 display-only Tk checks skipped in the headless run. A disposable QEMU
+MS-DOS roundtrip passed raw, zero-run and LZ4 transfers, checksum and staging
+readback, and malformed compressed-block rejection. The owner also completed
+four-file upload and download queues on the physical NuXT/SvarDOS at 115200
+baud, RTS/CTS and 4096-byte blocks with zero reported failures. See
+[SLINKXT/README.md](SLINKXT/README.md) for timings and limits. NuXT Link 4.1
+remains in this repository as the deprecated predecessor.
 
 ## Combined NuXTris release
 

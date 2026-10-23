@@ -13,7 +13,7 @@ on a stock 8088/8086. Others take advantage of the V20's extra instructions.
 I try these on the real machine and keep working on the parts that don't feel
 right. Each project's test notes say what has been checked.
 
-These are the **current versions as of 2026-10-21**. Source, ready-to-run DOS
+These are the **current versions as of 2026-10-23**. Source, ready-to-run DOS
 programs, build scripts and instructions are included. Bring your own DOS.
 There are no commercial OS files, BIOS ROMs or complete games from other
 publishers in here.
@@ -27,7 +27,8 @@ publishers in here.
 | [INVADERS](INVADERS/) | 2.0 | `INVADERS.COM` | Shoot the advancing aliens in an XT take on Space Invaders. |
 | [NUXTROIDS](NUXTROIDS/) | 1.3 | `NUXTROID.EXE` | Fly a spaceship, dodge asteroids and blast them into smaller pieces. |
 | [NUXTRIS](NUXTRIS/) | SP 1.3 / MP 1.0 | `NUXTRIS.EXE`, `SP_TRIS.EXE`, `MP_TRIS.EXE` together | Play Tetris alone or with a friend over serial or LAN. |
-| [NUXTLINK](NUXTLINK/) | 4.1 | `NUXFER.COM` | Move files between Linux and DOS over serial, back up folders, and sync its clock. |
+| [SLINKXT](SLINKXT/) | 1.0 | `SLINK.COM` | Move files between Linux and DOS over serial, back up folders, and sync its clock. |
+| [NUXTLINK](NUXTLINK/) | 4.1 (deprecated) | `NUXFER.COM` | Previous serial file manager, retained for existing setups. |
 | [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset to an AdLib synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Fix the XMS startup error and skip the manual-word check in your US 1.07 copy of Dune II. |
@@ -48,9 +49,9 @@ For NuXTris, copy all three EXEs to the same DOS folder. For multiplayer,
 copy the three files to both computers. LAN play needs a packet driver and
 `MTCPCFG` set to the full DOS path of your mTCP config file, for example
 `SET MTCPCFG=C:\NET\MTCP.CFG`. See the [connection guide](NUXTRIS/README.md).
-For NuXT Link, also run `sh NUXTLINK/linux/launch.sh` on Linux; it needs Python 3
-and Tkinter. Version 4.1 uses serial wire protocol v8 and works with the 4.0
-DOS server.
+For Slink-XT, also run `sh SLINKXT/linux/launch.sh` on Linux; it needs Python 3
+and Tkinter. It requires its own matching `SLINK.COM`. NuXT Link 4.1 remains
+available for existing setups, but Slink-XT is its continuation.
 
 Keep your existing NUXMENU.DAT when updating the menu, and your NuXTris scores
 and settings files when updating the game.

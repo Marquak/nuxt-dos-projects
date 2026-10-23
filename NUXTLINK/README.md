@@ -4,6 +4,8 @@ NuXT Link moves files between Linux and DOS over a serial cable. The Linux file 
 
 Version 4.1 is the serial release. Use its `NUXFER.COM` with the Linux client in this folder. Earlier NuXT Link versions are not included in this checkout.
 
+NuXT Link 4.1 is now deprecated. [Slink-XT 1.0](../SLINKXT/) continues the serial file manager with a new protocol and matching `SLINK.COM`. Existing NuXT Link installations can stay on 4.1; the two programs are not wire-compatible.
+
 ![Earlier NuXT Link file manager with a sample transfer queue](SCREENSHOT.PNG)
 
 ## Start

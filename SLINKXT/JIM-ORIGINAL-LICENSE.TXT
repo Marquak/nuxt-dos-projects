@@ -1,0 +1,15 @@
+The LZ4 library is provided under the BSD License.  However, my code was not
+derived from any of the original LZ4 code so I can provide it via any license I
+choose.  So, I am providing my code under what I am calling the Demoscene
+License.  The Demoscene License grants you the following rights:
+
+- You are free to use this code in any production, commercial or otherwise,
+  without providing remuneration to the author.
+
+- If you use this code, you must greet "Trixter/Hornet" if used in a demoscene
+  production, or "Jim Leonard" if used in a normal program.  Also, you must
+  send email to trixter@oldskool.org telling him you used the code so he can
+  marvel at your result.
+
+The LZ4 C code library's license can be found at:
+http://opensource.org/licenses/bsd-license.php

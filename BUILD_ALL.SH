@@ -11,3 +11,6 @@ done
 (cd TEXTMODE && sh BUILD.SH)
 (cd NUXTLINK && sh dos/BUILD.SH)
 (cd NUXTLINK && sh linux/build_codec.sh)
+(cd SLINKXT && sh dos/BUILD.SH)
+(cd SLINKXT && sh linux/build_bsum.sh)
+(cd SLINKXT && sh linux/build_codec.sh)

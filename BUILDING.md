@@ -5,8 +5,8 @@
 - Open Watcom C/C++ 2.0, Linux x86-64 host tools (`wcl`, `wcc`, `wasm`, `wlink`):
   https://github.com/open-watcom/open-watcom-v2/releases
 - GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS, NUXTDASH, TEXTMODE and the NUXMENU launcher.
-- A host C compiler (`cc`) for NuXTLink's native heatshrink helper.
-- Python 3.10+ for the host utilities, NUXMENU build and DUNE2FIX; Tkinter for NuXTLink.
+- A host C compiler (`cc`) for the serial clients' native compression and checksum helpers.
+- Python 3.10+ for the host utilities, NUXMENU build and DUNE2FIX; Tkinter for NuXTLink and Slink-XT.
 - Optional: Pillow to regenerate SUNSET procedural artwork; Furnace to edit
   the included OPL instrument audition. Neither is needed to compile/run DOS binaries.
 - Optional tests: DOSBox-X, a host C compiler, Xvfb for headless GUI tests, and
@@ -20,7 +20,7 @@ sh BUILD_ALL.SH
 ```
 
 This rebuilds the compiled DOS projects, including both ORBIT builds,
-the three NuXTris executables, and NuXTLink's native Linux compression helper.
+the three NuXTris executables, and the serial clients' native Linux helpers.
 DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
@@ -32,6 +32,8 @@ For a single project:
 (cd NUXTDASH && sh BUILD.SH)
 (cd ORBIT87 && sh BUILD.SH)
 (cd NUXTLINK && sh dos/BUILD.SH)
+(cd SLINKXT && sh dos/BUILD.SH)
+(cd SLINKXT && sh linux/build_bsum.sh && sh linux/build_codec.sh)
 (cd NUXTRIS && sh BUILD_ALL.SH)
 ```
 
@@ -49,12 +51,16 @@ compiler defaults. V20 does not support arbitrary 286/386 instructions, and
 ```sh
 python3 -m unittest discover -s DUNE2FIX -v
 python3 -m unittest discover -s NUXTLINK/tests -v
+PYTHONPATH=SLINKXT/linux python3 -m unittest discover -s SLINKXT/tests -p 'test_*.py' -v
 (cd NUXMENU && sh TEST.SH)
 (cd SUNSET && sh TEST.SH --build-only)
 ```
 
 NuXTLink GUI tests skip when Tk cannot open a display. For a headless GUI run,
 use `xvfb-run -a python3 -m unittest discover -s NUXTLINK/tests -v`.
+Slink-XT's Tk tests likewise skip without a display. Its QEMU roundtrip
+needs `SLINKXT_DOS_IMAGE` set to a disposable DOS disk image and is run
+separately with `python3 SLINKXT/tests/qemu_roundtrip.py`.
 Integration tests require a running DOS server and a disposable test drive;
 they can create/delete remote files and are not part of ordinary unit tests.
 SUNSET's full `TEST.SH` runs additional isolated DOSBox tests; `--build-only`
