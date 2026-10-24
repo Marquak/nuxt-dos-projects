@@ -4,13 +4,13 @@
 
 Serial Link XT moves files between Linux and DOS over a serial cable. Its Linux file manager browses both machines, queues transfers, backs up DOS folders, and can set the DOS clock. Interrupted transfers can resume, and each file is checked before it replaces the destination.
 
-SlinkX, the cable-tailed mascot in the Linux header, was supplied by the project owner.
+SlinkX, Our cable-tailed ferret mascot.
 
 <a href="screenshots/linux.png"><img src="screenshots/linux.png" width="800" alt="Slink-XT Linux file manager after a NuXT upload"></a>
 
 <a href="screenshots/dos.png"><img src="screenshots/dos.png" width="720" alt="Slink-XT 1.0 DOS server waiting for a serial connection"></a>
 
-`SLINK.COM` and the Linux client are both version 1.0. They use Slink-XT wire version 1 and must be used together.
+`SLINK.COM` and the Linux client are both version 1.0. They use Slink-XT wire version 1 (Our Protocol) and must be used together.
 
 ## Setup
 
