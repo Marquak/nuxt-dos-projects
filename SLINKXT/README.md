@@ -54,3 +54,17 @@ Across these 5,046,272 bytes, the reported upload times totaled 6m 40s for 4.1 a
 The program code was written with GPT-6 Codex. The DOS server derives from the GPL-3.0-or-later NuXTLink source; the Linux client is MIT licensed. The heatshrink encoder is ISC licensed. The BSD checksum implementation is adapted from Mateusz Viste's BSUM 1.1 under MIT terms. The DOS LZ4 decoding path adapts **Jim Leonard**'s 8088 decoder, supplied under his Demoscene License; its text is in [JIM-ORIGINAL-LICENSE.TXT](JIM-ORIGINAL-LICENSE.TXT). The DOS banner greets Jim as requested. The license also asks users of the code to email him at the address in that file.
 
 The transfer design was also informed by FastLynx behavior observed in synthetic captures, but contains no FastLynx code. See [PROTOCOL.md](PROTOCOL.md) for the Slink-XT wire format.
+
+## Project notes and cable wiring
+
+Slink-XT grew out of NuXTLink after roughly **100 hours** of on-and-off design, reverse engineering, coding, debugging, and testing together on the NuXT. That is an informal estimate; we did not track the hours.
+
+These diagrams show the three-wire option and the recommended full-handshake null-modem wiring for two PC-style RS-232 ports. The full-handshake cable is the one we use on the NuXT at 115200 baud with RTS/CTS. Cat 5 colors identify conductors, not an Ethernet or RJ45 pinout. Follow the numbered connector pins, not the drawing's left-to-right positions.
+
+### DE9 to DE9
+
+![DE9 to DE9 serial cable wiring: three-wire and full-handshake options](wiring/slinkxt-de9-to-de9.png)
+
+### DE9 to DB25
+
+![DE9 to DB25 serial cable wiring: three-wire and full-handshake options](wiring/slinkxt-de9-to-db25.png)
