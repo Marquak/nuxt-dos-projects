@@ -2,7 +2,7 @@
 
 If you've tried running the 1984 IBM PC *Castle Wolfenstein* on a fast :P DOS machine, you know it can get away from you. This patch fixes that. Movement, speech, and sound effects now run off hardware timers instead of CPU speed, so the game plays at a sensible pace. It also fixes scrambled character graphics on some VGA BIOSes, stops the false tamper detection on newer DOS versions, and adds Ctrl-X to drop back to DOS.
 
-You end up with a single new `CW.EXE`. Your game's other data files still need to be in the same folder. This is the original CGA-style game, not the 16-colour EGA remake, and no game files are included here.
+You end up with a single new `CW.EXE`. Your game's other data files still need to be in the same folder.
 
 ## Applying the patch
 
