@@ -13,7 +13,7 @@ on a stock 8088/8086. Others take advantage of the V20's extra instructions.
 I try these on the real machine and keep working on the parts that don't feel
 right. Each project's test notes say what has been checked.
 
-These are the **current versions as of 2026-10-23**. Source, ready-to-run DOS
+These are the **current versions as of 2026-10-25**. Source, ready-to-run DOS
 programs, build scripts and instructions are included. Bring your own DOS.
 There are no commercial OS files, BIOS ROMs or complete games from other
 publishers in here.
@@ -32,6 +32,7 @@ publishers in here.
 | [3D Checkers 88](CHECKERS88/) | 1.2.1 | `CHECK88.EXE` | Play checkers against the computer or a friend on a rotating 3D board, with classical AdLib music. |
 | [SUNSET](SUNSET/) | 3.2 | `SUNSET.EXE` | Watch a car cruise towards a neon sunset to an AdLib synthwave soundtrack. |
 | [DUNE2FIX](DUNE2FIX/) | 1.1 | Generate locally from your own executables | Fix the XMS startup error and skip the manual-word check in your US 1.07 copy of Dune II. |
+| [Castle Wolfenstein patch](CW7PATCH/) | CW7 | Generate locally from your own `CW.EXE` | Pace the game for faster DOS PCs, fix scrambled graphics and add a clean exit. |
 | [NUXTDASH](NUXTDASH/) | 1.3 | `DASH.COM` | Check CPU speed, memory, video, ports, BIOS information and drives. |
 | [TEXTMODE](TEXTMODE/) | 1.0 | `TEXTMODE.COM`; optional `IRC50.BAT` | Switch DOS between 25 and 50 text rows without ANSI.SYS. |
 
@@ -52,6 +53,9 @@ copy the three files to both computers. LAN play needs a packet driver and
 For Slink-XT, also run `sh SLINKXT/linux/launch.sh` on Linux; it needs Python 3
 and Tkinter. It requires its own matching `SLINK.COM`. NuXT Link 4.1 remains
 available for existing setups, but Slink-XT is its continuation.
+The Castle Wolfenstein patcher runs on Linux or Windows and needs your own
+matching game executable and data files. It backs up the old `CW.EXE` as
+`CW.BAK` before installing the patched one.
 
 Keep your existing NUXMENU.DAT when updating the menu, and your NuXTris scores
 and settings files when updating the game.
@@ -81,7 +85,9 @@ credited Mutopia music arrangements under their original licenses; see its
 
 DUNE2FIX contains a patching script, tests, hashes, instructions and a setup
 screenshot. You must supply your own matching Dune II executables. The game
-and its screenshot are not covered by this repository's MIT license. Names
+and its screenshot are not covered by this repository's MIT license.
+CW7PATCH contains a patcher and new 8086 helper, but no Castle Wolfenstein
+executable or game data. You must supply your own matching copy. Names
 of hardware and other games are used descriptively. This is an independent
 hobby project, not an official release from Monotech or any other vendor.
 

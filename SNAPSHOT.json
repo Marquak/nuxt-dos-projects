@@ -1,5 +1,5 @@
 {
-  "snapshot_date": "2026-10-23",
+  "snapshot_date": "2026-10-25",
   "collection": "NuXT DOS projects",
   "projects": {
     "NUXMENU": "1.5",
@@ -10,6 +10,7 @@
     "NUXTLINK": "4.1 serial (wire v8), deprecated",
     "SUNSET": "3.2",
     "DUNE2FIX": "1.1 combined XMS/manual-check patcher only",
+    "CW7PATCH": "CW7 owner-supplied Castle Wolfenstein patcher only",
     "NUXTDASH": "1.3",
     "NUXTROIDS": "1.3",
     "NUXTRIS": "combined selector, SP 1.3 and MP 1.0 (serial and LAN)",

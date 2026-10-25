@@ -6,7 +6,7 @@
   https://github.com/open-watcom/open-watcom-v2/releases
 - GNU binutils with i386 support (`as`, `ld`, `objcopy`) for INVADERS, NUXTDASH, TEXTMODE and the NUXMENU launcher.
 - A host C compiler (`cc`) for the serial clients' native compression and checksum helpers.
-- Python 3.10+ for the host utilities, NUXMENU build and DUNE2FIX; Tkinter for NuXTLink and Slink-XT.
+- Python 3.10+ for the host utilities, NUXMENU build, DUNE2FIX and CW7PATCH; Tkinter for NuXTLink and Slink-XT.
 - Optional: Pillow to regenerate SUNSET procedural artwork; Furnace to edit
   the included OPL instrument audition. Neither is needed to compile/run DOS binaries.
 - Optional tests: DOSBox-X, a host C compiler, Xvfb for headless GUI tests, and
@@ -24,6 +24,8 @@ the three NuXTris executables, and the serial clients' native Linux helpers.
 DUNE2FIX is a Python script;
 it does not compile or distribute Dune II. Builds replace the binaries inside
 this checkout. Use a copy if you want to retain the snapshot byte-for-byte.
+CW7PATCH likewise needs a matching owner-supplied Castle Wolfenstein `CW.EXE`;
+its included 8086 helper is already assembled for the Python patcher.
 
 For a single project:
 

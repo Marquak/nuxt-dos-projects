@@ -63,6 +63,12 @@ all possible third-party claims.
 - DUNE2FIX: original compatibility patcher; metadata describes exact local game
   versions. No original or patched game executable, PAK, save or soundtrack
   is included. The patcher license grants no rights in Dune II itself.
+- CW7PATCH: original 8086 timing helper and Python patcher for two verified
+  Castle Wolfenstein DOS executables. Nemesis/DivByZero's VOGONS research and
+  Python patch identified the DOS 3.x+ false anti-tamper checks; the research
+  is credited in CW7PATCH/README.md. No original or patched Castle Wolfenstein
+  executable or game data is included. The repository license grants no rights
+  in the game itself.
 
 ## Open Watcom runtime
 

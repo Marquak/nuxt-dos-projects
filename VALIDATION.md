@@ -1,9 +1,20 @@
-# Snapshot checks, 2026-10-23
+# Snapshot checks, 2026-10-25
 
 This file covers preparation of the GitHub package. The TESTING/TESTS files
 inside each project also retain earlier development results. Those historical
 tests were not all repeated for this packaging pass. Sections below the current
 release notes document earlier publication passes.
+
+## Castle Wolfenstein CW7 patcher
+
+The `CW7PATCH` folder contains the host patcher and project-authored 8086
+helper, without either original or patched game executable. The two verified
+eXoDOS `CW.EXE` and `CW.EX_` variants each produced a byte-identical CW7
+output in disposable directories. In both cases the old input was preserved
+as `CW.BAK`; unknown hashes and pre-existing backups were rejected without
+changing the input. The output matches the CW7 executable previously checked
+in MS-DOS 6.22/QEMU and played successfully by the owner on the NuXT. No new
+emulator run was needed for this packaging pass.
 
 ## Slink-XT 1.0
 
